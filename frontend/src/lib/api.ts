@@ -5,14 +5,15 @@
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5000";
 
 export interface StreamEvent {
-  type: "routing" | "agent" | "thinking" | "tool_call" | "tool_result" | "result" | "error";
+  type: "routing" | "agent" | "thought" | "tool" | "tool_result" | "result" | "error" | "done";
   content?: string;
   service?: string;
   capability?: string;
   agent?: string;
   task?: string;
   tool?: string;
-  params?: Record<string, unknown>;
+  input_preview?: string;
+  input_full?: string;
   preview?: string;
   full?: string;
   data_type?: string;
@@ -23,8 +24,8 @@ export interface ChatStreamCallbacks {
   onRouting?: (service: string, capability: string) => void;
   onAgent?: (agent: string, task: string) => void;
   onThinking?: (content: string) => void;
-  onToolCall?: (tool: string, params: Record<string, unknown>) => void;
-  onToolResult?: (preview: string, full?: string) => void;
+  onToolCall?: (tool: string, inputPreview: string, inputFull?: string) => void;
+  onToolResult?: (preview: string, full?: string, dataType?: string) => void;
   onResult?: (content: string) => void;
   onError?: (error: string) => void;
   onDone?: () => void;
@@ -101,20 +102,27 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
     case "agent":
       callbacks.onAgent?.(event.agent || "", event.task || "");
       break;
-    case "thinking":
+    case "thought":
       callbacks.onThinking?.(event.content || "");
       break;
-    case "tool_call":
-      callbacks.onToolCall?.(event.tool || "", event.params || {});
+    case "tool":
+      callbacks.onToolCall?.(
+        event.tool || "",
+        event.input_preview || "",
+        event.input_full
+      );
       break;
     case "tool_result":
-      callbacks.onToolResult?.(event.preview || "", event.full);
+      callbacks.onToolResult?.(event.preview || "", event.full, event.data_type);
       break;
     case "result":
       callbacks.onResult?.(event.content || "");
       break;
     case "error":
       callbacks.onError?.(event.content || "Unknown error");
+      break;
+    case "done":
+      callbacks.onDone?.();
       break;
   }
 }

@@ -59,7 +59,7 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
     setIsLoading(true)
 
     // Track accumulated state
-    let thinkingText = ""
+    const thoughts: string[] = []
     const toolCalls: { name: string; params: Record<string, unknown> }[] = []
     const toolResults: { name: string; result: unknown }[] = []
 
@@ -79,22 +79,33 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, agentName: agent, task }
+                ? { ...m, agentName: agent || m.agentName, task }
                 : m
             )
           )
         },
         onThinking: (content) => {
-          thinkingText += content + " "
+          thoughts.push(content)
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, hasThinking: true, thinking: thinkingText.trim() }
+                ? { ...m, hasThinking: true, thinking: thoughts.join("\n\n") }
                 : m
             )
           )
         },
-        onToolCall: (tool, params) => {
+        onToolCall: (tool, inputPreview, inputFull) => {
+          // Parse the input as params
+          let params: Record<string, unknown> = {}
+          try {
+            const inputStr = inputFull || inputPreview
+            if (inputStr) {
+              params = JSON.parse(inputStr)
+            }
+          } catch {
+            params = { input: inputPreview }
+          }
+
           toolCalls.push({ name: tool, params })
           setMessages(prev =>
             prev.map(m =>
@@ -104,21 +115,30 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
             )
           )
         },
-        onToolResult: (preview, full) => {
+        onToolResult: (preview, full, dataType) => {
           const lastTool = toolCalls[toolCalls.length - 1]
-          if (lastTool) {
-            toolResults.push({
-              name: lastTool.name,
-              result: full ? JSON.parse(full) : preview
-            })
-            setMessages(prev =>
-              prev.map(m =>
-                m.id === assistantId
-                  ? { ...m, toolResults: [...toolResults] }
-                  : m
-              )
-            )
+          let result: unknown = preview
+
+          // Try to parse as JSON if it's JSON data
+          if (dataType === "json" || dataType === "json_list") {
+            try {
+              result = JSON.parse(full || preview)
+            } catch {
+              result = preview
+            }
           }
+
+          toolResults.push({
+            name: lastTool?.name || "unknown",
+            result
+          })
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, toolResults: [...toolResults] }
+                : m
+            )
+          )
         },
         onResult: (content) => {
           setMessages(prev =>
@@ -137,6 +157,7 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
                 : m
             )
           )
+          setIsLoading(false)
         },
         onDone: () => {
           setIsLoading(false)
