@@ -1,0 +1,46 @@
+services:
+  # Hono API Service
+  - type: web
+    name: adagentai-api
+    runtime: node
+    region: oregon
+    plan: starter
+    branch: main
+    rootDir: backend/api
+    buildCommand: bun install
+    startCommand: bun start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+  # Flask + CrewAI Agent Service
+  - type: web
+    name: adagentai-agent
+    runtime: python
+    region: oregon
+    plan: starter
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn chat_server_callbacks:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: ANTHROPIC_API_KEY
+        sync: false
