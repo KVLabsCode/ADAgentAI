@@ -22,4 +22,7 @@ python-dotenv
 # HTTP client (needed by admob_mcp)
 httpx
 
+# Google Auth (for service account credentials)
+google-auth
+
 # Note: admob_mcp is a local dependency (sibling directory)

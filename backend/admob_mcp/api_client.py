@@ -9,10 +9,15 @@ Complete v1beta API client supporting all endpoints:
 """
 
 import os
+import json
+import tempfile
 from typing import Optional, Dict, Any, List
 import httpx
 
 from .constants import API_BASE_URL, REQUEST_TIMEOUT, OAUTH_SCOPES, DEFAULT_PAGE_SIZE
+
+# Global temp file path for service account credentials
+_temp_credentials_file: Optional[str] = None
 
 
 class AdMobAPIError(Exception):
@@ -40,11 +45,30 @@ class AdMobClient:
 
     async def _get_access_token(self) -> str:
         """Get or refresh the OAuth 2.0 access token."""
+        global _temp_credentials_file
+
         # Method 1: Direct access token from environment
         if os.environ.get("ADMOB_ACCESS_TOKEN"):
             return os.environ["ADMOB_ACCESS_TOKEN"]
 
-        # Method 2: Service account credentials
+        # Method 2: Service account JSON content from environment
+        credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if credentials_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+            # Write JSON to temp file and set path
+            if _temp_credentials_file is None:
+                try:
+                    creds_data = json.loads(credentials_json)
+                    fd, _temp_credentials_file = tempfile.mkstemp(suffix=".json")
+                    with os.fdopen(fd, 'w') as f:
+                        json.dump(creds_data, f)
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _temp_credentials_file
+                except json.JSONDecodeError as e:
+                    raise AdMobAPIError(
+                        f"Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}",
+                        details={"fix": "Ensure the JSON is valid"}
+                    )
+
+        # Method 3: Service account credentials file path
         credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
         if credentials_path:
             try:
