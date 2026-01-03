@@ -1,0 +1,20 @@
+# AdMob Crew Dependencies
+
+# Core framework
+crewai
+crewai-tools
+
+# LLM providers
+langchain-anthropic
+anthropic
+
+# Data validation
+pydantic
+
+# Environment management
+python-dotenv
+
+# HTTP client (needed by admob_mcp)
+httpx
+
+# Note: admob_mcp is a local dependency (sibling directory)

@@ -1,0 +1,6 @@
+[console_scripts]
+ad-platform-crew = ad_platform_crew.cli:main
+ad-platform-crew-replay = ad_platform_crew.cli:replay
+ad-platform-crew-test = ad_platform_crew.cli:test
+ad-platform-crew-train = ad_platform_crew.cli:train
+admob-crew = ad_platform_crew.cli:main

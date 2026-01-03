@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Run type checking
+cd backend/api
+echo "Running type check..."
+bun run typecheck || exit 1
+
+# Run unit tests
+echo "Running tests..."
+bun run test:run || exit 1
+
+echo "Pre-commit checks passed!"

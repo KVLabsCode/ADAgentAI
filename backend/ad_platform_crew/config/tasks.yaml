@@ -1,0 +1,204 @@
+# Task Definitions for Ad Platform Control Plane
+#
+# Tasks are templates that can be instantiated with user queries.
+# The {user_query} placeholder is replaced at runtime.
+
+# ============================================================================
+# PRIMARY TASK - HANDLES USER QUERIES
+# ============================================================================
+
+process_query:
+  description: >
+    Process the user's request about ad platform monetization: {user_query}
+
+    Instructions:
+    1. Understand what the user is asking for
+    2. Use "List AdMob Accounts" to get available accounts first
+    3. Based on the request, use appropriate tools to gather data
+    4. For apps: use "List AdMob Apps" with the account_id
+    5. For ad units: use "List AdMob Ad Units" with the account_id
+    6. For performance: use report generation tools
+    7. Provide a clear, actionable response with the data
+  expected_output: >
+    A clear response addressing the user's request with relevant data
+    from the ad platform(s).
+  agent: primary_agent
+
+# ============================================================================
+# ADMOB TASKS
+# ============================================================================
+
+admob_inspect_setup:
+  description: >
+    Inspect the complete AdMob setup: {user_query}
+
+    Steps:
+    1. List all accounts to identify available publisher accounts
+    2. For each account, list all registered apps
+    3. For each app, list configured ad units
+    4. Summarize the inventory structure clearly
+  expected_output: >
+    A comprehensive summary of the AdMob setup including:
+    - Account details (publisher ID, currency, timezone)
+    - Apps (platform, approval status, app store IDs)
+    - Ad units (format, ad types, associated apps)
+  agent: admob_inventory_specialist
+
+admob_analyze_performance:
+  description: >
+    Analyze AdMob performance: {user_query}
+
+    Steps:
+    1. Get account information
+    2. Generate mediation report for the last 7 days
+    3. Generate network report for comparison
+    4. Identify trends, opportunities, and issues
+    5. Provide actionable recommendations
+  expected_output: >
+    Performance analysis including:
+    - Revenue trends and metrics
+    - Ad source performance comparison
+    - eCPM analysis by format/platform
+    - Specific recommendations for improvement
+  agent: admob_reporting_specialist
+
+admob_configure_mediation:
+  description: >
+    Configure mediation: {user_query}
+
+    Steps:
+    1. List current mediation groups
+    2. List available ad sources
+    3. Understand the user's configuration goal
+    4. Create or update mediation groups as needed
+    5. Verify the configuration
+  expected_output: >
+    Mediation configuration result including:
+    - Current mediation group status
+    - Changes made (if any)
+    - Verification of the new setup
+  agent: admob_mediation_specialist
+
+admob_run_experiment:
+  description: >
+    Set up A/B experiment: {user_query}
+
+    Steps:
+    1. Identify the mediation group to experiment on
+    2. Design the experiment parameters
+    3. Create the A/B experiment
+    4. Provide monitoring instructions
+  expected_output: >
+    Experiment setup result including:
+    - Experiment configuration details
+    - Traffic split percentages
+    - Expected duration for statistical significance
+    - How to monitor and conclude the experiment
+  agent: admob_experimentation_specialist
+
+# ============================================================================
+# AD MANAGER TASKS
+# ============================================================================
+
+admanager_inspect_inventory:
+  description: >
+    Inspect Ad Manager inventory: {user_query}
+
+    Steps:
+    1. List networks to identify available network codes
+    2. List ad units in the hierarchy
+    3. List placements and their ad unit associations
+    4. List sites if applicable
+    5. Summarize the inventory structure
+  expected_output: >
+    Inventory summary including:
+    - Network information
+    - Ad unit hierarchy
+    - Placement configurations
+    - Site associations
+  agent: admanager_inventory_specialist
+
+admanager_generate_report:
+  description: >
+    Generate Ad Manager report: {user_query}
+
+    Steps:
+    1. Understand the reporting requirements
+    2. Create the report with appropriate dimensions and metrics
+    3. Run the report
+    4. Fetch and analyze results
+    5. Provide insights
+  expected_output: >
+    Report results including:
+    - Data tables or summaries
+    - Key metrics and trends
+    - Actionable insights
+  agent: admanager_reporting_specialist
+
+admanager_manage_orders:
+  description: >
+    Manage orders and line items: {user_query}
+
+    Steps:
+    1. List relevant orders
+    2. Get order and line item details
+    3. Analyze delivery and performance
+    4. Provide status and recommendations
+  expected_output: >
+    Order management summary including:
+    - Order status and details
+    - Line item delivery metrics
+    - Any issues or recommendations
+  agent: admanager_orders_specialist
+
+admanager_configure_deals:
+  description: >
+    Configure programmatic deals: {user_query}
+
+    Steps:
+    1. List existing private auctions and deals
+    2. Understand the deal requirements
+    3. Create or configure deals as needed
+    4. Verify the configuration
+  expected_output: >
+    Deal configuration result including:
+    - Current deal status
+    - New deal details (if created)
+    - Configuration verification
+  agent: admanager_deals_specialist
+
+# ============================================================================
+# CROSS-PLATFORM TASKS
+# ============================================================================
+
+unified_inventory_review:
+  description: >
+    Review inventory across all platforms: {user_query}
+
+    Coordinate with:
+    - AdMob inventory specialist for mobile app inventory
+    - Ad Manager inventory specialist for web/app inventory
+
+    Synthesize a unified view of all inventory.
+  expected_output: >
+    Unified inventory summary across platforms including:
+    - AdMob apps and ad units
+    - Ad Manager ad units and placements
+    - Cross-platform observations and recommendations
+  agent: inventory_orchestrator
+
+unified_performance_analysis:
+  description: >
+    Analyze performance across all platforms: {user_query}
+
+    Coordinate with:
+    - AdMob reporting specialist for mobile metrics
+    - Ad Manager reporting specialist for publisher metrics
+
+    Provide unified insights and recommendations.
+  expected_output: >
+    Cross-platform performance analysis including:
+    - Revenue and impression metrics by platform
+    - Comparative analysis
+    - Unified optimization recommendations
+  agent: reporting_orchestrator
