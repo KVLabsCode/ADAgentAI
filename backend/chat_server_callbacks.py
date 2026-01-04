@@ -106,7 +106,18 @@ def classify_query(user_query: str) -> tuple[str, str]:
         return ("admob", "inventory")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app,
+     origins=[
+         "http://localhost:3000",
+         "http://localhost:3002",
+         "https://ad-agent-ai.vercel.app",
+         # Regex for Vercel preview URLs
+         re.compile(r"https://.*\.vercel\.app$"),
+     ],
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "Accept"],
+     methods=["GET", "POST", "OPTIONS"]
+)
 
 # Global queue for tool events (set by generate() before crew runs)
 _tool_event_queue = None
