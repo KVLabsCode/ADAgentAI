@@ -7,11 +7,19 @@ import { db } from "../db";
 import { connectedProviders, type NewConnectedProvider } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { trackProviderConnected } from "../lib/analytics";
+import { safeEncrypt, safeDecrypt } from "../lib/crypto";
 
 const providers = new Hono();
 
-// All provider routes require authentication
-providers.use("*", requireAuth);
+// Most routes require authentication
+providers.use("*", async (c, next) => {
+  // Skip auth only for internal token endpoint (uses API key instead)
+  const path = c.req.path;
+  if (path.endsWith("/internal/token")) {
+    return next();
+  }
+  return requireAuth(c, next);
+});
 
 // ============================================================
 // Schemas
@@ -128,13 +136,13 @@ providers.get(
 
     if (error) {
       return c.redirect(
-        `${Bun.env.FRONTEND_URL}/settings/providers?error=${error}`
+        `${Bun.env.FRONTEND_URL}/providers?error=${error}`
       );
     }
 
     if (!code) {
       return c.redirect(
-        `${Bun.env.FRONTEND_URL}/settings/providers?error=no_code`
+        `${Bun.env.FRONTEND_URL}/providers?error=no_code`
       );
     }
 
@@ -167,6 +175,10 @@ providers.get(
       // Fetch provider-specific identifiers
       const providerData = await fetchProviderData(type, tokens.access_token);
 
+      // Encrypt tokens before storing
+      const encryptedAccessToken = await safeEncrypt(tokens.access_token);
+      const encryptedRefreshToken = await safeEncrypt(tokens.refresh_token);
+
       // Check if provider already connected
       const existing = await db.query.connectedProviders.findFirst({
         where: and(
@@ -182,8 +194,8 @@ providers.get(
         await db
           .update(connectedProviders)
           .set({
-            accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token || existing.refreshToken,
+            accessToken: encryptedAccessToken!,
+            refreshToken: encryptedRefreshToken || existing.refreshToken,
             tokenExpiresAt: expiresAt,
             publisherId: providerData.publisherId,
             networkCode: providerData.networkCode,
@@ -197,8 +209,8 @@ providers.get(
         await db.insert(connectedProviders).values({
           userId: user.id,
           provider: type,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
+          accessToken: encryptedAccessToken!,
+          refreshToken: encryptedRefreshToken,
           tokenExpiresAt: expiresAt,
           publisherId: providerData.publisherId,
           networkCode: providerData.networkCode,
@@ -210,7 +222,7 @@ providers.get(
       trackProviderConnected(user.id, type, true);
 
       return c.redirect(
-        `${Bun.env.FRONTEND_URL}/settings/providers?success=${type}`
+        `${Bun.env.FRONTEND_URL}/providers?success=${type}`
       );
     } catch (error) {
       console.error("OAuth callback error:", error);
@@ -219,7 +231,7 @@ providers.get(
       trackProviderConnected(user.id, type, false);
 
       return c.redirect(
-        `${Bun.env.FRONTEND_URL}/settings/providers?error=oauth_failed`
+        `${Bun.env.FRONTEND_URL}/providers?error=oauth_failed`
       );
     }
   }
@@ -282,9 +294,208 @@ providers.patch(
   }
 );
 
+/**
+ * GET /providers/:type/token - Get valid access token (auto-refreshes if needed)
+ * Used by internal services (CrewAI, MCP) to get tokens without manual refresh
+ */
+providers.get(
+  "/:type/token",
+  zValidator("param", z.object({ type: providerTypeSchema })),
+  async (c) => {
+    const user = c.get("user");
+    const { type } = c.req.valid("param");
+
+    // Find the provider connection
+    const provider = await db.query.connectedProviders.findFirst({
+      where: and(
+        eq(connectedProviders.userId, user.id),
+        eq(connectedProviders.provider, type),
+        eq(connectedProviders.isEnabled, true)
+      ),
+    });
+
+    if (!provider) {
+      return c.json({ error: "Provider not connected" }, 404);
+    }
+
+    // Decrypt stored tokens
+    const decryptedAccessToken = await safeDecrypt(provider.accessToken);
+    const decryptedRefreshToken = await safeDecrypt(provider.refreshToken);
+
+    // Check if token needs refresh (refresh 5 min before expiry)
+    const now = new Date();
+    const expiresAt = provider.tokenExpiresAt;
+    const needsRefresh = !expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000;
+
+    if (needsRefresh && decryptedRefreshToken) {
+      try {
+        const newTokens = await refreshAccessToken(decryptedRefreshToken);
+
+        // Encrypt new tokens before storing
+        const encryptedAccessToken = await safeEncrypt(newTokens.access_token);
+        const encryptedRefreshToken = await safeEncrypt(newTokens.refresh_token);
+
+        // Update stored tokens
+        const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
+        await db
+          .update(connectedProviders)
+          .set({
+            accessToken: encryptedAccessToken!,
+            refreshToken: encryptedRefreshToken || provider.refreshToken,
+            tokenExpiresAt: newExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(connectedProviders.id, provider.id));
+
+        return c.json({
+          accessToken: newTokens.access_token,
+          expiresAt: newExpiresAt.toISOString(),
+          provider: type,
+        });
+      } catch (error) {
+        console.error("Token refresh failed:", error);
+        // Return existing token if refresh fails (might still work)
+        return c.json({
+          accessToken: decryptedAccessToken,
+          expiresAt: expiresAt?.toISOString(),
+          provider: type,
+          warning: "Token refresh failed, using existing token",
+        });
+      }
+    }
+
+    return c.json({
+      accessToken: decryptedAccessToken,
+      expiresAt: expiresAt?.toISOString(),
+      provider: type,
+    });
+  }
+);
+
+/**
+ * POST /providers/internal/token - Internal endpoint for services (no user auth)
+ * Protected by internal API key
+ */
+providers.post("/internal/token", async (c) => {
+  console.log("[InternalToken] Request received");
+
+  // Verify internal API key
+  const apiKey = c.req.header("X-Internal-Key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  console.log(`[InternalToken] Key provided: ${apiKey ? 'yes' : 'no'}`);
+  console.log(`[InternalToken] Key expected: ${expectedKey ? 'yes' : 'no'}`);
+  console.log(`[InternalToken] Keys match: ${apiKey === expectedKey}`);
+
+  if (apiKey !== expectedKey) {
+    console.log("[InternalToken] Unauthorized - key mismatch");
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json() as { userId: string; provider: "admob" | "gam" };
+  const { userId, provider: providerType } = body;
+
+  console.log(`[InternalToken] Looking up ${providerType} for user ${userId}`);
+
+  if (!userId || !providerType) {
+    return c.json({ error: "userId and provider are required" }, 400);
+  }
+
+  // Find the provider connection
+  const provider = await db.query.connectedProviders.findFirst({
+    where: and(
+      eq(connectedProviders.userId, userId),
+      eq(connectedProviders.provider, providerType),
+      eq(connectedProviders.isEnabled, true)
+    ),
+  });
+
+  if (!provider) {
+    console.log("[InternalToken] Provider not found");
+    return c.json({ error: "Provider not connected" }, 404);
+  }
+
+  console.log(`[InternalToken] Found provider, token encrypted: ${provider.accessToken?.startsWith('eyJ') ? 'JWE' : 'unknown'}`);
+
+  // Decrypt stored tokens
+  const decryptedAccessToken = await safeDecrypt(provider.accessToken);
+  const decryptedRefreshToken = await safeDecrypt(provider.refreshToken);
+
+  console.log(`[InternalToken] Decrypted token length: ${decryptedAccessToken?.length || 0}`);
+
+  // Check if token needs refresh
+  const now = new Date();
+  const expiresAt = provider.tokenExpiresAt;
+  const needsRefresh = !expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000;
+
+  if (needsRefresh && decryptedRefreshToken) {
+    try {
+      const newTokens = await refreshAccessToken(decryptedRefreshToken);
+
+      // Encrypt new tokens before storing
+      const encryptedAccessToken = await safeEncrypt(newTokens.access_token);
+      const encryptedRefreshToken = await safeEncrypt(newTokens.refresh_token);
+
+      const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
+      await db
+        .update(connectedProviders)
+        .set({
+          accessToken: encryptedAccessToken!,
+          refreshToken: encryptedRefreshToken || provider.refreshToken,
+          tokenExpiresAt: newExpiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(connectedProviders.id, provider.id));
+
+      return c.json({
+        accessToken: newTokens.access_token,
+        expiresAt: newExpiresAt.toISOString(),
+      });
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+    }
+  }
+
+  return c.json({
+    accessToken: decryptedAccessToken,
+    expiresAt: expiresAt?.toISOString(),
+  });
+});
+
 // ============================================================
 // Helpers
 // ============================================================
+
+/**
+ * Refresh an access token using a refresh token
+ */
+async function refreshAccessToken(refreshToken: string): Promise<{
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+}> {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: Bun.env.GOOGLE_CLIENT_ID!,
+      client_secret: Bun.env.GOOGLE_CLIENT_SECRET!,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Token refresh failed: ${error}`);
+  }
+
+  return response.json() as Promise<{
+    access_token: string;
+    refresh_token?: string;
+    expires_in: number;
+  }>;
+}
 
 function getProviderDisplayName(provider: "admob" | "gam"): string {
   return provider === "admob" ? "Google AdMob" : "Google Ad Manager";

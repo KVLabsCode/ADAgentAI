@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Search, Download, Trash2, MessageSquare, MoreHorizontal } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { Search, Download, Trash2, MessageSquare, MoreHorizontal, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -25,31 +26,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+
 interface ChatHistoryItem {
   id: string
   title: string
   preview: string
   date: string
-  messageCount: number
 }
-
-// Mock data
-const mockChats: ChatHistoryItem[] = [
-  {
-    id: "1",
-    title: "Revenue analysis for December",
-    preview: "What was my total ad revenue in December?",
-    date: "2026-01-02",
-    messageCount: 12,
-  },
-  {
-    id: "2",
-    title: "Ad unit optimization",
-    preview: "Which ad units should I focus on improving?",
-    date: "2026-01-01",
-    messageCount: 8,
-  },
-]
 
 function formatRelativeDate(dateStr: string): string {
   const date = new Date(dateStr)
@@ -64,8 +48,36 @@ function formatRelativeDate(dateStr: string): string {
 }
 
 export default function ChatHistoryPage() {
-  const [chats, setChats] = React.useState<ChatHistoryItem[]>(mockChats)
+  const [chats, setChats] = React.useState<ChatHistoryItem[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
+
+  // Fetch chat sessions from API
+  const fetchChats = React.useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/chat/sessions`, {
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setChats(data.sessions.map((s: { id: string; title: string; lastMessage?: string; updatedAt: string }) => ({
+          id: s.id,
+          title: s.title,
+          preview: s.lastMessage || 'No messages yet',
+          date: s.updatedAt,
+        })))
+      }
+    } catch (error) {
+      console.error('Failed to fetch chat sessions:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    fetchChats()
+  }, [fetchChats])
 
   const filteredChats = chats.filter(
     chat =>
@@ -73,13 +85,50 @@ export default function ChatHistoryPage() {
       chat.preview.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleDelete = (chatId: string) => {
-    setChats(prev => prev.filter(c => c.id !== chatId))
+  const handleDelete = async (chatId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/chat/session/${chatId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        setChats(prev => prev.filter(c => c.id !== chatId))
+      }
+    } catch (error) {
+      console.error('Failed to delete chat:', error)
+    }
   }
 
-  const handleExport = (chatId: string, format: "md" | "json" | "pdf") => {
-    // TODO: Implement export
-    console.log("Exporting chat:", chatId, "as", format)
+  const handleExport = async (chatId: string, format: "md" | "json") => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/chat/session/${chatId}/export?format=${format === 'md' ? 'markdown' : 'json'}`,
+        { credentials: 'include' }
+      )
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `chat-export.${format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    } catch (error) {
+      console.error('Failed to export chat:', error)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -138,13 +187,10 @@ export default function ChatHistoryPage() {
                     {formatRelativeDate(chat.date)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-xs text-muted-foreground truncate">
+                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1 prose prose-sm dark:prose-invert max-w-none prose-p:m-0 prose-p:inline">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {chat.preview}
-                  </p>
-                  <span className="text-[10px] text-muted-foreground/60 shrink-0">
-                    · {chat.messageCount} msgs
-                  </span>
+                  </ReactMarkdown>
                 </div>
               </Link>
 

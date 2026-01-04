@@ -1,9 +1,8 @@
 # Agent Service Dependencies
 
-# Web server
-flask>=3.0.0
-flask-cors>=4.0.0
-gunicorn>=21.0.0
+# Web server (FastAPI)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
 
 # Core AI framework
 crewai
@@ -14,7 +13,7 @@ langchain-anthropic
 anthropic
 
 # Data validation
-pydantic
+pydantic>=2.0.0
 
 # Environment management
 python-dotenv

@@ -1,23 +1,50 @@
 "use client"
 
+import { useCallback } from "react"
+import { useRouter } from "next/navigation"
+import { authClient } from "@/lib/auth-client"
 import { User } from "@/lib/types"
 
-// Mock user data - replace with actual API call when backend is ready
-// TODO: Replace with actual session/API call from Better Auth (P-70)
-const MOCK_USER: User = {
-  id: "user-1",
-  email: "admin@adagent.dev",
-  name: "Admin User",
-  avatar: "",
-  role: "admin", // Toggle to "user" to test non-admin view
+interface UseUserReturn {
+  user: User | null
+  isAdmin: boolean
+  isLoading: boolean
+  isAuthenticated: boolean
+  signOut: () => void
+  refetch: () => void
 }
 
-export function useUser() {
-  // In production, this would fetch from session/API
-  // For now, return mock data
+export function useUser(): UseUserReturn {
+  const router = useRouter()
+  const { data: session, isPending, refetch } = authClient.useSession()
+
+  const rawRole = (session?.user as { role?: string })?.role
+  const role: 'user' | 'admin' = rawRole === 'admin' ? 'admin' : 'user'
+
+  const user: User | null = session?.user ? {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name || session.user.email?.split('@')[0] || 'User',
+    avatar: session.user.image || '',
+    role,
+  } : null
+
+  const signOut = useCallback(async () => {
+    try {
+      await authClient.signOut()
+    } catch (error) {
+      console.error('Sign out error:', error)
+    } finally {
+      router.push('/')
+    }
+  }, [router])
+
   return {
-    user: MOCK_USER,
-    isAdmin: MOCK_USER.role === "admin",
-    isLoading: false,
+    user,
+    isAdmin: user?.role === 'admin',
+    isLoading: isPending,
+    isAuthenticated: !!session?.user,
+    signOut,
+    refetch,
   }
 }

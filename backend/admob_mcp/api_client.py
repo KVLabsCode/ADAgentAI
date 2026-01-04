@@ -6,18 +6,22 @@ Complete v1beta API client supporting all endpoints:
 - Ad Sources, Adapters
 - Mediation Groups (CRUD + A/B experiments)
 - Reports (Mediation, Network, Campaign)
+
+Authentication is handled via the shared token service which:
+1. Fetches tokens from the API (auto-refreshed from DB)
+2. Falls back to environment variables
+3. Falls back to service account credentials
 """
 
 import os
-import json
-import tempfile
+import sys
 from typing import Optional, Dict, Any, List
 import httpx
 
-from .constants import API_BASE_URL, REQUEST_TIMEOUT, OAUTH_SCOPES, DEFAULT_PAGE_SIZE
+from .constants import API_BASE_URL, REQUEST_TIMEOUT, DEFAULT_PAGE_SIZE
 
-# Global temp file path for service account credentials
-_temp_credentials_file: Optional[str] = None
+# Add parent directory for shared imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class AdMobAPIError(Exception):
@@ -34,74 +38,47 @@ class AdMobClient:
     """
     Async client for AdMob API v1beta with OAuth 2.0 authentication.
 
-    Supports two authentication methods:
-    1. Service Account (GOOGLE_APPLICATION_CREDENTIALS)
-    2. Access Token (ADMOB_ACCESS_TOKEN)
+    Token management is automatic via the shared token service:
+    1. Tokens stored in DB are auto-refreshed via the API
+    2. Falls back to ADMOB_ACCESS_TOKEN env var
+    3. Falls back to service account credentials
     """
 
-    def __init__(self):
-        self._access_token: Optional[str] = None
-        self._credentials = None
+    def __init__(self, user_id: Optional[str] = None):
+        """
+        Initialize AdMob client.
+
+        Args:
+            user_id: Optional user ID for user-specific tokens (fetched from DB)
+        """
+        self._user_id = user_id
 
     async def _get_access_token(self) -> str:
-        """Get or refresh the OAuth 2.0 access token."""
-        global _temp_credentials_file
+        """Get a valid OAuth 2.0 access token via the token service."""
+        try:
+            from shared.token_service import get_access_token, TokenError
 
-        # Method 1: Direct access token from environment
+            return await get_access_token("admob", user_id=self._user_id)
+        except ImportError:
+            # Fallback if shared module not available
+            pass
+        except Exception as e:
+            raise AdMobAPIError(
+                f"Token service error: {str(e)}",
+                details={"user_id": self._user_id}
+            )
+
+        # Legacy fallback: direct env var
         if os.environ.get("ADMOB_ACCESS_TOKEN"):
             return os.environ["ADMOB_ACCESS_TOKEN"]
 
-        # Method 2: Service account JSON content from environment
-        credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-        if credentials_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-            # Write JSON to temp file and set path
-            if _temp_credentials_file is None:
-                try:
-                    creds_data = json.loads(credentials_json)
-                    fd, _temp_credentials_file = tempfile.mkstemp(suffix=".json")
-                    with os.fdopen(fd, 'w') as f:
-                        json.dump(creds_data, f)
-                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _temp_credentials_file
-                except json.JSONDecodeError as e:
-                    raise AdMobAPIError(
-                        f"Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}",
-                        details={"fix": "Ensure the JSON is valid"}
-                    )
-
-        # Method 3: Service account credentials file path
-        credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if credentials_path:
-            try:
-                from google.oauth2 import service_account
-                from google.auth.transport.requests import Request
-
-                if self._credentials is None:
-                    self._credentials = service_account.Credentials.from_service_account_file(
-                        credentials_path,
-                        scopes=OAUTH_SCOPES
-                    )
-
-                if self._credentials.expired or not self._credentials.token:
-                    self._credentials.refresh(Request())
-
-                return self._credentials.token
-            except ImportError:
-                raise AdMobAPIError(
-                    "Google Auth library not installed. Run: pip install google-auth",
-                    details={"fix": "pip install google-auth"}
-                )
-            except Exception as e:
-                raise AdMobAPIError(
-                    f"Failed to authenticate with service account: {str(e)}",
-                    details={"credentials_path": credentials_path}
-                )
-
         raise AdMobAPIError(
-            "No authentication configured. Set ADMOB_ACCESS_TOKEN or GOOGLE_APPLICATION_CREDENTIALS.",
+            "No authentication configured. Connect AdMob via OAuth or set ADMOB_ACCESS_TOKEN.",
             details={
                 "options": [
-                    "Set ADMOB_ACCESS_TOKEN with a valid OAuth 2.0 access token",
-                    "Set GOOGLE_APPLICATION_CREDENTIALS with path to service account JSON"
+                    "Connect AdMob account via the Providers page",
+                    "Set ADMOB_ACCESS_TOKEN environment variable",
+                    "Set GOOGLE_APPLICATION_CREDENTIALS for service account"
                 ]
             }
         )
@@ -318,9 +295,31 @@ class AdMobClient:
 _client: Optional[AdMobClient] = None
 
 
-def get_client() -> AdMobClient:
-    """Get or create the global AdMob client instance."""
+def get_client(user_id: Optional[str] = None) -> AdMobClient:
+    """
+    Get or create an AdMob client instance.
+
+    Args:
+        user_id: Optional user ID for user-specific tokens.
+                 If provided, tokens are fetched from the API (auto-refreshed).
+                 If None, checks CURRENT_USER_ID env var, then falls back to
+                 env vars or service account.
+
+    Returns:
+        AdMobClient instance
+    """
     global _client
+
+    # If user_id provided, create user-specific client
+    if user_id:
+        return AdMobClient(user_id=user_id)
+
+    # Check for user_id from environment (set by chat server)
+    env_user_id = os.environ.get("CURRENT_USER_ID")
+    if env_user_id:
+        return AdMobClient(user_id=env_user_id)
+
+    # Otherwise use global client for service account / env var auth
     if _client is None:
         _client = AdMobClient()
     return _client

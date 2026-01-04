@@ -1,56 +1,114 @@
 "use client"
 
+import * as React from "react"
+import { use } from "react"
+import { Loader2 } from "lucide-react"
 import { ChatContainer } from "@/components/chat/chat-container"
-import type { Provider, Message } from "@/lib/types"
+import type { Provider, Message, StreamEventItem } from "@/lib/types"
 
-// Mock providers - replace with real data from API
-const mockProviders: Provider[] = [
-  {
-    id: "1",
-    type: "admob",
-    status: "connected",
-    displayName: "My AdMob Account",
-    identifiers: {
-      publisherId: "pub-1234567890123456",
-    },
-  },
-]
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
-// Mock messages for existing chat - replace with real data from API
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    role: "user",
-    content: "What was my total ad revenue in December?",
-    createdAt: "2025-12-15T10:00:00Z",
-  },
-  {
-    id: "2",
-    role: "assistant",
-    content: "Based on your AdMob data, your total ad revenue for December 2025 was **$12,450.32**. This represents a 15% increase compared to November.\n\nHere's the breakdown by ad format:\n- Banner ads: $4,230.15\n- Interstitial ads: $5,890.22\n- Rewarded ads: $2,329.95",
-    agentName: "AdMob Agent",
-    createdAt: "2025-12-15T10:00:05Z",
-    thinking: "I need to query the AdMob API for the total revenue in December 2025. Let me fetch the earnings report for that period and break it down by ad format for better insights.",
-    toolCalls: [
-      {
-        name: "get_earnings_report",
-        params: { startDate: "2025-12-01", endDate: "2025-12-31" },
-      },
-    ],
-  },
-]
+interface ApiProvider {
+  id: string
+  type: "admob" | "gam"
+  name: string
+  identifier: string
+  isEnabled: boolean
+  lastSyncAt: string | null
+  connectedAt: string
+}
+
+interface ApiMessage {
+  id: string
+  role: "user" | "assistant" | "system"
+  content: string
+  agentName?: string
+  createdAt: string
+  // Metadata contains events (new) and legacy fields
+  metadata?: {
+    events?: StreamEventItem[]
+    thinking?: string
+    toolCalls?: { name: string; params: Record<string, unknown> }[]
+    toolResults?: { name: string; result: unknown }[]
+  }
+}
 
 export default function ChatSessionPage({
   params
 }: {
   params: Promise<{ id: string }>
 }) {
-  // In a real app, fetch the chat session data based on params.id
+  const { id: sessionId } = use(params)
+  const [providers, setProviders] = React.useState<Provider[]>([])
+  const [messages, setMessages] = React.useState<Message[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    async function fetchData() {
+      try {
+        // Fetch providers and session messages in parallel
+        const [providersRes, sessionRes] = await Promise.all([
+          fetch(`${API_URL}/api/providers`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/chat/session/${sessionId}`, { credentials: 'include' }),
+        ])
+
+        if (providersRes.ok) {
+          const data = await providersRes.json() as { providers: ApiProvider[] }
+          const mappedProviders: Provider[] = data.providers.map((p) => ({
+            id: p.id,
+            type: p.type,
+            status: "connected" as const,
+            displayName: p.name,
+            identifiers: p.type === "admob"
+              ? { publisherId: p.identifier }
+              : { networkCode: p.identifier, accountName: p.name },
+          }))
+          setProviders(mappedProviders)
+        }
+
+        if (sessionRes.ok) {
+          const data = await sessionRes.json() as { session: { messages: ApiMessage[] } }
+          const mappedMessages: Message[] = (data.session?.messages || []).map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            agentName: m.agentName,
+            createdAt: m.createdAt,
+            // Use events array if available (new format), otherwise fall back to legacy
+            events: m.metadata?.events,
+            // Legacy fields for backward compatibility
+            hasThinking: !!m.metadata?.thinking,
+            thinking: m.metadata?.thinking,
+            hasToolCalls: !!(m.metadata?.toolCalls && m.metadata.toolCalls.length > 0),
+            toolCalls: m.metadata?.toolCalls,
+            toolResults: m.metadata?.toolResults,
+          }))
+          setMessages(mappedMessages)
+        }
+      } catch (error) {
+        console.error('Failed to fetch chat session:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [sessionId])
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="h-full">
       <ChatContainer
-        providers={mockProviders}
-        initialMessages={mockMessages}
+        providers={providers}
+        initialMessages={messages}
+        sessionId={sessionId}
       />
     </div>
   )

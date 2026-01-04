@@ -130,7 +130,7 @@ billing.get("/usage", async (c) => {
  */
 billing.post("/checkout", async (c) => {
   const user = c.get("user");
-  const body = await c.req.json<{ priceId?: string }>();
+  const body = await c.req.json<{ priceId?: string; theme?: "light" | "dark" }>();
 
   try {
     // Use default price if not specified
@@ -142,7 +142,7 @@ billing.post("/checkout", async (c) => {
 
     const checkout = await polar.checkouts.create({
       products: [priceId],
-      successUrl: `${Bun.env.FRONTEND_URL}/settings/billing?success=true`,
+      successUrl: `${Bun.env.FRONTEND_URL}/billing?success=true`,
       customerEmail: user.email,
       customerName: user.name || undefined,
       metadata: {
@@ -153,8 +153,15 @@ billing.post("/checkout", async (c) => {
     // Track checkout started
     trackSubscription(user.id, "checkout_started");
 
+    // Append theme parameter to checkout URL if provided
+    let checkoutUrl = checkout.url;
+    if (body.theme && checkoutUrl) {
+      const separator = checkoutUrl.includes("?") ? "&" : "?";
+      checkoutUrl = `${checkoutUrl}${separator}theme=${body.theme}`;
+    }
+
     return c.json({
-      checkoutUrl: checkout.url,
+      checkoutUrl,
       clientSecret: checkout.clientSecret,
     });
   } catch (error) {

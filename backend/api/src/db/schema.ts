@@ -22,7 +22,7 @@ export const blogPostStatusEnum = pgEnum("blog_post_status", ["draft", "publishe
 // ============================================================
 
 export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   name: text("name"),
@@ -35,8 +35,8 @@ export const users = pgTable("users", {
 ]);
 
 export const sessions = pgTable("sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   ipAddress: text("ip_address"),
@@ -49,8 +49,8 @@ export const sessions = pgTable("sessions", {
 ]);
 
 export const accounts = pgTable("accounts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
   accessToken: text("access_token"),
@@ -67,7 +67,7 @@ export const accounts = pgTable("accounts", {
 ]);
 
 export const verifications = pgTable("verifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
@@ -82,7 +82,7 @@ export const verifications = pgTable("verifications", {
 // Connected Ad Platform Providers (AdMob, GAM)
 export const connectedProviders = pgTable("connected_providers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   provider: providerTypeEnum("provider").notNull(),
 
   // Provider-specific identifiers
@@ -90,7 +90,7 @@ export const connectedProviders = pgTable("connected_providers", {
   networkCode: text("network_code"), // GAM Network Code
   accountName: text("account_name"), // Display name from provider
 
-  // OAuth tokens (encrypted in production)
+  // OAuth tokens (JWE encrypted using BETTER_AUTH_SECRET)
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
   tokenExpiresAt: timestamp("token_expires_at"),
@@ -109,7 +109,7 @@ export const connectedProviders = pgTable("connected_providers", {
 // Chat Sessions
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   title: text("title").default("New Chat").notNull(),
   isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -145,7 +145,7 @@ export const blogPosts = pgTable("blog_posts", {
   title: varchar("title", { length: 255 }).notNull(),
   excerpt: text("excerpt"),
   content: text("content").notNull(),
-  authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  authorId: text("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   category: varchar("category", { length: 100 }),
   featured: boolean("featured").default(false).notNull(),
   status: blogPostStatusEnum("status").default("draft").notNull(),

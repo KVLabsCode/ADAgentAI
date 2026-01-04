@@ -8,6 +8,7 @@ async function seed() {
   const [adminUser] = await db
     .insert(users)
     .values({
+      id: "seed-admin-" + Date.now().toString(36),
       email: "admin@example.com",
       name: "Admin User",
       role: "admin",

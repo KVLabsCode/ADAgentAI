@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { Plug, Plus, Trash2 } from "lucide-react"
+import { Suspense } from "react"
+import { useSearchParams } from "next/navigation"
+import { Plug, Plus, Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -25,67 +27,107 @@ import { AccountSelectionModal } from "@/components/providers/account-selection-
 import { cn } from "@/lib/utils"
 import type { Provider, OAuthAccount } from "@/lib/types"
 
-// Mock data - replace with real API calls
-const mockProviders: Provider[] = [
-  {
-    id: "1",
-    type: "admob",
-    status: "connected",
-    displayName: "My AdMob Account",
-    identifiers: {
-      publisherId: "pub-1234567890123456",
-    },
-  },
-]
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
-// Mock multiple accounts returned from GAM OAuth - for demo purposes
-const mockGamAccounts: OAuthAccount[] = [
-  {
-    id: "gam-1",
-    type: "gam",
-    displayName: "Production Network",
-    identifiers: {
-      networkCode: "12345678",
-      accountName: "My Company - Production",
-    },
-  },
-  {
-    id: "gam-2",
-    type: "gam",
-    displayName: "Staging Network",
-    identifiers: {
-      networkCode: "87654321",
-      accountName: "My Company - Staging",
-    },
-  },
-  {
-    id: "gam-3",
-    type: "gam",
-    displayName: "Test Network",
-    identifiers: {
-      networkCode: "11223344",
-      accountName: "My Company - Test",
-    },
-  },
-]
-
-export default function ProvidersPage() {
-  const [providers, setProviders] = React.useState<Provider[]>(mockProviders)
+function ProvidersContent() {
+  const searchParams = useSearchParams()
+  const [providers, setProviders] = React.useState<Provider[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [connectingType, setConnectingType] = React.useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [accountSelectionOpen, setAccountSelectionOpen] = React.useState(false)
   const [pendingAccounts, setPendingAccounts] = React.useState<OAuthAccount[]>([])
   const [pendingProviderType, setPendingProviderType] = React.useState<"admob" | "gam">("gam")
 
-  const handleConnect = (type: "admob" | "gam") => {
-    // TODO: Replace with real OAuth flow
-    // For GAM, simulate OAuth returning multiple accounts
-    if (type === "gam") {
-      // Simulate OAuth callback with multiple accounts
-      setPendingProviderType(type)
-      setPendingAccounts(mockGamAccounts)
-      setAccountSelectionOpen(true)
-    } else {
-      // AdMob typically returns single account
-      console.log("Connecting AdMob - would initiate OAuth flow")
+  // Fetch providers on mount
+  const fetchProviders = React.useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/providers`, {
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Map API response to Provider type
+        setProviders(data.providers.map((p: Record<string, unknown>) => ({
+          id: p.id,
+          type: p.type,
+          status: 'connected',
+          displayName: p.name,
+          identifiers: p.type === 'admob'
+            ? { publisherId: p.identifier }
+            : { networkCode: p.identifier, accountName: p.name },
+        })))
+      }
+    } catch (error) {
+      console.error('Failed to fetch providers:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    fetchProviders()
+  }, [fetchProviders])
+
+  // Handle OAuth callback messages
+  React.useEffect(() => {
+    const success = searchParams.get('success')
+    const error = searchParams.get('error')
+
+    if (success) {
+      setStatusMessage({
+        type: 'success',
+        text: `Successfully connected ${success === 'admob' ? 'AdMob' : 'Google Ad Manager'}!`
+      })
+      // Refresh providers list
+      fetchProviders()
+      // Clear URL params
+      window.history.replaceState({}, '', '/providers')
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        'oauth_failed': 'OAuth connection failed. Please try again.',
+        'no_code': 'No authorization code received.',
+        'access_denied': 'Access was denied. Please grant permission to connect.',
+      }
+      setStatusMessage({
+        type: 'error',
+        text: errorMessages[error] || `Connection error: ${error}`
+      })
+      window.history.replaceState({}, '', '/providers')
+    }
+
+    // Auto-dismiss message after 5 seconds
+    if (success || error) {
+      const timer = setTimeout(() => setStatusMessage(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, fetchProviders])
+
+  const handleConnect = async (type: "admob" | "gam") => {
+    setConnectingType(type)
+    try {
+      // Call API to get OAuth URL
+      const response = await fetch(`${API_URL}/api/providers/connect/${type}`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate OAuth')
+      }
+
+      const { authUrl } = await response.json()
+
+      // Redirect to Google OAuth
+      window.location.href = authUrl
+    } catch (error) {
+      console.error('OAuth error:', error)
+      setStatusMessage({
+        type: 'error',
+        text: 'Failed to start connection. Please try again.'
+      })
+      setConnectingType(null)
     }
   }
 
@@ -108,12 +150,50 @@ export default function ProvidersPage() {
     setPendingAccounts([])
   }
 
-  const handleDisconnect = (providerId: string) => {
-    setProviders(prev => prev.filter(p => p.id !== providerId))
+  const handleDisconnect = async (providerId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/providers/${providerId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        setProviders(prev => prev.filter(p => p.id !== providerId))
+        setStatusMessage({
+          type: 'success',
+          text: 'Provider disconnected successfully.'
+        })
+      } else {
+        throw new Error('Failed to disconnect')
+      }
+    } catch (error) {
+      console.error('Disconnect error:', error)
+      setStatusMessage({
+        type: 'error',
+        text: 'Failed to disconnect provider. Please try again.'
+      })
+    }
   }
 
   return (
     <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+      {/* Status Message */}
+      {statusMessage && (
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-md text-xs",
+          statusMessage.type === 'success'
+            ? "bg-green-500/10 text-green-600 dark:text-green-400"
+            : "bg-red-500/10 text-red-600 dark:text-red-400"
+        )}>
+          {statusMessage.type === 'success' ? (
+            <CheckCircle2 className="h-3.5 w-3.5" />
+          ) : (
+            <XCircle className="h-3.5 w-3.5" />
+          )}
+          {statusMessage.text}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
           <h1 className="text-base font-medium tracking-tight">Connected Providers</h1>
@@ -130,27 +210,57 @@ export default function ProvidersPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => handleConnect("admob")} className="text-xs">
+            <DropdownMenuItem
+              onClick={() => handleConnect("admob")}
+              disabled={!!connectingType}
+              className="text-xs"
+            >
               <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded bg-green-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
-                  A
-                </div>
-                <span>AdMob</span>
+                {connectingType === 'admob' ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <div className="h-5 w-5 rounded bg-green-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                    A
+                  </div>
+                )}
+                <span>{connectingType === 'admob' ? 'Connecting...' : 'AdMob'}</span>
               </div>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs">
+            <DropdownMenuItem
+              onClick={() => handleConnect("gam")}
+              disabled={!!connectingType}
+              className="text-xs"
+            >
               <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
-                  G
-                </div>
-                <span>Google Ad Manager</span>
+                {connectingType === 'gam' ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                    G
+                  </div>
+                )}
+                <span>{connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}</span>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {providers.length === 0 ? (
+      {isLoading ? (
+        <div className="grid gap-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="rounded border border-border/30 px-3 py-2.5 animate-pulse">
+              <div className="flex items-center gap-2.5">
+                <div className="h-6 w-6 rounded bg-muted" />
+                <div className="space-y-1.5">
+                  <div className="h-3.5 w-32 bg-muted rounded" />
+                  <div className="h-2.5 w-24 bg-muted rounded" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : providers.length === 0 ? (
         <div className="rounded border border-border/30">
           <div className="flex flex-col items-center justify-center py-8 px-4">
             <div className="rounded bg-muted/50 p-2.5 mb-3">
@@ -168,11 +278,11 @@ export default function ProvidersPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleConnect("admob")} className="text-xs">
-                  AdMob
+                <DropdownMenuItem onClick={() => handleConnect("admob")} className="text-xs" disabled={!!connectingType}>
+                  {connectingType === 'admob' ? 'Connecting...' : 'AdMob'}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs">
-                  Google Ad Manager
+                <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs" disabled={!!connectingType}>
+                  {connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -288,5 +398,40 @@ export default function ProvidersPage() {
         onCancel={handleAccountSelectionCancel}
       />
     </div>
+  )
+}
+
+function ProvidersLoadingSkeleton() {
+  return (
+    <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <div className="h-4 w-40 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-56 bg-muted rounded animate-pulse mt-1" />
+        </div>
+        <div className="h-7 w-20 bg-muted rounded animate-pulse" />
+      </div>
+      <div className="grid gap-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded border border-border/30 px-3 py-2.5 animate-pulse">
+            <div className="flex items-center gap-2.5">
+              <div className="h-6 w-6 rounded bg-muted" />
+              <div className="space-y-1.5">
+                <div className="h-3.5 w-32 bg-muted rounded" />
+                <div className="h-2.5 w-24 bg-muted rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function ProvidersPage() {
+  return (
+    <Suspense fallback={<ProvidersLoadingSkeleton />}>
+      <ProvidersContent />
+    </Suspense>
   )
 }

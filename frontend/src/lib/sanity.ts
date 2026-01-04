@@ -23,6 +23,7 @@ export const sanityWriteClient = createClient({
 })
 
 // GROQ queries for blog posts
+// Note: Uses coalesce() to support both author reference and direct authorName field
 export const blogQueries = {
   // Get all published posts for public blog
   allPublishedPosts: `*[_type == "post" && status == "published"] | order(publishedAt desc) {
@@ -34,8 +35,8 @@ export const blogQueries = {
     category,
     featured,
     status,
-    "authorName": author->name,
-    "authorRole": author->role,
+    "authorName": coalesce(author->name, authorName),
+    "authorRole": coalesce(author->role, authorRole),
     publishedAt,
     "createdAt": _createdAt,
     "updatedAt": _updatedAt
@@ -51,8 +52,8 @@ export const blogQueries = {
     category,
     featured,
     status,
-    "authorName": author->name,
-    "authorRole": author->role,
+    "authorName": coalesce(author->name, authorName),
+    "authorRole": coalesce(author->role, authorRole),
     publishedAt,
     "createdAt": _createdAt,
     "updatedAt": _updatedAt
@@ -69,7 +70,7 @@ export const blogQueries = {
     featured,
     status,
     "authorId": author->_id,
-    "authorName": author->name,
+    "authorName": coalesce(author->name, authorName),
     publishedAt,
     "createdAt": _createdAt,
     "updatedAt": _updatedAt
@@ -86,7 +87,7 @@ export const blogQueries = {
     featured,
     status,
     "authorId": author->_id,
-    "authorName": author->name,
+    "authorName": coalesce(author->name, authorName),
     publishedAt,
     "createdAt": _createdAt,
     "updatedAt": _updatedAt
@@ -100,8 +101,8 @@ export const blogQueries = {
     excerpt,
     category,
     featured,
-    "authorName": author->name,
-    "authorRole": author->role,
+    "authorName": coalesce(author->name, authorName),
+    "authorRole": coalesce(author->role, authorRole),
     publishedAt,
     "createdAt": _createdAt
   }`,

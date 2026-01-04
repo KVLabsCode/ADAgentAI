@@ -44,18 +44,17 @@ class MCPClient:
     """
 
     def __init__(self):
-        self._api_client = None
+        self._AdMobClient = None
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
-        """Lazy initialization of the API client."""
+        """Lazy initialization - imports the client class."""
         if self._initialized:
             return
 
         try:
             from admob_mcp.api_client import AdMobClient
-
-            self._api_client = AdMobClient()
+            self._AdMobClient = AdMobClient
             self._initialized = True
         except ImportError as e:
             raise RuntimeError(
@@ -63,6 +62,24 @@ class MCPClient:
             )
         except Exception as e:
             raise RuntimeError(f"Failed to initialize AdMob API client: {e}")
+
+    def _get_api_client(self):
+        """
+        Get an API client with current user context.
+
+        Reads CURRENT_USER_ID at request time (not init time) so the
+        user's OAuth token can be fetched from the database.
+        """
+        import os
+        self._ensure_initialized()
+
+        user_id = os.environ.get("CURRENT_USER_ID")
+        if user_id:
+            print(f"[MCPClient] Creating AdMobClient with user_id: {user_id}")
+            return self._AdMobClient(user_id=user_id)
+        else:
+            print("[MCPClient] WARNING: No CURRENT_USER_ID set, using default client")
+            return self._AdMobClient()
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> MCPResponse:
         """
@@ -75,7 +92,8 @@ class MCPClient:
         Returns:
             MCPResponse with the result or error
         """
-        self._ensure_initialized()
+        # Get a client with current user context (reads CURRENT_USER_ID env var)
+        api_client = self._get_api_client()
 
         try:
             # Map tool names to API endpoints
@@ -87,7 +105,7 @@ class MCPClient:
                 if page_token:
                     params["pageToken"] = page_token
 
-                result = await self._api_client.request("GET", "accounts", params=params)
+                result = await api_client.request("GET", "accounts", params=params)
                 return MCPResponse(success=True, data=result)
 
             elif tool_name == "admob_get_account":
@@ -95,7 +113,7 @@ class MCPClient:
                 if not account_id.startswith("pub-"):
                     account_id = f"pub-{account_id}"
 
-                result = await self._api_client.request("GET", f"accounts/{account_id}")
+                result = await api_client.request("GET", f"accounts/{account_id}")
                 return MCPResponse(success=True, data=result)
 
             elif tool_name == "admob_list_apps":
@@ -110,7 +128,7 @@ class MCPClient:
                 if page_token:
                     params["pageToken"] = page_token
 
-                result = await self._api_client.request("GET", f"accounts/{account_id}/apps", params=params)
+                result = await api_client.request("GET", f"accounts/{account_id}/apps", params=params)
                 return MCPResponse(success=True, data=result)
 
             elif tool_name == "admob_list_ad_units":
@@ -125,7 +143,7 @@ class MCPClient:
                 if page_token:
                     params["pageToken"] = page_token
 
-                result = await self._api_client.request("GET", f"accounts/{account_id}/adUnits", params=params)
+                result = await api_client.request("GET", f"accounts/{account_id}/adUnits", params=params)
                 return MCPResponse(success=True, data=result)
 
             elif tool_name == "admob_create_app":
@@ -141,7 +159,7 @@ class MCPClient:
                 if arguments.get("display_name"):
                     app_data["displayName"] = arguments["display_name"]
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST", f"accounts/{account_id}/apps", json_data=app_data
                 )
                 return MCPResponse(success=True, data=result)
@@ -159,7 +177,7 @@ class MCPClient:
                 if arguments.get("ad_types"):
                     ad_unit_data["adTypes"] = arguments["ad_types"]
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST", f"accounts/{account_id}/adUnits", json_data=ad_unit_data
                 )
                 return MCPResponse(success=True, data=result)
@@ -180,7 +198,7 @@ class MCPClient:
                 if filter_str:
                     params["filter"] = filter_str
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "GET", f"accounts/{account_id}/adUnits/{ad_unit_id}/adUnitMappings", params=params
                 )
                 return MCPResponse(success=True, data=result)
@@ -198,7 +216,7 @@ class MCPClient:
                 if arguments.get("ad_unit_configurations"):
                     mapping_data["adUnitConfigurations"] = arguments["ad_unit_configurations"]
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST", f"accounts/{account_id}/adUnits/{ad_unit_id}/adUnitMappings", json_data=mapping_data
                 )
                 return MCPResponse(success=True, data=result)
@@ -208,7 +226,7 @@ class MCPClient:
                 if not account_id.startswith("pub-"):
                     account_id = f"pub-{account_id}"
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST", f"accounts/{account_id}/adUnitMappings:batchCreate",
                     json_data={"requests": arguments["mappings"]}
                 )
@@ -226,7 +244,7 @@ class MCPClient:
                 if page_token:
                     params["pageToken"] = page_token
 
-                result = await self._api_client.request("GET", f"accounts/{account_id}/adSources", params=params)
+                result = await api_client.request("GET", f"accounts/{account_id}/adSources", params=params)
                 return MCPResponse(success=True, data=result)
 
             elif tool_name == "admob_list_adapters":
@@ -242,7 +260,7 @@ class MCPClient:
                 if page_token:
                     params["pageToken"] = page_token
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "GET", f"accounts/{account_id}/adSources/{ad_source_id}/adapters", params=params
                 )
                 return MCPResponse(success=True, data=result)
@@ -262,7 +280,7 @@ class MCPClient:
                 if filter_str:
                     params["filter"] = filter_str
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "GET", f"accounts/{account_id}/mediationGroups", params=params
                 )
                 return MCPResponse(success=True, data=result)
@@ -278,7 +296,7 @@ class MCPClient:
                     "targeting": arguments["targeting"],
                 }
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST", f"accounts/{account_id}/mediationGroups", json_data=mediation_group_data
                 )
                 return MCPResponse(success=True, data=result)
@@ -292,7 +310,7 @@ class MCPClient:
 
                 mediation_group_data = arguments["mediation_group_data"]
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "PATCH",
                     f"accounts/{account_id}/mediationGroups/{mediation_group_id}",
                     params={"updateMask": update_mask},
@@ -311,7 +329,7 @@ class MCPClient:
                     "trafficPercentage": arguments["traffic_percentage"],
                 }
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST",
                     f"accounts/{account_id}/mediationGroups/{mediation_group_id}/mediationAbExperiment",
                     json_data=experiment_data
@@ -325,7 +343,7 @@ class MCPClient:
                 mediation_group_id = arguments["mediation_group_id"]
                 variant_choice = arguments["variant_choice"]
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST",
                     f"accounts/{account_id}/mediationGroups/{mediation_group_id}/mediationAbExperiment:stop",
                     json_data={"variantChoice": variant_choice}
@@ -347,7 +365,7 @@ class MCPClient:
                     "maxReportRows": arguments.get("max_report_rows", 1000),
                 }
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST",
                     f"accounts/{account_id}/mediationReport:generate",
                     json_data={"reportSpec": report_spec}
@@ -369,7 +387,7 @@ class MCPClient:
                     "maxReportRows": arguments.get("max_report_rows", 1000),
                 }
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST",
                     f"accounts/{account_id}/networkReport:generate",
                     json_data={"reportSpec": report_spec}
@@ -391,7 +409,7 @@ class MCPClient:
                     "languageCode": arguments.get("language_code", "en-US"),
                 }
 
-                result = await self._api_client.request(
+                result = await api_client.request(
                     "POST",
                     f"accounts/{account_id}/campaignReport:generate",
                     json_data={"reportSpec": report_spec}

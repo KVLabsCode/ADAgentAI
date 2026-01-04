@@ -1,75 +1,67 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
+import { useSearchParams } from "next/navigation"
+import { useTheme } from "next-themes"
 import {
   CreditCard,
   Check,
   Zap,
   Crown,
-  Download,
-  Trash2,
-  Plus,
   FileText,
   ExternalLink,
-  MoreHorizontal,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
+  XCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 interface PricingTier {
   name: string
   price: string
+  priceId?: string
   description: string
   features: string[]
   popular?: boolean
-  current?: boolean
 }
 
-interface PaymentMethod {
-  id: string
-  type: "visa" | "mastercard" | "amex"
-  last4: string
-  expiryMonth: number
-  expiryYear: number
-  isDefault: boolean
+interface Subscription {
+  hasSubscription: boolean
+  status: string
+  plan: {
+    id: string
+    name: string
+    amount: number
+    currency: string
+    interval: string
+  } | null
+  currentPeriodEnd?: string
+  cancelAtPeriodEnd?: boolean
+  customerId?: string
+}
+
+interface Usage {
+  chatMessages: number
+  providerQueries: number
+  limit: {
+    chatMessages: number
+    providerQueries: number
+  }
 }
 
 interface Invoice {
   id: string
-  date: string
   amount: number
-  status: "paid" | "pending" | "failed"
-  description: string
-  pdfUrl: string
+  currency: string
+  status: string
+  createdAt: string
+  product: string
 }
 
 const tiers: PricingTier[] = [
@@ -83,11 +75,11 @@ const tiers: PricingTier[] = [
       "Basic analytics",
       "Community support",
     ],
-    current: true,
   },
   {
     name: "Pro",
     price: "$29",
+    priceId: process.env.NEXT_PUBLIC_POLAR_PRO_PRICE_ID,
     description: "For growing publishers",
     features: [
       "Unlimited providers",
@@ -114,37 +106,6 @@ const tiers: PricingTier[] = [
   },
 ]
 
-// Mock data - replace with real API calls
-const mockPaymentMethods: PaymentMethod[] = [
-  {
-    id: "pm_1",
-    type: "visa",
-    last4: "4242",
-    expiryMonth: 12,
-    expiryYear: 2027,
-    isDefault: true,
-  },
-]
-
-const mockInvoices: Invoice[] = [
-  {
-    id: "inv_001",
-    date: "2026-01-01",
-    amount: 0,
-    status: "paid",
-    description: "Free Plan - January 2026",
-    pdfUrl: "#",
-  },
-  {
-    id: "inv_002",
-    date: "2025-12-01",
-    amount: 0,
-    status: "paid",
-    description: "Free Plan - December 2025",
-    pdfUrl: "#",
-  },
-]
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
@@ -153,50 +114,198 @@ function formatDate(dateStr: string): string {
   })
 }
 
-function getCardIcon(type: PaymentMethod["type"]) {
-  const iconClass = "h-6 w-4 text-muted-foreground"
-  switch (type) {
-    case "visa":
-      return <span className={cn(iconClass, "font-bold text-[10px] text-blue-600")}>VISA</span>
-    case "mastercard":
-      return <span className={cn(iconClass, "font-bold text-[10px] text-orange-600")}>MC</span>
-    case "amex":
-      return <span className={cn(iconClass, "font-bold text-[10px] text-blue-800")}>AMEX</span>
-  }
+function formatCurrency(amount: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+  }).format(amount / 100) // Polar amounts are in cents
 }
 
-export default function BillingPage() {
-  const [paymentMethods, setPaymentMethods] = React.useState<PaymentMethod[]>(mockPaymentMethods)
-  const [invoices] = React.useState<Invoice[]>(mockInvoices)
-  const [currentPlan] = React.useState<"free" | "pro" | "enterprise">("free")
+function BillingContent() {
+  const searchParams = useSearchParams()
+  const { resolvedTheme } = useTheme()
+  const [subscription, setSubscription] = React.useState<Subscription | null>(null)
+  const [usage, setUsage] = React.useState<Usage | null>(null)
+  const [invoices, setInvoices] = React.useState<Invoice[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
+  const [isUpgrading, setIsUpgrading] = React.useState<string | null>(null)
+  const [isOpeningPortal, setIsOpeningPortal] = React.useState(false)
+  const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error', text: string } | null>(null)
 
-  const handleRemovePaymentMethod = (id: string) => {
-    setPaymentMethods(prev => prev.filter(pm => pm.id !== id))
+  // Fetch billing data
+  const fetchBillingData = React.useCallback(async () => {
+    try {
+      const [subRes, usageRes, invoicesRes] = await Promise.all([
+        fetch(`${API_URL}/api/billing/subscription`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/billing/usage`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/billing/invoices`, { credentials: 'include' }),
+      ])
+
+      if (subRes.ok) {
+        setSubscription(await subRes.json())
+      }
+      if (usageRes.ok) {
+        setUsage(await usageRes.json())
+      }
+      if (invoicesRes.ok) {
+        const data = await invoicesRes.json()
+        setInvoices(data.invoices || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch billing data:', error)
+      setLoadError('Failed to connect to billing service. Please check your connection and try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    fetchBillingData()
+  }, [fetchBillingData])
+
+  // Handle success/error from checkout redirect
+  React.useEffect(() => {
+    const success = searchParams.get('success')
+    const error = searchParams.get('error')
+
+    if (success) {
+      setStatusMessage({ type: 'success', text: 'Subscription activated successfully!' })
+      fetchBillingData()
+      window.history.replaceState({}, '', '/billing')
+    } else if (error) {
+      setStatusMessage({ type: 'error', text: 'Checkout failed. Please try again.' })
+      window.history.replaceState({}, '', '/billing')
+    }
+
+    if (success || error) {
+      const timer = setTimeout(() => setStatusMessage(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, fetchBillingData])
+
+  const handleUpgrade = async (priceId?: string) => {
+    if (!priceId) return
+    setIsUpgrading(priceId)
+    try {
+      const theme = resolvedTheme === 'dark' ? 'dark' : 'light'
+      const response = await fetch(`${API_URL}/api/billing/checkout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, theme }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to create checkout (${response.status})`)
+      }
+
+      const { checkoutUrl } = await response.json()
+      window.location.href = checkoutUrl
+    } catch (error) {
+      console.error('Checkout error:', error)
+      const message = error instanceof Error ? error.message : 'Failed to start checkout'
+      setStatusMessage({ type: 'error', text: message.includes('fetch') ? 'Backend API not running. Please start the server.' : message })
+      setIsUpgrading(null)
+    }
   }
 
-  const handleSetDefaultPayment = (id: string) => {
-    setPaymentMethods(prev =>
-      prev.map(pm => ({ ...pm, isDefault: pm.id === id }))
+  const handleManageSubscription = async () => {
+    setIsOpeningPortal(true)
+    try {
+      const response = await fetch(`${API_URL}/api/billing/portal`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (!response.ok) throw new Error('Failed to get portal URL')
+
+      const { portalUrl } = await response.json()
+      window.location.href = portalUrl
+    } catch (error) {
+      console.error('Portal error:', error)
+      setStatusMessage({ type: 'error', text: 'Failed to open billing portal. Please try again.' })
+      setIsOpeningPortal(false)
+    }
+  }
+
+  const currentPlanName = subscription?.plan?.name?.toLowerCase() || 'free'
+  const isPro = subscription?.hasSubscription && subscription.status === 'active'
+  const usagePercent = usage ? Math.min((usage.chatMessages / (usage.limit.chatMessages || 1)) * 100, 100) : 0
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+        <div className="space-y-0.5">
+          <h1 className="text-base font-medium tracking-tight">Billing</h1>
+          <p className="text-xs text-muted-foreground/80">
+            Manage your subscription and payment methods.
+          </p>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded border border-border/30 p-3 animate-pulse">
+              <div className="h-4 w-32 bg-muted rounded mb-2" />
+              <div className="h-3 w-48 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
     )
   }
 
-  const handleDownloadInvoice = (invoice: Invoice) => {
-    // TODO: Implement actual download
-    console.log("Downloading invoice:", invoice.id)
-  }
-
-  const handleCancelSubscription = () => {
-    // TODO: Implement subscription cancellation via Polar
-    console.log("Cancelling subscription")
-  }
-
-  const handleManageSubscription = () => {
-    // TODO: Redirect to Polar customer portal
-    console.log("Opening Polar customer portal")
+  if (loadError) {
+    return (
+      <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+        <div className="space-y-0.5">
+          <h1 className="text-base font-medium tracking-tight">Billing</h1>
+          <p className="text-xs text-muted-foreground/80">
+            Manage your subscription and payment methods.
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="rounded-full bg-red-500/10 p-3 mb-3">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+          </div>
+          <p className="text-sm font-medium text-foreground/80 mb-1">Unable to load billing</p>
+          <p className="text-xs text-muted-foreground/70 mb-4 max-w-sm">{loadError}</p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => {
+              setLoadError(null)
+              setIsLoading(true)
+              fetchBillingData()
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+      {/* Status Message */}
+      {statusMessage && (
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-md text-xs",
+          statusMessage.type === 'success'
+            ? "bg-green-500/10 text-green-600 dark:text-green-400"
+            : "bg-red-500/10 text-red-600 dark:text-red-400"
+        )}>
+          {statusMessage.type === 'success' ? (
+            <CheckCircle2 className="h-3.5 w-3.5" />
+          ) : (
+            <XCircle className="h-3.5 w-3.5" />
+          )}
+          {statusMessage.text}
+        </div>
+      )}
+
       <div className="space-y-0.5">
         <h1 className="text-base font-medium tracking-tight">Billing</h1>
         <p className="text-xs text-muted-foreground/80">
@@ -210,71 +319,67 @@ export default function BillingPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-medium">Current Plan</h2>
             <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
-              {currentPlan === "free" ? "Free" : currentPlan === "pro" ? "Pro" : "Enterprise"}
+              {isPro ? subscription?.plan?.name || 'Pro' : 'Free'}
             </Badge>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500/80" />
-            <span className="text-[10px] text-muted-foreground/60">Active</span>
+            <div className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              subscription?.cancelAtPeriodEnd ? "bg-amber-500/80" : "bg-green-500/80"
+            )} />
+            <span className="text-[10px] text-muted-foreground/60">
+              {subscription?.cancelAtPeriodEnd ? 'Cancelling' : 'Active'}
+            </span>
           </div>
         </div>
         <div className="px-3 py-2.5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">
-                {currentPlan === "free" ? "$0" : currentPlan === "pro" ? "$29" : "Custom"}
+                {isPro && subscription?.plan
+                  ? formatCurrency(subscription.plan.amount, subscription.plan.currency)
+                  : '$0'}
                 <span className="text-xs text-muted-foreground/60 font-normal">/month</span>
               </p>
-              <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-                32 of 50 queries used this month
-              </p>
-              {/* Usage bar */}
-              <div className="mt-2 h-1 w-32 bg-muted/50 rounded-full overflow-hidden">
-                <div className="h-full w-[64%] bg-primary/70 rounded-full" />
-              </div>
+              {usage && (
+                <>
+                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                    {usage.limit.chatMessages === -1
+                      ? 'Unlimited queries'
+                      : `${usage.chatMessages} of ${usage.limit.chatMessages} queries used`}
+                  </p>
+                  {usage.limit.chatMessages !== -1 && (
+                    <div className="mt-2 h-1 w-32 bg-muted/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary/70 rounded-full transition-all"
+                        style={{ width: `${usagePercent}%` }}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              {subscription?.currentPeriodEnd && (
+                <p className="text-[10px] text-muted-foreground/50 mt-1">
+                  {subscription.cancelAtPeriodEnd ? 'Ends' : 'Renews'} {formatDate(subscription.currentPeriodEnd)}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1.5">
-              {currentPlan !== "free" && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs px-2"
-                    onClick={handleManageSubscription}
-                  >
+              {isPro && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  onClick={handleManageSubscription}
+                  disabled={isOpeningPortal}
+                >
+                  {isOpeningPortal ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
                     <ExternalLink className="h-3 w-3 mr-1" />
-                    Manage
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs px-2 text-destructive hover:text-destructive"
-                      >
-                        Cancel
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-base">Cancel subscription?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xs">
-                          Your plan will remain active until the end of the current billing period.
-                          You can resubscribe at any time.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="h-8 text-xs">Keep Plan</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleCancelSubscription}
-                          className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Cancel Subscription
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
+                  )}
+                  Manage
+                </Button>
               )}
             </div>
           </div>
@@ -285,204 +390,139 @@ export default function BillingPage() {
       <div>
         <h2 className="text-xs font-medium mb-2">Available Plans</h2>
         <div className="grid gap-2 sm:grid-cols-3">
-          {tiers.map((tier) => (
-            <div
-              key={tier.name}
-              className={cn(
-                "rounded border px-3 py-2.5",
-                tier.popular
-                  ? "border-primary/50 bg-primary/[0.02]"
-                  : "border-border/30",
-                tier.current && "bg-muted/30"
-              )}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  {tier.name === "Enterprise" ? (
-                    <Crown className="h-3.5 w-3.5 text-amber-500" />
-                  ) : tier.popular ? (
-                    <Zap className="h-3.5 w-3.5 text-primary" />
-                  ) : (
-                    <CreditCard className="h-3.5 w-3.5 text-muted-foreground/50" />
-                  )}
-                  <span className="text-sm font-medium">{tier.name}</span>
-                </div>
-                {tier.popular && (
-                  <Badge className="text-[8px] h-3.5 px-1 bg-primary/10 text-primary border-0">
-                    Popular
-                  </Badge>
+          {tiers.map((tier) => {
+            const isCurrent = (tier.name === 'Free' && !isPro) || (tier.name === 'Pro' && isPro)
+            const canUpgrade = tier.name === 'Pro' && !isPro && tier.priceId
+            const isUpgradingThis = isUpgrading === tier.priceId
+
+            return (
+              <div
+                key={tier.name}
+                className={cn(
+                  "rounded border px-3 py-2.5",
+                  tier.popular
+                    ? "border-primary/50 bg-primary/[0.02]"
+                    : "border-border/30",
+                  isCurrent && "bg-muted/30"
                 )}
-                {tier.current && (
-                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-border/40">
-                    Current
-                  </Badge>
-                )}
-              </div>
-              <div className="mb-1.5">
-                <span className="text-lg font-semibold">{tier.price}</span>
-                {tier.price !== "Custom" && (
-                  <span className="text-[10px] text-muted-foreground/60">/mo</span>
-                )}
-              </div>
-              <p className="text-[10px] text-muted-foreground/70 mb-2">{tier.description}</p>
-              <ul className="space-y-1 mb-2.5">
-                {tier.features.slice(0, 3).map((feature) => (
-                  <li key={feature} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
-                    <Check className="h-2.5 w-2.5 text-green-500/70 shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-                {tier.features.length > 3 && (
-                  <li className="text-[10px] text-muted-foreground/50">
-                    +{tier.features.length - 3} more
-                  </li>
-                )}
-              </ul>
-              <Button
-                size="sm"
-                className="w-full h-7 text-xs"
-                variant={tier.current ? "outline" : tier.popular ? "default" : "outline"}
-                disabled={tier.current}
               >
-                {tier.current ? "Current" : tier.name === "Enterprise" ? "Contact" : "Upgrade"}
-              </Button>
-            </div>
-          ))}
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    {tier.name === "Enterprise" ? (
+                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                    ) : tier.popular ? (
+                      <Zap className="h-3.5 w-3.5 text-primary" />
+                    ) : (
+                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    )}
+                    <span className="text-sm font-medium">{tier.name}</span>
+                  </div>
+                  {tier.popular && !isCurrent && (
+                    <Badge className="text-[8px] h-3.5 px-1 bg-primary/10 text-primary border-0">
+                      Popular
+                    </Badge>
+                  )}
+                  {isCurrent && (
+                    <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-border/40">
+                      Current
+                    </Badge>
+                  )}
+                </div>
+                <div className="mb-1.5">
+                  <span className="text-lg font-semibold">{tier.price}</span>
+                  {tier.price !== "Custom" && (
+                    <span className="text-[10px] text-muted-foreground/60">/mo</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 mb-2">{tier.description}</p>
+                <ul className="space-y-1 mb-2.5">
+                  {tier.features.slice(0, 3).map((feature) => (
+                    <li key={feature} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
+                      <Check className="h-2.5 w-2.5 text-green-500/70 shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                  {tier.features.length > 3 && (
+                    <li className="text-[10px] text-muted-foreground/50">
+                      +{tier.features.length - 3} more
+                    </li>
+                  )}
+                </ul>
+                <Button
+                  size="sm"
+                  className="w-full h-7 text-xs"
+                  variant={isCurrent ? "outline" : tier.popular ? "default" : "outline"}
+                  disabled={isCurrent || isUpgradingThis || (tier.name === 'Enterprise')}
+                  onClick={() => canUpgrade && handleUpgrade(tier.priceId)}
+                >
+                  {isUpgradingThis ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Upgrading...
+                    </>
+                  ) : isCurrent ? (
+                    "Current"
+                  ) : tier.name === "Enterprise" ? (
+                    "Contact"
+                  ) : (
+                    "Upgrade"
+                  )}
+                </Button>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* Payment Methods */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
-          <div>
-            <h2 className="text-xs font-medium">Payment Methods</h2>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-              Manage your saved payment methods.
-            </p>
-          </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
-                <Plus className="h-2.5 w-2.5 mr-1" />
-                Add
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle className="text-base">Add Payment Method</DialogTitle>
-                <DialogDescription className="text-xs">
-                  You'll be redirected to our secure payment provider.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <Button className="w-full" onClick={handleManageSubscription}>
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Continue to Polar
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-        <div className="px-3 py-2">
-          {paymentMethods.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="rounded bg-muted/50 p-2 mb-2">
-                <CreditCard className="h-4 w-4 text-muted-foreground/50" />
-              </div>
-              <p className="text-[11px] text-muted-foreground/70">No payment methods saved</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                Add a payment method to upgrade your plan
+      {/* Payment Methods - Managed via Polar Portal */}
+      {isPro && (
+        <div className="rounded border border-border/30">
+          <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-medium">Payment Methods</h2>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                Manage payment methods in the billing portal.
               </p>
             </div>
-          ) : (
-            <div className="space-y-1.5">
-              {paymentMethods.map((method) => (
-                <div
-                  key={method.id}
-                  className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-muted/30 transition-colors group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-7 w-10 rounded border border-border/40 bg-background flex items-center justify-center">
-                      {getCardIcon(method.type)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium">•••• {method.last4}</span>
-                        {method.isDefault && (
-                          <Badge variant="secondary" className="text-[8px] h-3.5 px-1">
-                            Default
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground/60">
-                        Expires {method.expiryMonth.toString().padStart(2, '0')}/{method.expiryYear}
-                      </p>
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <MoreHorizontal className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36">
-                      {!method.isDefault && (
-                        <DropdownMenuItem
-                          onClick={() => handleSetDefaultPayment(method.id)}
-                          className="text-xs"
-                        >
-                          <Check className="h-3 w-3 mr-2" />
-                          Set as default
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-xs text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3 mr-2" />
-                            Remove
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle className="text-base">Remove payment method?</AlertDialogTitle>
-                            <AlertDialogDescription className="text-xs">
-                              This card ending in {method.last4} will be removed from your account.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel className="h-8 text-xs">Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleRemovePaymentMethod(method.id)}
-                              className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Remove
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-[10px] px-2"
+              onClick={handleManageSubscription}
+              disabled={isOpeningPortal}
+            >
+              {isOpeningPortal ? (
+                <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
+              ) : (
+                <ExternalLink className="h-2.5 w-2.5 mr-1" />
+              )}
+              Manage
+            </Button>
+          </div>
+          <div className="px-3 py-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-12 rounded border border-border/40 bg-muted/30 flex items-center justify-center">
+                <CreditCard className="h-4 w-4 text-muted-foreground/50" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground/70">
+                  Payment methods are managed through Polar
+                </p>
+                <p className="text-[10px] text-muted-foreground/50">
+                  Click &quot;Manage&quot; to update your billing details
+                </p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Invoice History */}
       <div className="rounded border border-border/30">
         <div className="px-3 py-2 border-b border-border/30">
           <h2 className="text-xs font-medium">Invoice History</h2>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            Download past invoices for your records.
+            Your past invoices and payments.
           </p>
         </div>
         <div className="px-3 py-2">
@@ -501,7 +541,7 @@ export default function BillingPage() {
               {invoices.map((invoice) => (
                 <div
                   key={invoice.id}
-                  className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-muted/30 transition-colors group"
+                  className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="h-7 w-7 rounded bg-muted/50 flex items-center justify-center">
@@ -509,38 +549,25 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium">{invoice.description}</span>
+                        <span className="text-xs font-medium">{invoice.product}</span>
                         <Badge
                           variant="secondary"
-                          className={cn(
-                            "text-[8px] h-3.5 px-1",
-                            invoice.status === "paid" && "bg-green-500/10 text-green-600",
-                            invoice.status === "pending" && "bg-amber-500/10 text-amber-600",
-                            invoice.status === "failed" && "bg-red-500/10 text-red-600"
-                          )}
+                          className="text-[8px] h-3.5 px-1 bg-green-500/10 text-green-600"
                         >
-                          {invoice.status}
+                          paid
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-[10px] text-muted-foreground/60">
-                          {formatDate(invoice.date)}
+                          {formatDate(invoice.createdAt)}
                         </span>
                         <span className="text-[10px] text-muted-foreground/40">•</span>
                         <span className="text-[10px] text-muted-foreground/60">
-                          ${invoice.amount.toFixed(2)}
+                          {formatCurrency(invoice.amount, invoice.currency)}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleDownloadInvoice(invoice)}
-                  >
-                    <Download className="h-3 w-3" />
-                  </Button>
                 </div>
               ))}
             </div>
@@ -561,5 +588,34 @@ export default function BillingPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function BillingLoadingSkeleton() {
+  return (
+    <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+      <div className="space-y-0.5">
+        <h1 className="text-base font-medium tracking-tight">Billing</h1>
+        <p className="text-xs text-muted-foreground/80">
+          Manage your subscription and payment methods.
+        </p>
+      </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="rounded border border-border/30 p-3 animate-pulse">
+            <div className="h-4 w-32 bg-muted rounded mb-2" />
+            <div className="h-3 w-48 bg-muted rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<BillingLoadingSkeleton />}>
+      <BillingContent />
+    </Suspense>
   )
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Calendar, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +49,7 @@ function LoadingSkeleton() {
 
 export default function BlogPage() {
   const { posts, isLoading, error } = usePublicBlogPosts()
+  const [selectedCategory, setSelectedCategory] = useState("All")
 
   if (isLoading) {
     return <LoadingSkeleton />
@@ -61,9 +63,15 @@ export default function BlogPage() {
     )
   }
 
-  const featuredPost = posts.find((p) => p.featured)
-  const recentPosts = posts.filter((p) => !p.featured)
   const categories = ["All", ...Array.from(new Set(posts.map((p) => p.category)))]
+
+  // Filter posts by selected category
+  const filteredPosts = selectedCategory === "All"
+    ? posts
+    : posts.filter((p) => p.category === selectedCategory)
+
+  const featuredPost = filteredPosts.find((p) => p.featured)
+  const recentPosts = filteredPosts.filter((p) => !p.featured)
 
   return (
     <div className="flex flex-col">
@@ -89,8 +97,9 @@ export default function BlogPage() {
               {categories.map((category) => (
                 <button
                   key={category}
+                  onClick={() => setSelectedCategory(category)}
                   className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                    category === "All"
+                    category === selectedCategory
                       ? "bg-foreground text-background"
                       : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
@@ -191,13 +200,23 @@ export default function BlogPage() {
       )}
 
       {/* Empty State */}
-      {posts.length === 0 && (
+      {filteredPosts.length === 0 && (
         <section className="pb-16">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center py-12">
               <p className="text-sm text-muted-foreground">
-                No blog posts yet. Check back soon!
+                {posts.length === 0
+                  ? "No blog posts yet. Check back soon!"
+                  : `No posts in "${selectedCategory}" category.`}
               </p>
+              {posts.length > 0 && (
+                <button
+                  onClick={() => setSelectedCategory("All")}
+                  className="mt-3 text-xs text-foreground underline hover:no-underline"
+                >
+                  View all posts
+                </button>
+              )}
             </div>
           </div>
         </section>

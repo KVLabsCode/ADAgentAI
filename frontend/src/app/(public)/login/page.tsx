@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation"
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { authClient } from "@/lib/auth-client"
 
 // Google "G" logo as SVG
 function GoogleLogo({ className }: { className?: string }) {
@@ -54,11 +55,18 @@ function LoginContent() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
-    // TODO: Replace with actual OAuth redirect
-    // For now, simulate a redirect delay then go to dashboard
-    setTimeout(() => {
-      window.location.href = "/dashboard"
-    }, 1500)
+    try {
+      // Use absolute URLs to ensure redirect goes to frontend, not backend
+      const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: `${frontendUrl}/dashboard`,
+        errorCallbackURL: `${frontendUrl}/login?error=auth_failed`,
+      })
+    } catch (error) {
+      console.error('Sign in error:', error)
+      setIsLoading(false)
+    }
   }
 
   return (

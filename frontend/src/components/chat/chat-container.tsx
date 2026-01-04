@@ -1,23 +1,29 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
 import { ChatSettingsPanel } from "./chat-settings-panel"
 import { streamChat } from "@/lib/api"
-import type { Message, Provider } from "@/lib/types"
+import type { Message, Provider, StreamEventItem } from "@/lib/types"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 interface ChatContainerProps {
   initialMessages?: Message[]
   providers?: Provider[]
+  sessionId?: string
 }
 
-export function ChatContainer({ initialMessages = [], providers = [] }: ChatContainerProps) {
+export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
+  const router = useRouter()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
   const [settingsOpen, setSettingsOpen] = React.useState(false)
+  const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
   const [enabledProviders, setEnabledProviders] = React.useState<string[]>(
     providers.filter(p => p.status === "connected").map(p => p.id)
   )
@@ -26,12 +32,58 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
 
+  // Create a new chat session
+  const createSession = async (title?: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`${API_URL}/api/chat/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ title: title || 'New Chat' }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        return data.session.id
+      }
+    } catch (error) {
+      console.error('Failed to create chat session:', error)
+    }
+    return null
+  }
+
+  // Save a message to the database
+  const saveMessage = async (sessionId: string, role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>) => {
+    try {
+      await fetch(`${API_URL}/api/chat/session/${sessionId}/save-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content, role, metadata }),
+      })
+    } catch (error) {
+      console.error('Failed to save message:', error)
+    }
+  }
+
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isLoading || !hasProviders) return
 
     // Cancel any pending request
     abortControllerRef.current?.abort()
     abortControllerRef.current = new AbortController()
+
+    // Create a session if this is the first message
+    let sessionId = currentSessionId
+    if (!sessionId) {
+      // Use first ~50 chars of message as title
+      const title = content.slice(0, 50) + (content.length > 50 ? '...' : '')
+      sessionId = await createSession(title)
+      if (sessionId) {
+        setCurrentSessionId(sessionId)
+        // Update URL using history API to avoid component remount
+        window.history.replaceState(null, '', `/chat/${sessionId}`)
+      }
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -48,20 +100,23 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
       content: "",
       createdAt: new Date().toISOString(),
       agentName: "",
-      hasThinking: false,
-      thinking: "",
-      hasToolCalls: false,
-      toolCalls: [],
-      toolResults: [],
+      events: [],
     }
 
     setMessages(prev => [...prev, userMessage, assistantMessage])
     setIsLoading(true)
 
-    // Track accumulated state
-    const thoughts: string[] = []
+    // Save user message to database (don't await to avoid blocking UI)
+    if (sessionId) {
+      saveMessage(sessionId, 'user', content)
+    }
+
+    // Track sequential events
+    const events: StreamEventItem[] = []
+    // Also track legacy format for saving to DB
     const toolCalls: { name: string; params: Record<string, unknown> }[] = []
     const toolResults: { name: string; result: unknown }[] = []
+    let finalContent = ""
 
     await streamChat(
       content,
@@ -79,23 +134,23 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, agentName: agent || m.agentName, task }
+                ? { ...m, agentName: agent || m.agentName }
                 : m
             )
           )
         },
-        onThinking: (content) => {
-          thoughts.push(content)
+        onThinking: (thinkingContent) => {
+          // Add each thinking event separately for sequential display
+          events.push({ type: "thinking", content: thinkingContent })
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, hasThinking: true, thinking: thoughts.join("\n\n") }
+                ? { ...m, events: [...events] }
                 : m
             )
           )
         },
         onToolCall: (tool, inputPreview, inputFull) => {
-          // Parse the input as params
           let params: Record<string, unknown> = {}
           try {
             const inputStr = inputFull || inputPreview
@@ -106,20 +161,23 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
             params = { input: inputPreview }
           }
 
+          // Add to sequential events
+          events.push({ type: "tool", name: tool, params })
+          // Also track for legacy saving
           toolCalls.push({ name: tool, params })
+
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, hasToolCalls: true, toolCalls: [...toolCalls] }
+                ? { ...m, events: [...events] }
                 : m
             )
           )
         },
         onToolResult: (preview, full, dataType) => {
-          const lastTool = toolCalls[toolCalls.length - 1]
+          const lastToolCall = toolCalls[toolCalls.length - 1]
           let result: unknown = preview
 
-          // Try to parse as JSON if it's JSON data
           if (dataType === "json" || dataType === "json_list") {
             try {
               result = JSON.parse(full || preview)
@@ -128,23 +186,25 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
             }
           }
 
-          toolResults.push({
-            name: lastTool?.name || "unknown",
-            result
-          })
+          // Add to sequential events
+          events.push({ type: "tool_result", name: lastToolCall?.name || "unknown", result })
+          // Also track for legacy saving
+          toolResults.push({ name: lastToolCall?.name || "unknown", result })
+
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, toolResults: [...toolResults] }
+                ? { ...m, events: [...events] }
                 : m
             )
           )
         },
-        onResult: (content) => {
+        onResult: (resultContent) => {
+          finalContent = resultContent
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, content }
+                ? { ...m, content: resultContent }
                 : m
             )
           )
@@ -161,6 +221,20 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
         },
         onDone: () => {
           setIsLoading(false)
+          // Save assistant message to database
+          if (sessionId && finalContent) {
+            const allThinking = events
+              .filter((e): e is StreamEventItem & { type: "thinking" } => e.type === "thinking")
+              .map(e => e.content)
+              .join("\n\n")
+
+            saveMessage(sessionId, 'assistant', finalContent, {
+              thinking: allThinking,
+              toolCalls,
+              toolResults,
+              events, // Save sequential events for proper display on reload
+            })
+          }
         },
       },
       abortControllerRef.current.signal
@@ -205,7 +279,7 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
 
       <div className="flex-1 overflow-hidden">
         {!hasMessages ? (
-          <div className="h-full flex flex-col items-center justify-center p-4">
+          <div className="h-full flex flex-col items-center justify-center px-6 py-4">
             <div className="max-w-xl w-full space-y-5">
               <div className="text-center space-y-1">
                 <h2 className="text-lg font-medium tracking-tight">
@@ -235,8 +309,8 @@ export function ChatContainer({ initialMessages = [], providers = [] }: ChatCont
         ) : (
           <div className="h-full flex flex-col">
             <ChatMessages messages={messages} isLoading={isLoading} />
-            <div className="border-t border-border/30 p-3">
-              <div className="max-w-3xl mx-auto">
+            <div className="border-t border-border/30 px-6 py-3">
+              <div className="max-w-3xl mx-auto w-full">
                 <ChatInput
                   onSend={handleSendMessage}
                   disabled={!hasProviders}

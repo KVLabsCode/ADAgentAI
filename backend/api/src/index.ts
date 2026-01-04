@@ -58,7 +58,9 @@ app.use("*", errorHandler);
 app.route("/health", healthRoutes);
 
 // Better Auth handler
-app.on(["POST", "GET"], "/api/auth/**", (c) => auth.handler(c.req.raw));
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
+  return auth.handler(c.req.raw);
+});
 
 // API version prefix
 const api = new Hono();

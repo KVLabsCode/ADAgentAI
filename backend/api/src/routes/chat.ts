@@ -25,6 +25,13 @@ const sendMessageSchema = z.object({
   content: z.string().min(1).max(10000),
 });
 
+const saveMessageSchema = z.object({
+  content: z.string().min(1).max(50000),
+  role: z.enum(["user", "assistant"]),
+  agentName: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
 const exportFormatSchema = z.object({
   format: z.enum(["json", "markdown"]).default("json"),
 });
@@ -208,6 +215,52 @@ chat.delete("/session/:id", async (c) => {
 
   return c.json({ success: true });
 });
+
+/**
+ * POST /chat/session/:id/save-message - Save a single message
+ * Used by frontend to persist messages after streaming from agent
+ */
+chat.post(
+  "/session/:id/save-message",
+  zValidator("json", saveMessageSchema),
+  async (c) => {
+    const user = c.get("user");
+    const sessionId = c.req.param("id");
+    const { content, role, agentName, metadata } = c.req.valid("json");
+
+    // Verify session belongs to user
+    const session = await db.query.chatSessions.findFirst({
+      where: and(
+        eq(chatSessions.id, sessionId),
+        eq(chatSessions.userId, user.id)
+      ),
+    });
+
+    if (!session) {
+      return c.json({ error: "Chat session not found" }, 404);
+    }
+
+    // Create message
+    const [message] = await db
+      .insert(messages)
+      .values({
+        sessionId,
+        role,
+        content,
+        agentName: agentName || null,
+        metadata: metadata || null,
+      } satisfies NewMessage)
+      .returning();
+
+    // Update session timestamp
+    await db
+      .update(chatSessions)
+      .set({ updatedAt: new Date() })
+      .where(eq(chatSessions.id, sessionId));
+
+    return c.json({ message }, 201);
+  }
+);
 
 /**
  * GET /chat/session/:id/export - Export chat

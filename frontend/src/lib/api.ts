@@ -40,6 +40,7 @@ export async function streamChat(
   signal?: AbortSignal
 ): Promise<void> {
   const url = `${AGENT_URL}/chat/stream?message=${encodeURIComponent(message)}`;
+  let doneHandled = false; // Prevent duplicate onDone calls
 
   try {
     const response = await fetch(url, {
@@ -47,6 +48,7 @@ export async function streamChat(
       headers: {
         Accept: "text/event-stream",
       },
+      credentials: "include", // Send cookies for auth
       signal,
     });
 
@@ -77,7 +79,14 @@ export async function streamChat(
 
           try {
             const event: StreamEvent = JSON.parse(jsonStr);
-            handleEvent(event, callbacks);
+            if (event.type === "done") {
+              if (!doneHandled) {
+                doneHandled = true;
+                callbacks.onDone?.();
+              }
+            } else {
+              handleEvent(event, callbacks);
+            }
           } catch {
             console.warn("Failed to parse SSE event:", jsonStr);
           }
@@ -85,12 +94,22 @@ export async function streamChat(
       }
     }
 
-    callbacks.onDone?.();
+    // Only call onDone if not already handled by server event
+    if (!doneHandled) {
+      callbacks.onDone?.();
+    }
   } catch (error) {
+    console.error("[streamChat] Error:", error);
     if (error instanceof Error && error.name === "AbortError") {
+      console.log("[streamChat] Request aborted");
       return;
     }
-    callbacks.onError?.(error instanceof Error ? error.message : "Unknown error");
+    // Provide helpful error message for connection failures
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      callbacks.onError?.(`Unable to connect to agent service at ${AGENT_URL}. Please ensure the CrewAI agent is running.`);
+    } else {
+      callbacks.onError?.(error instanceof Error ? error.message : "Unknown error");
+    }
   }
 }
 
@@ -121,8 +140,6 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
     case "error":
       callbacks.onError?.(event.content || "Unknown error");
       break;
-    case "done":
-      callbacks.onDone?.();
-      break;
+    // "done" is handled inline in streamChat to prevent duplicate calls
   }
 }

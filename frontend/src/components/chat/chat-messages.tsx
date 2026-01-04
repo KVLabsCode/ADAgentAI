@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Bot } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UserMessage } from "./user-message"
 import { AssistantMessage } from "./assistant-message"
@@ -22,9 +22,13 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
     }
   }, [messages, isLoading])
 
+  // Check if last message is an empty assistant message (streaming in progress)
+  const lastMessage = messages[messages.length - 1]
+  const isStreaming = lastMessage?.role === "assistant" && !lastMessage.content && isLoading
+
   return (
     <ScrollArea className="flex-1" ref={scrollRef}>
-      <div className="max-w-3xl mx-auto py-4 px-4 space-y-4">
+      <div className="max-w-2xl mx-auto py-6 px-4 space-y-5">
         {messages.map((message) => (
           <div key={message.id}>
             {message.role === "user" ? (
@@ -35,12 +39,16 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
           </div>
         ))}
 
-        {isLoading && (
-          <div className="flex items-center gap-2 text-muted-foreground/70">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-foreground/5 border border-border/30">
-              <Loader2 className="h-3 w-3 animate-spin text-foreground/50" />
+        {/* Show typing indicator only when loading and no streaming message */}
+        {isLoading && !isStreaming && messages.length > 0 && (
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <Bot className="h-4 w-4 text-white" />
             </div>
-            <span className="text-xs">Thinking...</span>
+            <div className="flex items-center gap-2 py-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Thinking...</span>
+            </div>
           </div>
         )}
       </div>

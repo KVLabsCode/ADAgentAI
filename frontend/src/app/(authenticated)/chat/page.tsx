@@ -1,35 +1,70 @@
 "use client"
 
+import * as React from "react"
+import { Loader2 } from "lucide-react"
 import { ChatContainer } from "@/components/chat/chat-container"
 import type { Provider } from "@/lib/types"
 
-// Mock providers - replace with real data from API
-const mockProviders: Provider[] = [
-  {
-    id: "1",
-    type: "admob",
-    status: "connected",
-    displayName: "My AdMob Account",
-    identifiers: {
-      publisherId: "pub-1234567890123456",
-    },
-  },
-  {
-    id: "2",
-    type: "gam",
-    status: "connected",
-    displayName: "Production Network",
-    identifiers: {
-      networkCode: "12345678",
-      accountName: "My Company GAM",
-    },
-  },
-]
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+
+interface ApiProvider {
+  id: string
+  type: "admob" | "gam"
+  name: string
+  identifier: string
+  isEnabled: boolean
+  lastSyncAt: string | null
+  connectedAt: string
+}
 
 export default function ChatPage() {
+  const [providers, setProviders] = React.useState<Provider[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    async function fetchProviders() {
+      try {
+        const response = await fetch(`${API_URL}/api/providers`, {
+          credentials: 'include',
+        })
+
+        if (response.ok) {
+          const data = await response.json() as { providers: ApiProvider[] }
+
+          // Map API response to frontend Provider type
+          const mappedProviders: Provider[] = data.providers.map((p) => ({
+            id: p.id,
+            type: p.type,
+            status: "connected" as const, // API only returns connected providers
+            displayName: p.name,
+            identifiers: p.type === "admob"
+              ? { publisherId: p.identifier }
+              : { networkCode: p.identifier, accountName: p.name },
+          }))
+
+          setProviders(mappedProviders)
+        }
+      } catch (error) {
+        console.error('Failed to fetch providers:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProviders()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="h-full">
-      <ChatContainer providers={mockProviders} />
+      <ChatContainer providers={providers} />
     </div>
   )
 }

@@ -75,8 +75,8 @@ export function PostEditorForm({ post, isEdit = false }: PostEditorFormProps) {
       content,
       status,
       // Author is automatically set to the logged-in admin user
-      authorId: post?.authorId || user.id,
-      authorName: post?.authorName || user.name,
+      authorId: post?.authorId || user?.id || '',
+      authorName: post?.authorName || user?.name || 'Unknown',
     }
 
     const result = await savePost(postData, post?.id)

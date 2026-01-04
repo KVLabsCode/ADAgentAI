@@ -28,7 +28,7 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
 
-  # Flask + CrewAI Agent Service
+  # FastAPI + CrewAI Agent Service
   - type: web
     name: adagentai-agent
     runtime: python
@@ -37,7 +37,7 @@ services:
     branch: main
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn chat_server_callbacks:app --bind 0.0.0.0:$PORT
+    startCommand: uvicorn chat_server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHONUNBUFFERED

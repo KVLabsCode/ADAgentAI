@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -67,7 +68,12 @@ const adminNavItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { toggleSidebar, state } = useSidebar()
-  const { user, isAdmin } = useUser()
+  const { user, isAdmin, signOut } = useUser()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/40">
@@ -179,46 +185,58 @@ export function AppSidebar() {
       <SidebarFooter className="p-2 border-t border-border/40">
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  className="h-9 data-[state=open]:bg-sidebar-accent"
-                  tooltip="Account"
+            {mounted ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    className="h-9 data-[state=open]:bg-sidebar-accent"
+                  >
+                    <Avatar className="h-5 w-5 rounded">
+                      <AvatarImage src={user?.avatar} alt={user?.name || 'User'} />
+                      <AvatarFallback className="rounded bg-muted text-[10px] font-medium">
+                        {user?.name?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left leading-tight">
+                      <span className="truncate text-xs font-medium">{user?.name || 'User'}</span>
+                      <span className="truncate text-[10px] text-muted-foreground">
+                        {user?.email || ''}
+                      </span>
+                    </div>
+                    <ChevronUp className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-[--radix-dropdown-menu-trigger-width] min-w-48"
+                  side="top"
+                  align="start"
+                  sideOffset={4}
                 >
-                  <Avatar className="h-5 w-5 rounded">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="rounded bg-muted text-[10px] font-medium">
-                      {user.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left leading-tight">
-                    <span className="truncate text-xs font-medium">{user.name}</span>
-                    <span className="truncate text-[10px] text-muted-foreground">
-                      {user.email}
-                    </span>
-                  </div>
-                  <ChevronUp className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-48"
-                side="top"
-                align="start"
-                sideOffset={4}
-              >
-                <DropdownMenuItem asChild className="text-xs">
-                  <Link href="/settings" className="cursor-pointer">
-                    <User className="mr-2 h-3.5 w-3.5" />
-                    Account
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer text-xs text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 h-3.5 w-3.5" />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem asChild className="text-xs">
+                    <Link href="/settings" className="cursor-pointer">
+                      <User className="mr-2 h-3.5 w-3.5" />
+                      Account
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={signOut}
+                    className="cursor-pointer text-xs text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 h-3.5 w-3.5" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <SidebarMenuButton className="h-9">
+                <div className="h-5 w-5 rounded bg-muted animate-pulse" />
+                <div className="grid flex-1 gap-1">
+                  <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+                  <div className="h-2 w-28 bg-muted rounded animate-pulse" />
+                </div>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

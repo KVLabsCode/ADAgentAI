@@ -133,4 +133,4 @@ def crew() -> Crew:
 
 
 # Note: Do NOT create crew instances at module load time!
-# The chat_server_callbacks.py creates crews on-demand with routing.
+# The chat_server.py (FastAPI) creates crews on-demand with routing.

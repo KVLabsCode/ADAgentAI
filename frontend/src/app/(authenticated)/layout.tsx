@@ -1,11 +1,13 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun, Loader2 } from "lucide-react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/hooks/use-user"
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
@@ -61,6 +63,33 @@ export default function AuthenticatedLayout({
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
+  const { isLoading, isAuthenticated } = useUser()
+
+  React.useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [isLoading, isAuthenticated, router])
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Don't render protected content if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />

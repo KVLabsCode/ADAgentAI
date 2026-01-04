@@ -3,13 +3,22 @@ Google Ad Manager API Client with OAuth 2.0 authentication.
 
 Complete v1 API client supporting ALL 154 endpoints.
 Auto-generated from discovery document.
+
+Authentication is handled via the shared token service which:
+1. Fetches tokens from the API (auto-refreshed from DB)
+2. Falls back to environment variables
+3. Falls back to service account credentials
 """
 
 import os
+import sys
 from typing import Optional, Dict, Any, List
 import httpx
 
-from .constants import API_BASE_URL, REQUEST_TIMEOUT, OAUTH_SCOPES, DEFAULT_PAGE_SIZE
+from .constants import API_BASE_URL, REQUEST_TIMEOUT, DEFAULT_PAGE_SIZE
+
+# Add parent directory for shared imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class AdManagerAPIError(Exception):
@@ -26,47 +35,49 @@ class AdManagerClient:
     """
     Async client for Google Ad Manager API v1 with OAuth 2.0 authentication.
 
-    Supports ALL 154 API endpoints.
+    Token management is automatic via the shared token service:
+    1. Tokens stored in DB are auto-refreshed via the API
+    2. Falls back to AD_MANAGER_ACCESS_TOKEN env var
+    3. Falls back to service account credentials
     """
 
-    def __init__(self):
-        self._access_token: Optional[str] = None
-        self._credentials = None
+    def __init__(self, user_id: Optional[str] = None):
+        """
+        Initialize Ad Manager client.
+
+        Args:
+            user_id: Optional user ID for user-specific tokens (fetched from DB)
+        """
+        self._user_id = user_id
 
     async def _get_access_token(self) -> str:
-        """Get or refresh the OAuth 2.0 access token."""
+        """Get a valid OAuth 2.0 access token via the token service."""
+        try:
+            from shared.token_service import get_access_token, TokenError
+
+            return await get_access_token("gam", user_id=self._user_id)
+        except ImportError:
+            # Fallback if shared module not available
+            pass
+        except Exception as e:
+            raise AdManagerAPIError(
+                f"Token service error: {str(e)}",
+                details={"user_id": self._user_id}
+            )
+
+        # Legacy fallback: direct env var
         if os.environ.get("AD_MANAGER_ACCESS_TOKEN"):
             return os.environ["AD_MANAGER_ACCESS_TOKEN"]
 
-        credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if credentials_path:
-            try:
-                from google.oauth2 import service_account
-                from google.auth.transport.requests import Request
-
-                if self._credentials is None:
-                    self._credentials = service_account.Credentials.from_service_account_file(
-                        credentials_path,
-                        scopes=OAUTH_SCOPES
-                    )
-
-                if self._credentials.expired or not self._credentials.token:
-                    self._credentials.refresh(Request())
-
-                return self._credentials.token
-            except ImportError:
-                raise AdManagerAPIError(
-                    "Google Auth library not installed. Run: pip install google-auth",
-                    details={"fix": "pip install google-auth"}
-                )
-            except Exception as e:
-                raise AdManagerAPIError(
-                    f"Failed to authenticate with service account: {str(e)}",
-                    details={"credentials_path": credentials_path}
-                )
-
         raise AdManagerAPIError(
-            "No authentication configured. Set AD_MANAGER_ACCESS_TOKEN or GOOGLE_APPLICATION_CREDENTIALS."
+            "No authentication configured. Connect GAM via OAuth or set AD_MANAGER_ACCESS_TOKEN.",
+            details={
+                "options": [
+                    "Connect Google Ad Manager account via the Providers page",
+                    "Set AD_MANAGER_ACCESS_TOKEN environment variable",
+                    "Set GOOGLE_APPLICATION_CREDENTIALS for service account"
+                ]
+            }
         )
 
     async def request(
@@ -1344,9 +1355,31 @@ class AdManagerClient:
 _client: Optional[AdManagerClient] = None
 
 
-def get_client() -> AdManagerClient:
-    """Get or create the global Ad Manager client instance."""
+def get_client(user_id: Optional[str] = None) -> AdManagerClient:
+    """
+    Get or create an Ad Manager client instance.
+
+    Args:
+        user_id: Optional user ID for user-specific tokens.
+                 If provided, tokens are fetched from the API (auto-refreshed).
+                 If None, checks CURRENT_USER_ID env var, then falls back to
+                 env vars or service account.
+
+    Returns:
+        AdManagerClient instance
+    """
     global _client
+
+    # If user_id provided, create user-specific client
+    if user_id:
+        return AdManagerClient(user_id=user_id)
+
+    # Check for user_id from environment (set by chat server)
+    env_user_id = os.environ.get("CURRENT_USER_ID")
+    if env_user_id:
+        return AdManagerClient(user_id=env_user_id)
+
+    # Otherwise use global client for service account / env var auth
     if _client is None:
         _client = AdManagerClient()
     return _client
