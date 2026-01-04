@@ -53,9 +53,13 @@ export const auth = betterAuth({
     },
   },
 
-  // Trusted origins for CORS
+  // Trusted origins for CORS - includes Vercel preview URLs
   trustedOrigins: [
     Bun.env.FRONTEND_URL || "http://localhost:3000",
+    "http://localhost:3000",
+    "http://localhost:3002",
+    // Vercel preview URLs follow pattern: *-sumanth-prasads-projects.vercel.app
+    /\.vercel\.app$/,
   ],
 
   // Callbacks for custom logic

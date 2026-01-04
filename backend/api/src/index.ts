@@ -34,11 +34,42 @@ app.use("*", logger());
 // Security headers
 app.use("*", secureHeaders());
 
-// CORS configuration
+// CORS configuration - supports multiple origins including Vercel previews
+const allowedOrigins = [
+  Bun.env.FRONTEND_URL || "http://localhost:3000",
+  "http://localhost:3000",
+  "http://localhost:3002",
+];
+
+// Add Vercel preview pattern if configured
+const vercelProjectName = Bun.env.VERCEL_PROJECT_NAME;
+
 app.use(
   "*",
   cors({
-    origin: Bun.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return allowedOrigins[0];
+
+      // Check exact matches
+      if (allowedOrigins.includes(origin)) return origin;
+
+      // Allow Vercel preview deployments (pattern: *-username-projects.vercel.app)
+      if (origin.endsWith(".vercel.app")) {
+        // Allow all Vercel preview URLs for this project
+        if (vercelProjectName && origin.includes(vercelProjectName)) {
+          return origin;
+        }
+        // Also allow common Vercel patterns for the project
+        if (origin.includes("sumanth-prasads-projects")) {
+          return origin;
+        }
+      }
+
+      // Fallback - don't allow
+      console.warn(`CORS blocked origin: ${origin}`);
+      return allowedOrigins[0];
+    },
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
