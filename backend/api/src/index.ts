@@ -39,6 +39,7 @@ const allowedOrigins = [
   Bun.env.FRONTEND_URL || "http://localhost:3000",
   "http://localhost:3000",
   "http://localhost:3002",
+  "https://ad-agent-ai.vercel.app",
 ];
 
 // Add Vercel preview pattern if configured

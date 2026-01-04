@@ -57,7 +57,9 @@ export async function requireAdmin(c: Context, next: Next) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 
-  if (user.role !== "admin") {
+  // Access role from user object (added via additionalFields in auth config)
+  const userRole = (user as unknown as { role?: string }).role;
+  if (userRole !== "admin") {
     throw new HTTPException(403, { message: "Forbidden: Admin access required" });
   }
 

@@ -54,13 +54,24 @@ export const auth = betterAuth({
   },
 
   // Trusted origins for CORS - includes Vercel preview URLs
-  trustedOrigins: [
-    Bun.env.FRONTEND_URL || "http://localhost:3000",
-    "http://localhost:3000",
-    "http://localhost:3002",
-    // Vercel preview URLs follow pattern: *-sumanth-prasads-projects.vercel.app
-    /\.vercel\.app$/,
-  ],
+  trustedOrigins: async (request) => {
+    const baseOrigins = [
+      Bun.env.FRONTEND_URL || "http://localhost:3000",
+      "http://localhost:3000",
+      "http://localhost:3002",
+      "https://ad-agent-ai.vercel.app",
+    ];
+
+    // If request has an origin header that's a Vercel preview URL, add it dynamically
+    if (request) {
+      const origin = request.headers.get("origin");
+      if (origin && origin.endsWith(".vercel.app") && !baseOrigins.includes(origin)) {
+        baseOrigins.push(origin);
+      }
+    }
+
+    return baseOrigins;
+  },
 
   // Callbacks for custom logic
   callbacks: {
