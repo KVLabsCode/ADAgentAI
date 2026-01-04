@@ -42,6 +42,19 @@ export const auth = betterAuth({
     },
   },
 
+  // Advanced cookie configuration for cross-origin auth
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+    },
+    defaultCookieAttributes: {
+      sameSite: "none" as const,
+      secure: true,
+      httpOnly: true,
+      path: "/",
+    },
+  },
+
   // User configuration
   user: {
     additionalFields: {
