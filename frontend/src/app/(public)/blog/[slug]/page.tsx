@@ -1,15 +1,14 @@
-"use client"
-
-import { use } from "react"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Calendar, Clock, Twitter, Linkedin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { usePublicBlogPost, useRelatedPosts } from "@/hooks/use-public-blog"
+import { getPostBySlug, getRelatedPosts, getAllSlugs } from "@/lib/blog"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+
+export const dynamic = "force-dynamic"
+export const revalidate = 60
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -23,46 +22,19 @@ function formatDate(dateString: string) {
   })
 }
 
-function LoadingSkeleton() {
-  return (
-    <article className="py-12">
-      <div className="container mx-auto px-4">
-        <div className="max-w-2xl mx-auto">
-          <Skeleton className="h-4 w-24 mb-8" />
-          <Skeleton className="h-6 w-20 mb-4" />
-          <Skeleton className="h-10 w-full mb-4" />
-          <Skeleton className="h-4 w-3/4 mb-6" />
-          <div className="flex items-center justify-between py-4 border-y border-border/50 mb-8">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-8 rounded-full" />
-              <div>
-                <Skeleton className="h-4 w-24 mb-1" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            </div>
-            <Skeleton className="h-4 w-32" />
-          </div>
-          <div className="space-y-4">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        </div>
-      </div>
-    </article>
-  )
+export async function generateStaticParams() {
+  const slugs = await getAllSlugs()
+  return slugs.map((slug) => ({ slug }))
 }
 
-function BlogPostContent({ slug }: { slug: string }) {
-  const { post, isLoading, error } = usePublicBlogPost(slug)
-  const { posts: relatedPosts } = useRelatedPosts(slug)
+export default async function BlogPostPage({ params }: Props) {
+  const { slug } = await params
+  const [post, relatedPosts] = await Promise.all([
+    getPostBySlug(slug),
+    getRelatedPosts(slug),
+  ])
 
-  if (isLoading) {
-    return <LoadingSkeleton />
-  }
-
-  if (error || !post) {
+  if (!post) {
     notFound()
   }
 
@@ -147,7 +119,7 @@ function BlogPostContent({ slug }: { slug: string }) {
                 ),
                 li: ({ children }) => (
                   <li className="text-sm text-muted-foreground leading-relaxed flex gap-2">
-                    <span className="text-emerald-500 mt-1">•</span>
+                    <span className="text-emerald-500 mt-1">*</span>
                     <span>{children}</span>
                   </li>
                 ),
@@ -249,9 +221,4 @@ function BlogPostContent({ slug }: { slug: string }) {
       </div>
     </article>
   )
-}
-
-export default function BlogPostPage({ params }: Props) {
-  const { slug } = use(params)
-  return <BlogPostContent slug={slug} />
 }

@@ -38,6 +38,8 @@ function LoginContent() {
   const [isLoading, setIsLoading] = React.useState(false)
 
   const error = searchParams.get("error")
+  const redirectTo = searchParams.get("redirect") // Get redirect param if present
+
   const errorMessage = React.useMemo(() => {
     switch (error) {
       case "access_denied":
@@ -58,10 +60,12 @@ function LoginContent() {
     try {
       // Use absolute URLs to ensure redirect goes to frontend, not backend
       const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      // Use redirect param if provided, otherwise default to dashboard
+      const callbackPath = redirectTo || "/dashboard"
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: `${frontendUrl}/dashboard`,
-        errorCallbackURL: `${frontendUrl}/login?error=auth_failed`,
+        callbackURL: `${frontendUrl}${callbackPath}`,
+        errorCallbackURL: `${frontendUrl}/login?error=auth_failed${redirectTo ? `&redirect=${encodeURIComponent(redirectTo)}` : ""}`,
       })
     } catch (error) {
       console.error('Sign in error:', error)

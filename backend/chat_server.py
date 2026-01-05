@@ -115,6 +115,40 @@ class DoneEvent(BaseModel):
 API_URL = os.environ.get("API_URL", "http://localhost:3001")
 
 
+async def get_user_providers(user_id: str) -> list[dict]:
+    """
+    Fetch connected providers for a user from the main API.
+
+    Returns list of provider dicts with 'type', 'name', 'identifier' (account ID).
+    """
+    if not user_id:
+        return []
+
+    try:
+        # Use internal API key for server-to-server call
+        internal_api_key = os.environ.get("INTERNAL_API_KEY", "")
+        if not internal_api_key:
+            print("  Warning: INTERNAL_API_KEY not set, cannot fetch providers")
+            return []
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(
+                f"{API_URL}/api/providers/internal/list",
+                params={"userId": user_id},
+                headers={"x-internal-api-key": internal_api_key},
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("providers", [])
+            else:
+                print(f"  Provider fetch failed: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"  Error fetching providers: {e}")
+        return []
+
+
 async def get_current_user(request: Request) -> Optional[dict]:
     """
     Validate session and get current user from the main API.
@@ -391,7 +425,13 @@ def capture_tool_result(context):
 # Crew Creation
 # =============================================================================
 
-def create_crew_for_query(user_query: str, service: str, capability: str, user_id: Optional[str] = None) -> Crew:
+def create_crew_for_query(
+    user_query: str,
+    service: str,
+    capability: str,
+    user_id: Optional[str] = None,
+    providers: Optional[list[dict]] = None
+) -> Crew:
     """Create a streaming crew routed to the appropriate specialist."""
     factory = get_factory()
 
@@ -401,18 +441,42 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
 
     specialist = factory.create_specialist(service, capability, verbose=False)
 
+    # Build provider context for the agent
+    provider_context = ""
+    if providers:
+        admob_accounts = [p for p in providers if p.get("type") == "admob"]
+        gam_accounts = [p for p in providers if p.get("type") == "gam"]
+
+        if admob_accounts:
+            admob_info = ", ".join([f"{p.get('name', 'Account')} (ID: {p.get('identifier', 'unknown')})" for p in admob_accounts])
+            provider_context += f"\nConnected AdMob accounts: {admob_info}"
+
+        if gam_accounts:
+            gam_info = ", ".join([f"{p.get('name', 'Network')} (network code: {p.get('identifier', 'unknown')})" for p in gam_accounts])
+            provider_context += f"\nConnected Ad Manager networks: {gam_info}"
+
     # Service-specific instructions
     if service == "general":
-        instructions = """
+        instructions = f"""
         You are a helpful ad platform assistant. Respond naturally and directly.
         For greetings, respond briefly and offer to help with AdMob or Ad Manager.
         For capability questions, briefly list what you can do.
         Keep responses short and friendly.
+        {provider_context}
         """
     elif service == "admob":
-        instructions = """
+        # Get the first AdMob account ID if available
+        admob_providers = [p for p in (providers or []) if p.get("type") == "admob"]
+        if admob_providers:
+            account_id = admob_providers[0].get("identifier", "")
+            account_instruction = f"Use account_id: {account_id} (already known - do NOT call list_accounts)"
+        else:
+            account_instruction = "Call list_accounts ONCE to get account_id, then reuse it"
+
+        instructions = f"""
         Instructions for AdMob:
-        - List accounts ONCE at start only if needed, then reuse that account_id
+        {provider_context}
+        - {account_instruction}
         - Choose the RIGHT dimension for the query:
           * "top ad units" or "ad unit performance" → AD_UNIT dimension
           * "top apps" or "app performance" → APP dimension
@@ -422,11 +486,20 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
         - Make ONE report call with correct dimensions - don't retry
         """
     else:
-        instructions = """
+        # Get the first GAM network code if available
+        gam_providers = [p for p in (providers or []) if p.get("type") == "gam"]
+        if gam_providers:
+            network_code = gam_providers[0].get("identifier", "")
+            network_instruction = f"Use network_code: {network_code} (already known - do NOT call list_networks)"
+        else:
+            network_instruction = "Call list_networks ONCE to get network_code if needed"
+
+        instructions = f"""
         Instructions for Ad Manager:
-        - For reports/analytics: directly use report tools (network is auto-detected)
+        {provider_context}
+        - {network_instruction}
+        - For reports/analytics: directly use report tools
         - For ad units/placements: use list tools directly
-        - Only use "List Networks" if user asks about network structure
         - Go straight to answering the question
         """
 
@@ -482,6 +555,11 @@ async def stream_crew_response(user_message: str, user_id: Optional[str] = None)
     global _current_collector
 
     try:
+        # Fetch user's connected providers
+        providers = await get_user_providers(user_id) if user_id else []
+        if providers:
+            print(f"  User has {len(providers)} connected provider(s)")
+
         # Classify and route query
         service, capability = await classify_query(user_message)
         print(f"  Routed to: {service}/{capability} (user: {user_id or 'anonymous'})")
@@ -491,8 +569,8 @@ async def stream_crew_response(user_message: str, user_id: Optional[str] = None)
         # Set up event collector for tool calls
         _current_collector = ToolEventCollector()
 
-        # Create crew with user context for OAuth tokens
-        crew = create_crew_for_query(user_message, service, capability, user_id=user_id)
+        # Create crew with user context for OAuth tokens and provider info
+        crew = create_crew_for_query(user_message, service, capability, user_id=user_id, providers=providers)
 
         # Start async streaming
         streaming = await crew.kickoff_async(inputs={'user_query': user_message})

@@ -13,9 +13,9 @@ const providers = new Hono();
 
 // Most routes require authentication
 providers.use("*", async (c, next) => {
-  // Skip auth only for internal token endpoint (uses API key instead)
+  // Skip auth for internal endpoints (uses API key instead)
   const path = c.req.path;
-  if (path.endsWith("/internal/token")) {
+  if (path.includes("/internal/")) {
     return next();
   }
   return requireAuth(c, next);
@@ -371,6 +371,48 @@ providers.get(
     });
   }
 );
+
+/**
+ * GET /providers/internal/list - Internal endpoint for fetching user's providers
+ * Protected by internal API key. Used by chat server.
+ */
+providers.get("/internal/list", async (c) => {
+  // Verify internal API key
+  const apiKey = c.req.header("x-internal-api-key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const userId = c.req.query("userId");
+  if (!userId) {
+    return c.json({ error: "userId is required" }, 400);
+  }
+
+  const userProviders = await db.query.connectedProviders.findMany({
+    where: and(
+      eq(connectedProviders.userId, userId),
+      eq(connectedProviders.isEnabled, true)
+    ),
+    columns: {
+      id: true,
+      provider: true,
+      publisherId: true,
+      networkCode: true,
+      accountName: true,
+    },
+  });
+
+  return c.json({
+    providers: userProviders.map((p) => ({
+      id: p.id,
+      type: p.provider,
+      name: p.accountName || getProviderDisplayName(p.provider),
+      identifier: p.provider === "admob" ? p.publisherId : p.networkCode,
+    })),
+  });
+});
 
 /**
  * POST /providers/internal/token - Internal endpoint for services (no user auth)

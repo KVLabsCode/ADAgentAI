@@ -1,106 +1,139 @@
-import fs from "fs"
-import path from "path"
-import matter from "gray-matter"
-import readingTime from "reading-time"
-
-const BLOG_DIR = path.join(process.cwd(), "content/blog")
+// Server-side blog data fetching (no CORS issues)
+import { sanityClient, blogQueries, isSanityConfigured, type SanityBlogPost } from "./sanity"
 
 export interface BlogPost {
   slug: string
   title: string
   excerpt: string
+  content: string
+  category: string
+  featured: boolean
   date: string
   readTime: string
   author: {
     name: string
     role: string
   }
-  category: string
-  featured: boolean
-  content: string
 }
 
 export interface BlogPostMeta {
   slug: string
   title: string
   excerpt: string
+  category: string
+  featured: boolean
   date: string
   readTime: string
   author: {
     name: string
     role: string
   }
-  category: string
-  featured: boolean
 }
 
-export function getAllPosts(): BlogPostMeta[] {
-  if (!fs.existsSync(BLOG_DIR)) {
+// Calculate reading time from content
+function calculateReadTime(content: string): string {
+  const wordsPerMinute = 200
+  const words = content.trim().split(/\s+/).length
+  const minutes = Math.ceil(words / wordsPerMinute)
+  return `${minutes} min read`
+}
+
+// Transform Sanity post to blog format
+function transformPost(post: SanityBlogPost): BlogPost {
+  return {
+    slug: post.slug,
+    title: post.title,
+    excerpt: post.excerpt,
+    content: post.content,
+    category: post.category,
+    featured: post.featured,
+    date: post.publishedAt || post.createdAt,
+    readTime: calculateReadTime(post.content || ""),
+    author: {
+      name: post.authorName || "ADAgent Team",
+      role: post.authorRole || "",
+    },
+  }
+}
+
+function toMeta(post: BlogPost): BlogPostMeta {
+  return {
+    slug: post.slug,
+    title: post.title,
+    excerpt: post.excerpt,
+    category: post.category,
+    featured: post.featured,
+    date: post.date,
+    readTime: post.readTime,
+    author: post.author,
+  }
+}
+
+// Server-side: Get all published posts
+export async function getAllPosts(): Promise<BlogPostMeta[]> {
+  if (!isSanityConfigured()) {
     return []
   }
 
-  const files = fs.readdirSync(BLOG_DIR).filter((file) => file.endsWith(".mdx"))
-
-  const posts = files.map((file) => {
-    const slug = file.replace(".mdx", "")
-    const filePath = path.join(BLOG_DIR, file)
-    const fileContent = fs.readFileSync(filePath, "utf-8")
-    const { data, content } = matter(fileContent)
-    const { text: readTime } = readingTime(content)
-
-    return {
-      slug,
-      title: data.title || "",
-      excerpt: data.excerpt || "",
-      date: data.date || "",
-      readTime,
-      author: {
-        name: data.author?.name || "ADAgent Team",
-        role: data.author?.role || "",
-      },
-      category: data.category || "",
-      featured: data.featured || false,
-    }
-  })
-
-  // Sort by date descending
-  return posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  try {
+    const sanityPosts = await sanityClient.fetch<SanityBlogPost[]>(
+      blogQueries.allPublishedPosts
+    )
+    const posts = sanityPosts.map(transformPost).map(toMeta)
+    posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return posts
+  } catch (err) {
+    console.error("Failed to fetch blog posts:", err)
+    return []
+  }
 }
 
-export function getPostBySlug(slug: string): BlogPost | null {
-  const filePath = path.join(BLOG_DIR, `${slug}.mdx`)
-
-  if (!fs.existsSync(filePath)) {
+// Server-side: Get single post by slug
+export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
+  if (!isSanityConfigured()) {
     return null
   }
 
-  const fileContent = fs.readFileSync(filePath, "utf-8")
-  const { data, content } = matter(fileContent)
-  const { text: readTime } = readingTime(content)
-
-  return {
-    slug,
-    title: data.title || "",
-    excerpt: data.excerpt || "",
-    date: data.date || "",
-    readTime,
-    author: {
-      name: data.author?.name || "ADAgent Team",
-      role: data.author?.role || "",
-    },
-    category: data.category || "",
-    featured: data.featured || false,
-    content,
+  try {
+    const post = await sanityClient.fetch<SanityBlogPost | null>(
+      blogQueries.postBySlug,
+      { slug }
+    )
+    return post ? transformPost(post) : null
+  } catch (err) {
+    console.error("Failed to fetch blog post:", err)
+    return null
   }
 }
 
-export function getAllSlugs(): string[] {
-  if (!fs.existsSync(BLOG_DIR)) {
+// Server-side: Get related posts
+export async function getRelatedPosts(currentSlug: string): Promise<BlogPostMeta[]> {
+  if (!isSanityConfigured()) {
     return []
   }
 
-  return fs
-    .readdirSync(BLOG_DIR)
-    .filter((file) => file.endsWith(".mdx"))
-    .map((file) => file.replace(".mdx", ""))
+  try {
+    const sanityPosts = await sanityClient.fetch<SanityBlogPost[]>(
+      blogQueries.relatedPosts,
+      { slug: currentSlug }
+    )
+    return sanityPosts.map(transformPost).map(toMeta)
+  } catch (err) {
+    console.error("Failed to fetch related posts:", err)
+    return []
+  }
+}
+
+// Get all slugs for static generation
+export async function getAllSlugs(): Promise<string[]> {
+  if (!isSanityConfigured()) {
+    return []
+  }
+
+  try {
+    const posts = await getAllPosts()
+    return posts.map(p => p.slug)
+  } catch {
+    return []
+  }
 }

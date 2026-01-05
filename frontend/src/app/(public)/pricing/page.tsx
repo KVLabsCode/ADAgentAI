@@ -18,7 +18,7 @@ const tiers = [
       "Community support",
     ],
     cta: "Get Started",
-    href: "/login",
+    href: "/login?redirect=/dashboard",
     highlighted: false,
   },
   {
@@ -36,7 +36,7 @@ const tiers = [
       "Custom reports",
     ],
     cta: "Start Free Trial",
-    href: "/login",
+    href: "/login?redirect=/billing",
     highlighted: true,
   },
   {
