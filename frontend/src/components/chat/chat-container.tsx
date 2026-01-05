@@ -270,43 +270,55 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         <ChatHeader hasProviders={hasProviders} />
       </div>
 
-      {/* Scrollable content area */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {!hasMessages ? (
-          <div className="h-full flex flex-col items-center justify-center px-6 py-4">
-            <div className="max-w-xl w-full space-y-5">
-              <div className="text-center space-y-1">
-                <h2 className="text-lg font-medium tracking-tight">
-                  {hasProviders ? "How can I help you today?" : "Connect a provider to start"}
-                </h2>
-                <p className="text-xs text-muted-foreground/70">
-                  {hasProviders
-                    ? "Ask about your ad performance, create reports, or get optimization tips."
-                    : "Link your AdMob or Google Ad Manager account to begin."}
-                </p>
-              </div>
+      {!hasMessages ? (
+        /* Empty state - centered content with input */
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
+          <div className="max-w-xl w-full space-y-6">
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-medium tracking-tight">
+                {hasProviders ? "How can I help you today?" : "Connect a provider to start"}
+              </h2>
+              <p className="text-xs text-muted-foreground/70">
+                {hasProviders
+                  ? "Ask about your ad performance, create reports, or get optimization tips."
+                  : "Link your AdMob or Google Ad Manager account to begin."}
+              </p>
+            </div>
 
-              {hasProviders && (
-                <ExamplePrompts onPromptClick={handlePromptClick} />
-              )}
+            {/* Centered Input */}
+            <div className="w-full">
+              <ChatInput
+                onSend={handleSendMessage}
+                disabled={!hasProviders}
+                isLoading={isLoading}
+                placeholder={hasProviders ? "Ask anything about your ads..." : "Connect a provider first"}
+              />
+            </div>
+
+            {hasProviders && (
+              <ExamplePrompts onPromptClick={handlePromptClick} />
+            )}
+          </div>
+        </div>
+      ) : (
+        /* With messages - scrollable content + sticky input */
+        <>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <ChatMessages messages={messages} isLoading={isLoading} />
+          </div>
+
+          {/* Sticky Input at bottom */}
+          <div className="shrink-0 bg-background/95 backdrop-blur-sm border-t border-border/30 px-6 py-3">
+            <div className="max-w-6xl mx-auto w-full">
+              <ChatInput
+                onSend={handleSendMessage}
+                disabled={!hasProviders}
+                isLoading={isLoading}
+              />
             </div>
           </div>
-        ) : (
-          <ChatMessages messages={messages} isLoading={isLoading} />
-        )}
-      </div>
-
-      {/* Fixed Input - always visible at bottom */}
-      <div className="shrink-0 bg-background/95 backdrop-blur-sm border-t border-border/30 px-6 py-3">
-        <div className="max-w-6xl mx-auto w-full">
-          <ChatInput
-            onSend={handleSendMessage}
-            disabled={!hasProviders}
-            isLoading={isLoading}
-            placeholder={!hasMessages && hasProviders ? "Ask anything about your ads..." : !hasProviders ? "Connect a provider first" : undefined}
-          />
-        </div>
-      </div>
+        </>
+      )}
     </div>
   )
 }

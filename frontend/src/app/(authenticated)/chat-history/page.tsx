@@ -33,6 +33,21 @@ interface ChatHistoryItem {
   date: string
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '') // Remove headers
+    .replace(/\*\*(.+?)\*\*/g, '$1') // Bold **text**
+    .replace(/\*(.+?)\*/g, '$1') // Italic *text*
+    .replace(/__(.+?)__/g, '$1') // Bold __text__
+    .replace(/_(.+?)_/g, '$1') // Italic _text_
+    .replace(/^[\s]*[-*+]\s+/gm, '') // Bullet points
+    .replace(/^\d+\.\s+/gm, '') // Numbered lists
+    .replace(/`(.+?)`/g, '$1') // Inline code
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Links [text](url)
+    .replace(/\n+/g, ' ') // Collapse newlines to spaces
+    .trim()
+}
+
 function formatRelativeDate(dateStr: string): string {
   const date = new Date(dateStr)
   const now = new Date()
@@ -186,7 +201,7 @@ export default function ChatHistoryPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                  {chat.preview}
+                  {stripMarkdown(chat.preview)}
                 </p>
               </Link>
 
