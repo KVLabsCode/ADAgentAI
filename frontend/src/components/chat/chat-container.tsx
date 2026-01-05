@@ -268,10 +268,13 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
 
   return (
     <div className="flex flex-col h-full">
-      <ChatHeader
-        onSettingsClick={() => setSettingsOpen(true)}
-        hasProviders={hasProviders}
-      />
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
+        <ChatHeader
+          onSettingsClick={() => setSettingsOpen(true)}
+          hasProviders={hasProviders}
+        />
+      </div>
 
       <ChatSettingsPanel
         open={settingsOpen}
@@ -281,9 +284,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         onToggleProvider={handleToggleProvider}
       />
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {!hasMessages ? (
-          <div className="h-full flex flex-col items-center justify-center px-6 py-4">
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
             <div className="max-w-xl w-full space-y-5">
               <div className="text-center space-y-1">
                 <h2 className="text-lg font-medium tracking-tight">
@@ -311,9 +314,12 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col">
-            <ChatMessages messages={messages} isLoading={isLoading} />
-            <div className="border-t border-border/30 px-6 py-3">
+          <>
+            <div className="flex-1 overflow-y-auto">
+              <ChatMessages messages={messages} isLoading={isLoading} />
+            </div>
+            {/* Sticky Input at Bottom */}
+            <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border/30 px-6 py-3">
               <div className="max-w-6xl mx-auto w-full">
                 <ChatInput
                   onSend={handleSendMessage}
@@ -322,7 +328,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
                 />
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

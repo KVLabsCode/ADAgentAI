@@ -1,15 +1,17 @@
 "use client"
 
 import * as React from "react"
-import { Moon, Sun, Monitor, Bell, Shield, User } from "lucide-react"
+import { Moon, Sun, Monitor, Bell, Shield, User, MessageSquare, Brain } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { useChatSettings } from "@/lib/chat-settings"
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const { displayMode, setDisplayMode } = useChatSettings()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
@@ -28,6 +30,33 @@ export default function SettingsPage() {
           Manage your application preferences.
         </p>
       </div>
+
+      {/* Chat Display */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Chat Display
+          </CardTitle>
+          <CardDescription>
+            Configure how agent activity is displayed in chat.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Compact mode</p>
+              <p className="text-xs text-muted-foreground">
+                Show thinking and tool calls in a single combined box instead of separate blocks.
+              </p>
+            </div>
+            <Switch
+              checked={displayMode === "compact"}
+              onCheckedChange={(checked) => setDisplayMode(checked ? "compact" : "detailed")}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Appearance */}
       <Card>
