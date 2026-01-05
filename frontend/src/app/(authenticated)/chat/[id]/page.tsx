@@ -106,6 +106,7 @@ export default function ChatSessionPage({
   return (
     <div className="h-full">
       <ChatContainer
+        key={sessionId}
         providers={providers}
         initialMessages={messages}
         sessionId={sessionId}

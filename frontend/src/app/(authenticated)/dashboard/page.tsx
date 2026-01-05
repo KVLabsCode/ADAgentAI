@@ -1,52 +1,89 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
-import { MessageSquarePlus, Plug, ArrowRight, History, Sparkles } from "lucide-react"
+import { MessageSquarePlus, Plug, ArrowRight, History, Loader2 } from "lucide-react"
+import { authClient } from "@/lib/auth-client"
 
-// Mock user data - replace with auth context
-const mockUser = {
-  name: "User",
-  email: "user@example.com",
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+
+interface ApiSession {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
 }
 
-// Mock data - replace with real API calls
-const mockStats = {
-  connectedProviders: 1,
-  recentChats: 2,
+interface ApiProvider {
+  id: string
+  type: "admob" | "gam"
+  name: string
 }
 
-const mockRecentChats = [
-  {
-    id: "1",
-    title: "Revenue analysis for December",
-    preview: "What was my total ad revenue in December?",
-    date: "Today",
-  },
-  {
-    id: "2",
-    title: "Ad unit optimization",
-    preview: "Which ad units should I focus on?",
-    date: "Yesterday",
-  },
-  {
-    id: "3",
-    title: "eCPM trends this quarter",
-    preview: "Show me eCPM trends over Q4",
-    date: "2 days ago",
-  },
-]
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return "Today"
+  if (diffDays === 1) return "Yesterday"
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+  return date.toLocaleDateString()
+}
 
 export default function DashboardPage() {
-  const user = mockUser
-  const stats = mockStats
-  const recentChats = mockRecentChats
+  const { data: session } = authClient.useSession()
+  const [providers, setProviders] = React.useState<ApiProvider[]>([])
+  const [recentChats, setRecentChats] = React.useState<ApiSession[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    async function fetchData() {
+      try {
+        const [providersRes, sessionsRes] = await Promise.all([
+          fetch(`${API_URL}/api/providers`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/chat/sessions`, { credentials: 'include' }),
+        ])
+
+        if (providersRes.ok) {
+          const data = await providersRes.json()
+          setProviders(data.providers || [])
+        }
+
+        if (sessionsRes.ok) {
+          const data = await sessionsRes.json()
+          setRecentChats(data.sessions || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User'
+  const connectedProviders = providers.length
+  const chatCount = recentChats.length
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
       {/* Welcome */}
       <div className="space-y-0.5">
         <h1 className="text-base font-medium tracking-tight">
-          Welcome back, {user.name}
+          Welcome back, {userName}
         </h1>
         <p className="text-xs text-muted-foreground/80">
           Manage your ad platforms with AI-powered assistance.
@@ -60,9 +97,9 @@ export default function DashboardPage() {
             <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wide">Providers</span>
             <Plug className="h-3 w-3 text-muted-foreground/50" />
           </div>
-          <div className="text-xl font-medium tabular-nums">{stats.connectedProviders}</div>
+          <div className="text-xl font-medium tabular-nums">{connectedProviders}</div>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            {stats.connectedProviders === 0 ? "No providers connected" : "Connected accounts"}
+            {connectedProviders === 0 ? "No providers connected" : "Connected accounts"}
           </p>
         </div>
 
@@ -71,8 +108,8 @@ export default function DashboardPage() {
             <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wide">Chats</span>
             <History className="h-3 w-3 text-muted-foreground/50" />
           </div>
-          <div className="text-xl font-medium tabular-nums">{stats.recentChats}</div>
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">This week</p>
+          <div className="text-xl font-medium tabular-nums">{chatCount}</div>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">Total conversations</p>
         </div>
       </div>
 
@@ -143,9 +180,10 @@ export default function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-medium truncate">{chat.title}</p>
-                      <span className="text-[10px] text-muted-foreground/50 shrink-0">{chat.date}</span>
+                      <span className="text-[10px] text-muted-foreground/50 shrink-0">
+                        {formatRelativeDate(chat.updatedAt || chat.createdAt)}
+                      </span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{chat.preview}</p>
                   </div>
                   <ArrowRight className="h-3 w-3 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 ml-2 transition-colors" />
                 </Link>
