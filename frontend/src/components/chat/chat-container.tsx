@@ -6,7 +6,6 @@ import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
-import { ChatSettingsPanel } from "./chat-settings-panel"
 import { streamChat, type ChatHistoryMessage } from "@/lib/api"
 import { authClient } from "@/lib/auth-client"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
@@ -24,11 +23,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   const { data: session } = authClient.useSession()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
-  const [settingsOpen, setSettingsOpen] = React.useState(false)
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
-  const [enabledProviders, setEnabledProviders] = React.useState<string[]>(
-    providers.filter(p => p.status === "connected").map(p => p.id)
-  )
   const abortControllerRef = React.useRef<AbortController | null>(null)
 
   const hasProviders = providers.some(p => p.status === "connected")
@@ -261,14 +256,6 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     handleSendMessage(prompt)
   }
 
-  const handleToggleProvider = (providerId: string) => {
-    setEnabledProviders(prev =>
-      prev.includes(providerId)
-        ? prev.filter(id => id !== providerId)
-        : [...prev, providerId]
-    )
-  }
-
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
@@ -280,19 +267,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     <div className="flex flex-col h-full overflow-hidden">
       {/* Fixed Header - always visible at top */}
       <div className="shrink-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40">
-        <ChatHeader
-          onSettingsClick={() => setSettingsOpen(true)}
-          hasProviders={hasProviders}
-        />
+        <ChatHeader hasProviders={hasProviders} />
       </div>
-
-      <ChatSettingsPanel
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        providers={providers}
-        enabledProviders={enabledProviders}
-        onToggleProvider={handleToggleProvider}
-      />
 
       {/* Scrollable content area */}
       <div className="flex-1 min-h-0 overflow-y-auto">

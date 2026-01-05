@@ -20,12 +20,12 @@ interface AssistantMessageProps {
   message: Message
 }
 
-// Convert single newlines to double newlines for markdown paragraph rendering
+// Preserve newlines for markdown - convert \r\n to \n and ensure blank lines are kept
 function normalizeNewlines(content: string): string {
   if (!content) return ""
   return content
-    .replace(/\r\n/g, '\n')
-    .replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
+    .replace(/\r\n/g, '\n')  // Normalize Windows line endings
+    .replace(/\n{3,}/g, '\n\n')  // Collapse excessive blank lines to double
 }
 
 // Check if a tool is a write/dangerous operation that needs approval
