@@ -20,8 +20,9 @@ pydantic>=2.0.0
 # Environment management
 python-dotenv
 
-# HTTP client (needed by admob_mcp)
+# HTTP client (needed by admob_mcp and session validation)
 httpx
+requests
 
 # Google Auth (for service account credentials)
 google-auth

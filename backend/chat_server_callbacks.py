@@ -16,11 +16,16 @@ import json
 import queue
 import threading
 from pathlib import Path
+from typing import Optional
 from flask import Flask, request, Response, stream_with_context
 from flask_cors import CORS
+import requests as http_requests  # Renamed to avoid conflict with flask.request
 
 # Set environment before imports
 os.environ.setdefault("MODEL", "anthropic/claude-sonnet-4-20250514")
+
+# API URL for session validation (main Bun/Hono API)
+API_URL = os.environ.get("API_URL", "http://localhost:3001")
 
 # Add project to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -105,6 +110,41 @@ def classify_query(user_query: str) -> tuple[str, str]:
         print(f"Classification error: {e}, defaulting to admob_inventory")
         return ("admob", "inventory")
 
+
+def get_current_user() -> Optional[dict]:
+    """
+    Validate session and get current user from the main API.
+
+    Forwards cookies to the API to validate the Better Auth session.
+    Returns user dict with 'id' if authenticated, None otherwise.
+    """
+    # Get cookies from the Flask request
+    cookies = {key: value for key, value in request.cookies.items()}
+
+    if not cookies:
+        print("  No cookies found in request")
+        return None
+
+    try:
+        # Call the main API's session endpoint
+        response = http_requests.get(
+            f"{API_URL}/api/auth/get-session",
+            cookies=cookies,
+            timeout=10,
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            # Better Auth returns { session: {...}, user: {...} }
+            if data and data.get("user"):
+                return data["user"]
+        print(f"  Session validation returned status {response.status_code}")
+        return None
+    except Exception as e:
+        print(f"  Auth validation error: {e}")
+        return None
+
+
 app = Flask(__name__)
 CORS(app,
      origins=[
@@ -159,16 +199,22 @@ def capture_tool_result(context):
     return None
 
 
-def get_crew_for_query(user_query: str) -> tuple[Crew, str, str]:
+def get_crew_for_query(user_query: str, user_id: Optional[str] = None) -> tuple[Crew, str, str]:
     """
     Create a crew with streaming enabled, routed to the appropriate specialist.
 
     Args:
         user_query: The user's query to route
+        user_id: Optional user ID for fetching user-specific OAuth tokens
 
     Returns:
         Tuple of (crew, service, capability) for logging
     """
+    # Pass user_id to factory so tools can fetch user-specific tokens
+    if user_id:
+        os.environ["CURRENT_USER_ID"] = user_id
+        print(f"  Set CURRENT_USER_ID: {user_id}")
+
     factory = get_factory()
 
     # Step 1: Classify the query to determine routing
@@ -767,6 +813,11 @@ def chat_stream():
         return Response("data: " + json.dumps({"type": "error", "content": "No message provided"}) + "\n\n",
                        mimetype='text/event-stream')
 
+    # Authenticate user and get user_id
+    user = get_current_user()
+    user_id = user.get("id") if user else None
+    print(f"  Chat request from user: {user_id or 'anonymous'}")
+
     @stream_with_context
     def generate():
         """Generator function for SSE streaming."""
@@ -776,8 +827,8 @@ def chat_stream():
             global _tool_event_queue
             _tool_event_queue = queue.Queue()
 
-            # Route to the appropriate specialist based on query
-            crew, service, capability = get_crew_for_query(user_message)
+            # Route to the appropriate specialist based on query (with user_id for OAuth tokens)
+            crew, service, capability = get_crew_for_query(user_message, user_id=user_id)
 
             # Send routing info to UI
             yield f"data: {json.dumps({'type': 'routing', 'service': service, 'capability': capability})}\n\n"

@@ -310,7 +310,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
           <div className="h-full flex flex-col">
             <ChatMessages messages={messages} isLoading={isLoading} />
             <div className="border-t border-border/30 px-6 py-3">
-              <div className="max-w-3xl mx-auto w-full">
+              <div className="max-w-4xl mx-auto w-full">
                 <ChatInput
                   onSend={handleSendMessage}
                   disabled={!hasProviders}
