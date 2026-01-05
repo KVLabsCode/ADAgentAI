@@ -20,12 +20,25 @@ interface AssistantMessageProps {
   message: Message
 }
 
-// Preserve newlines for markdown - convert \r\n to \n and ensure blank lines are kept
+// Normalize content for markdown rendering
+// Ensures proper paragraph spacing by converting single newlines to double
 function normalizeNewlines(content: string): string {
   if (!content) return ""
-  return content
-    .replace(/\r\n/g, '\n')  // Normalize Windows line endings
-    .replace(/\n{3,}/g, '\n\n')  // Collapse excessive blank lines to double
+
+  // Normalize line endings and clean up
+  let normalized = content
+    .replace(/\r\n/g, '\n')        // Windows -> Unix line endings
+    .replace(/\n{3,}/g, '\n\n')    // Collapse 3+ newlines to 2
+
+  // Convert single newlines to double newlines for markdown paragraph breaks
+  // Use a loop because the regex can't handle overlapping matches in one pass
+  let prev = ""
+  while (prev !== normalized) {
+    prev = normalized
+    normalized = normalized.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
+  }
+
+  return normalized
 }
 
 // Check if a tool is a write/dangerous operation that needs approval
