@@ -1,11 +1,13 @@
 // Server-side blog data fetching (no CORS issues)
-import { sanityClient, blogQueries, isSanityConfigured, type SanityBlogPost } from "./sanity"
+import { sanityClient, blogQueries, isSanityConfigured, type SanityBlogPost, type PortableTextBlock } from "./sanity"
 
 export interface BlogPost {
   slug: string
   title: string
+  subtitle?: string
   excerpt: string
-  content: string
+  content: string | PortableTextBlock[] // Support both markdown and Portable Text
+  isPortableText: boolean
   category: string
   featured: boolean
   date: string
@@ -13,6 +15,7 @@ export interface BlogPost {
   author: {
     name: string
     role: string
+    image?: string
   }
 }
 
@@ -27,24 +30,41 @@ export interface BlogPostMeta {
   author: {
     name: string
     role: string
+    image?: string
   }
 }
 
-// Calculate reading time from content
-function calculateReadTime(content: string): string {
+// Calculate reading time from content (handles both string and Portable Text)
+function calculateReadTime(content: string | PortableTextBlock[]): string {
   const wordsPerMinute = 200
-  const words = content.trim().split(/\s+/).length
+  let text = ""
+
+  if (typeof content === "string") {
+    text = content
+  } else if (Array.isArray(content)) {
+    // Extract text from Portable Text blocks
+    text = content
+      .filter(block => block._type === "block")
+      .map(block => block.children?.map(child => child.text || "").join("") || "")
+      .join(" ")
+  }
+
+  const words = text.trim().split(/\s+/).length
   const minutes = Math.ceil(words / wordsPerMinute)
   return `${minutes} min read`
 }
 
 // Transform Sanity post to blog format
 function transformPost(post: SanityBlogPost): BlogPost {
+  const isPortableText = Array.isArray(post.content)
+
   return {
     slug: post.slug,
     title: post.title,
+    subtitle: post.subtitle,
     excerpt: post.excerpt,
     content: post.content,
+    isPortableText,
     category: post.category,
     featured: post.featured,
     date: post.publishedAt || post.createdAt,
@@ -52,6 +72,7 @@ function transformPost(post: SanityBlogPost): BlogPost {
     author: {
       name: post.authorName || "ADAgent Team",
       role: post.authorRole || "",
+      image: post.authorImage,
     },
   }
 }

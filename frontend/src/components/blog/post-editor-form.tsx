@@ -50,7 +50,9 @@ export function PostEditorForm({ post, isEdit = false }: PostEditorFormProps) {
     post?.category || "Product"
   )
   const [featured, setFeatured] = React.useState(post?.featured || false)
-  const [content, setContent] = React.useState(post?.content || "")
+  const [content, setContent] = React.useState<string>(
+    typeof post?.content === 'string' ? post.content : ""
+  )
   const [slugManuallyEdited, setSlugManuallyEdited] = React.useState(false)
 
   // Auto-generate slug from title

@@ -77,9 +77,17 @@ export function BlogList({ posts }: BlogListProps) {
                   </p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1.5">
-                      <div className="h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center text-[8px] font-semibold">
-                        AD
-                      </div>
+                      {featuredPost.author.image ? (
+                        <img
+                          src={featuredPost.author.image}
+                          alt={featuredPost.author.name}
+                          className="h-5 w-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center text-[8px] font-semibold">
+                          {featuredPost.author.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <span>{featuredPost.author.name}</span>
                     </div>
                     <div className="flex items-center gap-1">

@@ -36,6 +36,7 @@ export const blogQueries = {
     featured,
     status,
     "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
     "authorRole": coalesce(author->role, authorRole),
     publishedAt,
     "createdAt": _createdAt,
@@ -53,6 +54,7 @@ export const blogQueries = {
     featured,
     status,
     "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
     "authorRole": coalesce(author->role, authorRole),
     publishedAt,
     "createdAt": _createdAt,
@@ -71,6 +73,7 @@ export const blogQueries = {
     status,
     "authorId": author->_id,
     "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
     publishedAt,
     "createdAt": _createdAt,
     "updatedAt": _updatedAt
@@ -88,6 +91,7 @@ export const blogQueries = {
     status,
     "authorId": author->_id,
     "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
     publishedAt,
     "createdAt": _createdAt,
     "updatedAt": _updatedAt
@@ -102,10 +106,37 @@ export const blogQueries = {
     category,
     featured,
     "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
     "authorRole": coalesce(author->role, authorRole),
     publishedAt,
     "createdAt": _createdAt
   }`,
+}
+
+// Portable Text block type
+export interface PortableTextBlock {
+  _type: string
+  _key: string
+  children?: Array<{
+    _type: string
+    _key: string
+    text?: string
+    marks?: string[]
+  }>
+  style?: string
+  markDefs?: Array<{
+    _type: string
+    _key: string
+    href?: string
+  }>
+  asset?: {
+    _ref: string
+    _type: string
+  }
+  code?: string
+  language?: string
+  caption?: string
+  alt?: string
 }
 
 // Types for Sanity responses
@@ -113,12 +144,19 @@ export interface SanityBlogPost {
   id: string
   slug: string
   title: string
+  subtitle?: string
   excerpt: string
-  content: string
+  content: string | PortableTextBlock[] // Support both old markdown and new Portable Text
+  coverImage?: {
+    asset: {
+      _ref: string
+    }
+  }
   category: "Product" | "Company" | "Education" | "Tips"
   featured: boolean
   status: "draft" | "published"
   authorName: string
+  authorImage?: string
   authorRole?: string
   authorId?: string
   publishedAt?: string

@@ -77,12 +77,13 @@ export interface BlogPost {
   slug: string
   title: string
   excerpt: string
-  content: string
+  content: string | unknown[] // Support both markdown string and Portable Text array
   category: "Product" | "Company" | "Education" | "Tips"
   status: "draft" | "published"
   featured: boolean
   authorId: string
   authorName: string
+  authorImage?: string
   publishedAt?: string
   createdAt: string
   updatedAt: string
@@ -97,6 +98,7 @@ export interface BlogPostMeta {
   status: "draft" | "published"
   featured: boolean
   authorName: string
+  authorImage?: string
   publishedAt?: string
   createdAt: string
   updatedAt: string
