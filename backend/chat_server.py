@@ -449,8 +449,13 @@ def create_crew_for_query(
         recent_history = history[-6:]  # Keep last 6 messages for context
         history_lines = []
         for msg in recent_history:
-            role = msg.get("role", msg.role if hasattr(msg, "role") else "user")
-            content = msg.get("content", msg.content if hasattr(msg, "content") else "")
+            # Handle both Pydantic models and dicts
+            if hasattr(msg, "role"):
+                role = msg.role
+                content = msg.content
+            else:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
             # Truncate very long messages
             if len(content) > 500:
                 content = content[:500] + "..."
