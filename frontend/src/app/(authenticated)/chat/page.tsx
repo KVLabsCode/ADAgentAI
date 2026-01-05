@@ -64,7 +64,7 @@ export default function ChatPage() {
 
   return (
     <div className="h-full">
-      <ChatContainer key="new-chat" providers={providers} />
+      <ChatContainer providers={providers} />
     </div>
   )
 }

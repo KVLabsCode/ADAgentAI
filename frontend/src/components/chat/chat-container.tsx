@@ -35,15 +35,6 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   const hasMessages = messages.length > 0
   const userId = session?.user?.id
 
-  // Reset state when navigating to new chat (initialSessionId becomes undefined)
-  React.useEffect(() => {
-    if (initialSessionId === undefined) {
-      setMessages([])
-      setCurrentSessionId(null)
-      abortControllerRef.current?.abort()
-    }
-  }, [initialSessionId])
-
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {
     try {
