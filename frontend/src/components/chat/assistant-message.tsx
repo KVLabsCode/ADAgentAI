@@ -3,7 +3,6 @@
 import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import remarkBreaks from "remark-breaks"
 import { Bot, Brain, Wrench, CheckCircle2, ChevronDown, Clock, ShieldCheck, ShieldX, Route } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -20,26 +19,27 @@ interface AssistantMessageProps {
   message: Message
 }
 
-// Normalize content for markdown rendering
-// Ensures proper paragraph spacing by converting single newlines to double
-function normalizeNewlines(content: string): string {
+/**
+ * Format content for proper markdown rendering with spacing.
+ * LLM outputs often lack proper blank lines between sections.
+ * This adds spacing before section headers and between distinct blocks.
+ */
+function formatMarkdownContent(content: string): string {
   if (!content) return ""
 
-  // Normalize line endings and clean up
-  let normalized = content
-    .replace(/\r\n/g, '\n')        // Windows -> Unix line endings
-    .replace(/\n{3,}/g, '\n\n')    // Collapse 3+ newlines to 2
-
-  // Convert single newlines to double newlines for markdown paragraph breaks
-  // Use a loop because the regex can't handle overlapping matches in one pass
-  let prev = ""
-  while (prev !== normalized) {
-    prev = normalized
-    normalized = normalized.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
-  }
-
-  return normalized
+  return content
+    // Normalize line endings
+    .replace(/\r\n/g, '\n')
+    // Add blank line before bold section headers (e.g., "**Title:**")
+    .replace(/([^\n])\n(\*\*[^*]+:\*\*)/g, '$1\n\n$2')
+    // Add blank line before markdown headings (## or ###)
+    .replace(/([^\n])\n(#{1,3}\s)/g, '$1\n\n$2')
+    // Add blank line after list blocks before new text
+    .replace(/(^[-*]\s.+\n)([^-*\n])/gm, '$1\n$2')
+    // Collapse excessive blank lines
+    .replace(/\n{3,}/g, '\n\n')
 }
+
 
 // Check if a tool is a write/dangerous operation that needs approval
 function isWriteOperation(toolName: string): boolean {
@@ -464,9 +464,9 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
             "px-4 py-3",
             "border border-border/30"
           )}>
-            <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed prose-p:my-3 prose-p:leading-relaxed prose-pre:bg-background prose-pre:text-foreground prose-pre:text-xs prose-code:bg-background prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-strong:text-foreground [&_br]:block [&_br]:my-2">
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                {normalizeNewlines(message.content)}
+            <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed prose-p:my-3 prose-p:leading-relaxed prose-pre:bg-background prose-pre:text-foreground prose-pre:text-xs prose-code:bg-background prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-strong:text-foreground">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {formatMarkdownContent(message.content)}
               </ReactMarkdown>
             </div>
           </div>
