@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquarePlus,
@@ -67,6 +67,7 @@ const adminNavItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { toggleSidebar, state } = useSidebar()
   const { user, isAdmin, signOut } = useUser()
   const [mounted, setMounted] = useState(false)
@@ -74,6 +75,15 @@ export function AppSidebar() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Handle New Chat click - force refresh when already in a chat
+  const handleNewChatClick = (e: React.MouseEvent) => {
+    if (pathname.startsWith('/chat')) {
+      e.preventDefault()
+      router.push('/chat')
+      router.refresh()
+    }
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/40">
@@ -119,7 +129,10 @@ export function AppSidebar() {
                     tooltip={item.title}
                     className="h-8 text-xs"
                   >
-                    <Link href={item.url}>
+                    <Link
+                      href={item.url}
+                      onClick={item.title === "New Chat" ? handleNewChatClick : undefined}
+                    >
                       <item.icon className="h-3.5 w-3.5" />
                       <span>{item.title}</span>
                     </Link>

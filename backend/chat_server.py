@@ -502,8 +502,9 @@ async def stream_crew_response(user_message: str, user_id: Optional[str] = None)
         # Async iteration over streaming chunks
         async for chunk in streaming:
             # Yield any collected tool events
-            for event in _current_collector.get_events():
-                yield format_sse(event)
+            if _current_collector:
+                for event in _current_collector.get_events():
+                    yield format_sse(event)
 
             # Agent/task transitions
             if chunk.agent_role != current_agent or chunk.task_name != current_task:
