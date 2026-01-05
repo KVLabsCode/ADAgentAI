@@ -412,10 +412,14 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
     elif service == "admob":
         instructions = """
         Instructions for AdMob:
-        - For reports/analytics questions: directly generate the report (account is auto-detected)
-        - For listing apps/ad units: use list tools directly (account is auto-detected)
-        - Only use "List AdMob Accounts" if user specifically asks about accounts
-        - Go straight to answering the question - don't list accounts unnecessarily
+        - List accounts ONCE at start only if needed, then reuse that account_id
+        - Choose the RIGHT dimension for the query:
+          * "top ad units" or "ad unit performance" → AD_UNIT dimension
+          * "top apps" or "app performance" → APP dimension
+          * "by date" or "trends" → DATE dimension
+          * "ad formats" (banner/interstitial) → FORMAT dimension
+        - Metrics: ESTIMATED_EARNINGS, IMPRESSIONS, IMPRESSION_RPM, CLICKS
+        - Make ONE report call with correct dimensions - don't retry
         """
     else:
         instructions = """
