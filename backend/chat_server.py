@@ -154,6 +154,8 @@ async def get_current_user(request: Request) -> Optional[dict]:
 CLASSIFICATION_PROMPT = """Classify this user query into ONE category.
 
 Categories:
+- simple_greeting: Greetings like "hi", "hello", "hey", "good morning"
+- simple_help: Questions about capabilities like "what can you do", "help", "how do you work"
 - admob_inventory: AdMob accounts, apps, ad units (list, create, view setup)
 - admob_reporting: AdMob performance, revenue, eCPM, reports, analytics
 - admob_mediation: AdMob mediation groups, ad sources, waterfall, networks
@@ -167,6 +169,36 @@ Categories:
 Query: {query}
 
 Respond with ONLY the category name, nothing else."""
+
+# Simple responses that don't need the crew
+SIMPLE_RESPONSES = {
+    "simple_greeting": """Hello! I'm your Ad Platform Assistant. I can help you with:
+
+• **AdMob**: View accounts, apps, ad units, revenue reports, mediation setup
+• **Google Ad Manager**: Networks, ad units, orders, line items, reports
+
+What would you like to know about your ad performance today?""",
+
+    "simple_help": """I'm an AI assistant specialized in ad platform management. Here's what I can do:
+
+**AdMob:**
+• List your accounts, apps, and ad units
+• Generate revenue and performance reports
+• Analyze mediation groups and ad sources
+• Review A/B test experiments
+
+**Google Ad Manager:**
+• View networks and ad unit inventory
+• Manage orders and line items
+• Generate custom reports
+• Analyze targeting and deals
+
+Just ask me something like:
+• "Show my AdMob revenue for the last 7 days"
+• "List my ad units"
+• "What's my eCPM this month?"
+"""
+}
 
 ROUTE_MAP = {
     "admob_inventory": ("admob", "inventory"),
@@ -196,13 +228,21 @@ def get_router_llm() -> LLM:
     return _router_llm
 
 
-async def classify_query(user_query: str) -> tuple[str, str]:
+async def classify_query(user_query: str) -> tuple[str, str, Optional[str]]:
     """
     Classify a user query to determine routing.
 
     Returns:
-        Tuple of (service, capability)
+        Tuple of (service, capability, simple_response) where simple_response
+        is not None if this is a simple query that doesn't need the crew.
     """
+    # Quick check for obvious simple queries (no LLM needed)
+    query_lower = user_query.lower().strip()
+    if query_lower in ["hi", "hello", "hey", "hi!", "hello!", "hey!"]:
+        return ("simple", "greeting", SIMPLE_RESPONSES["simple_greeting"])
+    if query_lower in ["help", "?", "what can you do", "what can you do?", "how do you work", "how do you work?"]:
+        return ("simple", "help", SIMPLE_RESPONSES["simple_help"])
+
     llm = get_router_llm()
     prompt = CLASSIFICATION_PROMPT.format(query=user_query)
 
@@ -215,13 +255,17 @@ async def classify_query(user_query: str) -> tuple[str, str]:
         )
         category = response.strip().lower().replace('"', '').replace("'", "")
 
+        # Check for simple responses first
+        if category in SIMPLE_RESPONSES:
+            return ("simple", category.replace("simple_", ""), SIMPLE_RESPONSES[category])
+
         if category in ROUTE_MAP:
-            return ROUTE_MAP[category]
+            return (*ROUTE_MAP[category], None)
         print(f"Unknown category '{category}', defaulting to admob_inventory")
-        return ("admob", "inventory")
+        return ("admob", "inventory", None)
     except Exception as e:
         print(f"Classification error: {e}, defaulting to admob_inventory")
-        return ("admob", "inventory")
+        return ("admob", "inventory", None)
 
 
 # =============================================================================
@@ -424,10 +468,15 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
 
         {instructions}
 
-        Provide a clear, actionable response with the data.
-        If you encounter errors, explain them clearly.
+        RESPONSE FORMAT:
+        - Be DIRECT and CONCISE - answer the question asked
+        - Start with the key data/answer immediately
+        - Use bullet points for lists
+        - Include only relevant metrics
+        - NO lengthy explanations or caveats unless requested
+        - If comparing data, show a clear comparison table/list
         """,
-        expected_output="A clear response with relevant data from the ad platform.",
+        expected_output="A concise, direct response with the requested data. No verbose explanations.",
         agent=specialist,
     )
 
@@ -466,14 +515,20 @@ async def stream_crew_response(user_message: str, user_id: Optional[str] = None)
     global _current_collector
 
     try:
-        # Set up event collector
-        _current_collector = ToolEventCollector()
-
         # Classify and route query
-        service, capability = await classify_query(user_message)
+        service, capability, simple_response = await classify_query(user_message)
         print(f"  Routed to: {service}/{capability} (user: {user_id or 'anonymous'})")
 
         yield format_sse(RoutingEvent(service=service, capability=capability).model_dump())
+
+        # Handle simple queries without crew
+        if simple_response:
+            yield format_sse(ResultEvent(content=simple_response).model_dump())
+            yield format_sse(DoneEvent().model_dump())
+            return
+
+        # Set up event collector for tool calls
+        _current_collector = ToolEventCollector()
 
         # Create crew with user context for OAuth tokens
         crew = create_crew_for_query(user_message, service, capability, user_id=user_id)
@@ -578,13 +633,26 @@ app = FastAPI(
 
 # CORS middleware - must specify origins when allowing credentials
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
+# Build allowed origins list
+ALLOWED_ORIGINS = [
+    FRONTEND_URL,
+    "http://localhost:3000",
+    "http://localhost:3002",  # Alternative Next.js port
+    "https://adagentai.com",
+    "https://www.adagentai.com",
+]
+
+# Add Vercel preview URL pattern if configured
+VERCEL_PROJECT = os.environ.get("VERCEL_PROJECT_NAME", "adagent-ai")
+if VERCEL_PROJECT:
+    # Vercel preview URLs follow pattern: project-name-*.vercel.app
+    ALLOWED_ORIGINS.append(f"https://{VERCEL_PROJECT}.vercel.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        FRONTEND_URL,
-        "http://localhost:3000",
-        "http://localhost:3002",  # Alternative Next.js port
-    ],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://adagent-ai.*\.vercel\.app",  # Match all preview URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -614,11 +682,12 @@ async def health():
 async def chat_stream(
     request: Request,
     message: str = Query(..., description="User message"),
+    user_id: Optional[str] = Query(None, description="User ID for OAuth token lookup"),
 ):
     """
     Stream chat responses using Server-Sent Events.
 
-    Requires authentication via session cookie.
+    Authentication via user_id query parameter (passed from frontend session).
 
     Connects to CrewAI agent and streams:
     - routing: Which specialist handles the query
@@ -633,15 +702,18 @@ async def chat_stream(
     if not message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # Validate user session
-    user = await get_current_user(request)
-    if not user:
+    # Get user_id from query param (cross-domain cookie workaround)
+    # If not provided, try to get from session cookie (same-domain)
+    if not user_id:
+        user = await get_current_user(request)
+        user_id = user.get("id") if user else None
+
+    if not user_id:
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Please log in to use chat."
         )
 
-    user_id = user.get("id")
     print(f"  Chat request from user: {user_id}")
 
     return StreamingResponse(
