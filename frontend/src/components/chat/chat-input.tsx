@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { SendHorizonal, Loader2, Plug, ChevronDown, Check, Sparkles } from "lucide-react"
+import { SendHorizonal, Loader2, ChevronDown, Check, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -19,12 +19,15 @@ import {
 } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import { useChatSettings, AVAILABLE_MODELS } from "@/lib/chat-settings"
+import { ContextSettings } from "./context-settings"
+import type { Provider } from "@/lib/types"
 
 interface ChatInputProps {
   onSend: (message: string) => void
   disabled?: boolean
   isLoading?: boolean
   placeholder?: string
+  providers?: Provider[]
 }
 
 export function ChatInput({
@@ -32,6 +35,7 @@ export function ChatInput({
   disabled = false,
   isLoading = false,
   placeholder = "Type your message...",
+  providers = [],
 }: ChatInputProps) {
   const [value, setValue] = React.useState("")
   const [modelOpen, setModelOpen] = React.useState(false)
@@ -106,18 +110,10 @@ export function ChatInput({
         </Button>
       </form>
 
-      {/* Bottom toolbar with plug icon and model selector */}
+      {/* Bottom toolbar with context settings and model selector */}
       <div className="flex items-center gap-2">
-        {/* Plug icon placeholder for future provider/app selection */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-full text-muted-foreground/60 hover:text-foreground/80"
-          disabled
-        >
-          <Plug className="h-3.5 w-3.5" />
-          <span className="sr-only">Connect providers</span>
-        </Button>
+        {/* Context settings (providers, response style) */}
+        <ContextSettings providers={providers} />
 
         {/* Model selector */}
         <Popover open={modelOpen} onOpenChange={setModelOpen}>

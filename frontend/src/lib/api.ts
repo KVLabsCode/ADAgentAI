@@ -36,6 +36,12 @@ export interface ChatHistoryMessage {
   content: string;
 }
 
+export interface ChatContext {
+  enabledProviderIds: string[];
+  responseStyle: "concise" | "detailed";
+  autoIncludeContext: boolean;
+}
+
 /**
  * Stream chat responses from CrewAI agent
  */
@@ -44,7 +50,8 @@ export async function streamChat(
   callbacks: ChatStreamCallbacks,
   signal?: AbortSignal,
   userId?: string,
-  history?: ChatHistoryMessage[]
+  history?: ChatHistoryMessage[],
+  context?: ChatContext
 ): Promise<void> {
   const url = `${AGENT_URL}/chat/stream`;
   let doneHandled = false; // Prevent duplicate onDone calls
@@ -61,6 +68,7 @@ export async function streamChat(
         message,
         user_id: userId,
         history: history || [],
+        context: context || {},
       }),
       signal,
     });

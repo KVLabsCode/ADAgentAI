@@ -6,8 +6,9 @@ import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
-import { streamChat, type ChatHistoryMessage } from "@/lib/api"
+import { streamChat, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
 import { authClient } from "@/lib/auth-client"
+import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -21,6 +22,7 @@ interface ChatContainerProps {
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const router = useRouter()
   const { data: session } = authClient.useSession()
+  const { enabledProviderIds, responseStyle, autoIncludeContext } = useChatSettings()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
@@ -29,6 +31,13 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
   const userId = session?.user?.id
+
+  // Build context for API calls
+  const chatContext: ChatContext = React.useMemo(() => ({
+    enabledProviderIds,
+    responseStyle,
+    autoIncludeContext,
+  }), [enabledProviderIds, responseStyle, autoIncludeContext])
 
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {
@@ -246,7 +255,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
       },
       abortControllerRef.current.signal,
       userId, // Pass user ID for OAuth token fetching
-      history // Pass conversation history for context
+      history, // Pass conversation history for context
+      chatContext // Pass context settings (enabled providers, response style)
     )
 
     setIsLoading(false)
@@ -285,6 +295,11 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
               </p>
             </div>
 
+            {/* Example prompts above input */}
+            {hasProviders && (
+              <ExamplePrompts onPromptClick={handlePromptClick} />
+            )}
+
             {/* Centered Input */}
             <div className="w-full">
               <ChatInput
@@ -292,12 +307,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
                 disabled={!hasProviders}
                 isLoading={isLoading}
                 placeholder={hasProviders ? "Ask anything about your ads..." : "Connect a provider first"}
+                providers={providers}
               />
             </div>
-
-            {hasProviders && (
-              <ExamplePrompts onPromptClick={handlePromptClick} />
-            )}
           </div>
         </div>
       ) : (
@@ -314,6 +326,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
                 onSend={handleSendMessage}
                 disabled={!hasProviders}
                 isLoading={isLoading}
+                providers={providers}
               />
             </div>
           </div>

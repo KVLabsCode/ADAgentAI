@@ -425,17 +425,100 @@ def capture_tool_result(context):
 # Crew Creation
 # =============================================================================
 
-def create_crew_for_query(
+def build_kickoff_inputs(
     user_query: str,
+    providers: Optional[list[dict]] = None,
+    history: Optional[list] = None,
+    context: Optional[ChatContext] = None
+) -> dict:
+    """
+    Build kickoff inputs dict for crew execution.
+
+    This follows CrewAI best practice of passing context via kickoff inputs
+    with variable interpolation in task descriptions.
+    """
+    inputs = {"user_query": user_query}
+
+    # Build conversation history context (last 6 messages max)
+    if history:
+        recent_history = history[-6:]
+        history_lines = []
+        for msg in recent_history:
+            if hasattr(msg, "role"):
+                role, content = msg.role, msg.content
+            else:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+            if len(content) > 500:
+                content = content[:500] + "..."
+            history_lines.append(f"{role.upper()}: {content}")
+        inputs["history_context"] = "\n\nConversation history:\n" + "\n".join(history_lines)
+    else:
+        inputs["history_context"] = ""
+
+    # Build provider context
+    provider_lines = []
+    admob_account_id = ""
+    gam_network_code = ""
+
+    if providers:
+        admob_accounts = [p for p in providers if p.get("type") == "admob"]
+        gam_accounts = [p for p in providers if p.get("type") == "gam"]
+
+        if admob_accounts:
+            admob_info = ", ".join([f"{p.get('name', 'Account')} (ID: {p.get('identifier', 'unknown')})" for p in admob_accounts])
+            provider_lines.append(f"User's SELECTED AdMob accounts: {admob_info}")
+            provider_lines.append("(These accounts are already known - do NOT list or enumerate them.)")
+            admob_account_id = admob_accounts[0].get("identifier", "")
+
+        if gam_accounts:
+            gam_info = ", ".join([f"{p.get('name', 'Network')} (network code: {p.get('identifier', 'unknown')})" for p in gam_accounts])
+            provider_lines.append(f"User's SELECTED Ad Manager networks: {gam_info}")
+            provider_lines.append("(These networks are already known - do NOT list or enumerate them.)")
+            gam_network_code = gam_accounts[0].get("identifier", "")
+
+    inputs["provider_context"] = "\n".join(provider_lines) if provider_lines else ""
+    inputs["admob_account_id"] = admob_account_id
+    inputs["gam_network_code"] = gam_network_code
+
+    # Response style from user context
+    response_style = context.responseStyle if context else "concise"
+
+    if response_style == "detailed":
+        inputs["style_instructions"] = """
+        RESPONSE STYLE (User prefers DETAILED):
+        - Provide comprehensive explanations with context
+        - Include relevant background information
+        - Explain metrics and what they mean
+        - Use headers to organize longer responses
+        - Provide actionable insights and recommendations
+        """
+    else:
+        inputs["style_instructions"] = """
+        RESPONSE STYLE (User prefers CONCISE):
+        - Be DIRECT - answer the specific question first
+        - Be BRIEF - no unnecessary explanations
+        - Use bullet points for lists of data
+        - For metrics, show key numbers only
+        - NO caveats or disclaimers unless critical
+        """
+
+    return inputs
+
+
+def create_crew_for_query(
     service: str,
     capability: str,
     user_id: Optional[str] = None,
     providers: Optional[list[dict]] = None,
-    history: Optional[list] = None
 ) -> Crew:
-    """Create a streaming crew routed to the appropriate specialist."""
+    """
+    Create a streaming crew routed to the appropriate specialist.
+
+    Uses variable interpolation ({variable}) in task descriptions.
+    Pass context via kickoff(inputs=build_kickoff_inputs(...)).
+    """
     factory = get_factory()
-    history = history or []
 
     # Pass user_id to factory so tools can fetch user-specific tokens
     if user_id:
@@ -443,62 +526,19 @@ def create_crew_for_query(
 
     specialist = factory.create_specialist(service, capability, verbose=False)
 
-    # Build conversation history context (last 6 messages max)
-    history_context = ""
-    if history:
-        recent_history = history[-6:]  # Keep last 6 messages for context
-        history_lines = []
-        for msg in recent_history:
-            # Handle both Pydantic models and dicts
-            if hasattr(msg, "role"):
-                role = msg.role
-                content = msg.content
-            else:
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
-            # Truncate very long messages
-            if len(content) > 500:
-                content = content[:500] + "..."
-            history_lines.append(f"{role.upper()}: {content}")
-        if history_lines:
-            history_context = "\n\nConversation history:\n" + "\n".join(history_lines)
-
-    # Build provider context for the agent
-    provider_context = ""
-    if providers:
-        admob_accounts = [p for p in providers if p.get("type") == "admob"]
-        gam_accounts = [p for p in providers if p.get("type") == "gam"]
-
-        if admob_accounts:
-            admob_info = ", ".join([f"{p.get('name', 'Account')} (ID: {p.get('identifier', 'unknown')})" for p in admob_accounts])
-            provider_context += f"\nConnected AdMob accounts: {admob_info}"
-
-        if gam_accounts:
-            gam_info = ", ".join([f"{p.get('name', 'Network')} (network code: {p.get('identifier', 'unknown')})" for p in gam_accounts])
-            provider_context += f"\nConnected Ad Manager networks: {gam_info}"
-
-    # Service-specific instructions
+    # Service-specific instructions using variable interpolation
     if service == "general":
-        instructions = f"""
+        service_instructions = """
         You are a helpful ad platform assistant. Respond naturally and directly.
         For greetings, respond briefly and offer to help with AdMob or Ad Manager.
         For capability questions, briefly list what you can do.
         Keep responses short and friendly.
-        {provider_context}
         """
     elif service == "admob":
-        # Get the first AdMob account ID if available
-        admob_providers = [p for p in (providers or []) if p.get("type") == "admob"]
-        if admob_providers:
-            account_id = admob_providers[0].get("identifier", "")
-            account_instruction = f"Use account_id: {account_id} (already known - do NOT call list_accounts)"
-        else:
-            account_instruction = "Call list_accounts ONCE to get account_id, then reuse it"
-
-        instructions = f"""
+        service_instructions = """
         Instructions for AdMob:
-        {provider_context}
-        - {account_instruction}
+        - If account ID is provided below, use it directly (do NOT call list_accounts)
+        - If no account ID provided, call list_accounts ONCE to get it
         - Choose the RIGHT dimension for the query:
           * "top ad units" or "ad unit performance" → AD_UNIT dimension
           * "top apps" or "app performance" → APP dimension
@@ -506,44 +546,42 @@ def create_crew_for_query(
           * "ad formats" (banner/interstitial) → FORMAT dimension
         - Metrics: ESTIMATED_EARNINGS, IMPRESSIONS, IMPRESSION_RPM, CLICKS
         - Make ONE report call with correct dimensions - don't retry
+
+        Account ID to use: {admob_account_id}
         """
     else:
-        # Get the first GAM network code if available
-        gam_providers = [p for p in (providers or []) if p.get("type") == "gam"]
-        if gam_providers:
-            network_code = gam_providers[0].get("identifier", "")
-            network_instruction = f"Use network_code: {network_code} (already known - do NOT call list_networks)"
-        else:
-            network_instruction = "Call list_networks ONCE to get network_code if needed"
-
-        instructions = f"""
+        service_instructions = """
         Instructions for Ad Manager:
-        {provider_context}
-        - {network_instruction}
+        - If network code is provided below, use it directly (do NOT call list_networks)
+        - If no network code provided, call list_networks ONCE to get it
         - For reports/analytics: directly use report tools
         - For ad units/placements: use list tools directly
         - Go straight to answering the question
+
+        Network code to use: {gam_network_code}
         """
 
+    # Task with variable placeholders - values passed via kickoff(inputs={...})
     task = Task(
-        description=f"""
-        User request: {{user_query}}
+        description="""
+        User request: {user_query}
         {history_context}
 
-        {instructions}
+        {provider_context}
 
-        IMPORTANT - Response style:
-        - Be DIRECT - answer the specific question first
-        - Be CONCISE - no unnecessary explanations
-        - Use bullet points for lists of data
-        - For metrics, show key numbers prominently
-        - NO caveats or disclaimers unless critical
+        """ + service_instructions + """
+
+        {style_instructions}
+
+        IMPORTANT:
+        - Do NOT list accounts/networks when they are already provided above
+        - Use the provided account/network IDs directly without verification
         - If referring to previous conversation, be contextual
         - Use blank lines between sections for readability
         """,
-        expected_output="A direct, concise answer to the user's question with proper markdown formatting.",
+        expected_output="A direct answer to the user's question with proper markdown formatting.",
         agent=specialist,
-        markdown=True,  # Enable proper markdown formatting with newlines
+        markdown=True,
     )
 
     return Crew(
@@ -570,7 +608,8 @@ def format_sse(data: dict) -> str:
 async def stream_crew_response(
     user_message: str,
     user_id: Optional[str] = None,
-    history: Optional[list] = None
+    history: Optional[list] = None,
+    context: Optional[ChatContext] = None
 ) -> AsyncGenerator[str, None]:
     """
     Async generator for streaming crew responses as SSE events.
@@ -579,6 +618,7 @@ async def stream_crew_response(
         user_message: The user's chat message
         user_id: Optional user ID for fetching user-specific OAuth tokens
         history: Optional list of previous messages for context
+        context: Optional chat context with enabled providers and settings
 
     Yields:
         SSE-formatted strings with event data
@@ -588,9 +628,16 @@ async def stream_crew_response(
 
     try:
         # Fetch user's connected providers
-        providers = await get_user_providers(user_id) if user_id else []
+        all_providers = await get_user_providers(user_id) if user_id else []
+
+        # Filter providers based on user's context settings
+        if context and context.enabledProviderIds:
+            providers = [p for p in all_providers if p.get("id") in context.enabledProviderIds]
+        else:
+            providers = all_providers  # If no filter, use all
+
         if providers:
-            print(f"  User has {len(providers)} connected provider(s)")
+            print(f"  User has {len(providers)} active provider(s) (of {len(all_providers)} total)")
 
         # Classify and route query
         service, capability = await classify_query(user_message)
@@ -601,14 +648,19 @@ async def stream_crew_response(
         # Set up event collector for tool calls
         _current_collector = ToolEventCollector()
 
-        # Create crew with user context for OAuth tokens, provider info, and conversation history
+        # Create crew (uses variable interpolation in task description)
         crew = create_crew_for_query(
-            user_message, service, capability,
-            user_id=user_id, providers=providers, history=history
+            service, capability,
+            user_id=user_id, providers=providers
         )
 
-        # Start async streaming
-        streaming = await crew.kickoff_async(inputs={'user_query': user_message})
+        # Build kickoff inputs with all context (CrewAI best practice)
+        kickoff_inputs = build_kickoff_inputs(
+            user_message, providers=providers, history=history, context=context
+        )
+
+        # Start async streaming with inputs for variable interpolation
+        streaming = await crew.kickoff_async(inputs=kickoff_inputs)
 
         current_agent = ""
         current_task = ""
@@ -766,11 +818,19 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class ChatContext(BaseModel):
+    """User's chat context settings."""
+    enabledProviderIds: list[str] = []  # Empty means all enabled
+    responseStyle: str = "concise"  # "concise" or "detailed"
+    autoIncludeContext: bool = True
+
+
 class ChatRequest(BaseModel):
     """Request body for chat endpoint."""
     message: str
     history: list[ChatMessage] = []
     user_id: Optional[str] = None
+    context: Optional[ChatContext] = None
 
 
 @app.get("/chat/stream")
@@ -822,7 +882,7 @@ async def chat_stream_post(
     print(f"  Chat request (POST) from user: {user_id or 'anonymous'}, history: {len(body.history)} messages")
 
     return StreamingResponse(
-        stream_crew_response(body.message, user_id=user_id, history=body.history),
+        stream_crew_response(body.message, user_id=user_id, history=body.history, context=body.context),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
