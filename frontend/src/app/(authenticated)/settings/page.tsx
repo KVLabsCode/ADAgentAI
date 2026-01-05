@@ -23,7 +23,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-2xl mx-auto">
+    <div className="flex-1 overflow-y-auto">
+    <div className="flex flex-col gap-6 p-6 max-w-2xl mx-auto pb-12">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
@@ -198,6 +199,7 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+    </div>
     </div>
   )
 }
