@@ -3,30 +3,18 @@
 import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkBreaks from "remark-breaks"
 
-// Format content to ensure proper paragraph breaks
-// Converts single newlines to double newlines for markdown paragraph rendering
-function formatContentWithParagraphs(content: string): string {
+// Convert single newlines to double newlines for markdown paragraph rendering
+// This ensures blank lines between sections are preserved
+function normalizeNewlines(content: string): string {
   if (!content) return ""
 
-  // Split by lines and group into paragraphs
-  // Lines ending with : are headers, add blank line after
-  // Consecutive lines without blank lines become separate paragraphs
+  // Replace single newlines with double (but not already double)
+  // This ensures each line break becomes a paragraph break in markdown
   return content
-    .split('\n')
-    .map((line, i, arr) => {
-      const trimmed = line.trim()
-      // Add blank line after header-like lines (ending with :)
-      if (trimmed.endsWith(':') && i < arr.length - 1 && arr[i + 1].trim()) {
-        return line + '\n'
-      }
-      // Add blank line before lines that start with bold (section headers)
-      if (trimmed.startsWith('**') && i > 0 && arr[i - 1].trim() && !arr[i - 1].trim().endsWith(':')) {
-        return '\n' + line
-      }
-      return line
-    })
-    .join('\n')
+    .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
+    .replace(/([^\n])\n([^\n])/g, '$1\n\n$2')  // Single \n to double \n\n
 }
 import { Bot, Brain, Wrench, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -211,9 +199,9 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
               "px-4 py-2.5"
             )}
           >
-            <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed prose-p:my-3 prose-p:leading-relaxed prose-pre:bg-background prose-pre:text-foreground prose-pre:text-xs prose-code:bg-background prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-strong:text-foreground">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {formatContentWithParagraphs(message.content)}
+            <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed prose-p:my-3 prose-p:leading-relaxed prose-pre:bg-background prose-pre:text-foreground prose-pre:text-xs prose-code:bg-background prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-strong:text-foreground [&_br]:block [&_br]:my-2">
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                {normalizeNewlines(message.content)}
               </ReactMarkdown>
             </div>
           </div>
