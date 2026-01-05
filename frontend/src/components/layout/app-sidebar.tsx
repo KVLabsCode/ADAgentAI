@@ -76,12 +76,11 @@ export function AppSidebar() {
     setMounted(true)
   }, [])
 
-  // Handle New Chat click - force refresh when already in a chat
+  // Handle New Chat click - force hard navigation when already in a chat
   const handleNewChatClick = (e: React.MouseEvent) => {
     if (pathname.startsWith('/chat')) {
       e.preventDefault()
-      router.push('/chat')
-      router.refresh()
+      window.location.href = '/chat'
     }
   }
 
