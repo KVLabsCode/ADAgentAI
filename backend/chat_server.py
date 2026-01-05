@@ -740,6 +740,13 @@ async def root():
     }
 
 
+@app.get("/")
+@app.head("/")
+async def root():
+    """Root endpoint for health checks."""
+    return {"status": "ok", "service": "ad-platform-agent"}
+
+
 @app.get("/health")
 async def health():
     """Health check endpoint."""
