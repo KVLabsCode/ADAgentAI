@@ -12,6 +12,10 @@ interface ChatSettingsState {
   responseStyle: ResponseStyle
   // Provider IDs that are enabled for context (empty = all enabled)
   enabledProviderIds: string[]
+  // App IDs that are enabled for context (keyed by provider ID)
+  // Format: { "provider-id": ["app-id-1", "app-id-2"] }
+  // Empty array or missing key = all apps enabled for that provider
+  enabledAppIds: Record<string, string[]>
   // Whether to auto-include account context in queries
   autoIncludeContext: boolean
   setDisplayMode: (mode: DisplayMode) => void
@@ -19,6 +23,8 @@ interface ChatSettingsState {
   setResponseStyle: (style: ResponseStyle) => void
   setEnabledProviderIds: (ids: string[]) => void
   toggleProvider: (id: string) => void
+  setEnabledAppIds: (providerId: string, appIds: string[]) => void
+  toggleApp: (providerId: string, appId: string) => void
   setAutoIncludeContext: (enabled: boolean) => void
 }
 
@@ -29,6 +35,7 @@ export const useChatSettings = create<ChatSettingsState>()(
       selectedModel: "claude-sonnet-4-20250514",
       responseStyle: "concise",
       enabledProviderIds: [], // Empty means all are enabled
+      enabledAppIds: {}, // Empty means all apps enabled for all providers
       autoIncludeContext: true,
       setDisplayMode: (mode) => set({ displayMode: mode }),
       setSelectedModel: (model) => set({ selectedModel: model }),
@@ -40,6 +47,31 @@ export const useChatSettings = create<ChatSettingsState>()(
           set({ enabledProviderIds: current.filter((i) => i !== id) })
         } else {
           set({ enabledProviderIds: [...current, id] })
+        }
+      },
+      setEnabledAppIds: (providerId, appIds) => {
+        const current = get().enabledAppIds
+        set({ enabledAppIds: { ...current, [providerId]: appIds } })
+      },
+      toggleApp: (providerId, appId) => {
+        const current = get().enabledAppIds
+        const providerApps = current[providerId] || []
+        if (providerApps.includes(appId)) {
+          // Remove app
+          set({
+            enabledAppIds: {
+              ...current,
+              [providerId]: providerApps.filter((id) => id !== appId),
+            },
+          })
+        } else {
+          // Add app
+          set({
+            enabledAppIds: {
+              ...current,
+              [providerId]: [...providerApps, appId],
+            },
+          })
         }
       },
       setAutoIncludeContext: (enabled) => set({ autoIncludeContext: enabled }),

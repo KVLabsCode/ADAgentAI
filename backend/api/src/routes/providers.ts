@@ -238,6 +238,109 @@ providers.get(
 );
 
 /**
+ * GET /providers/:id/apps - List apps for an AdMob provider
+ */
+providers.get("/:id/apps", async (c) => {
+  const user = c.get("user");
+  const providerId = c.req.param("id");
+
+  // Find the provider connection
+  const provider = await db.query.connectedProviders.findFirst({
+    where: and(
+      eq(connectedProviders.id, providerId),
+      eq(connectedProviders.userId, user.id)
+    ),
+  });
+
+  if (!provider) {
+    return c.json({ error: "Provider not found" }, 404);
+  }
+
+  // Only AdMob supports apps listing
+  if (provider.provider !== "admob") {
+    return c.json({ apps: [], message: "Apps listing only supported for AdMob" });
+  }
+
+  // Decrypt stored token
+  const decryptedAccessToken = await safeDecrypt(provider.accessToken);
+  const decryptedRefreshToken = await safeDecrypt(provider.refreshToken);
+
+  // Check if token needs refresh
+  const now = new Date();
+  const expiresAt = provider.tokenExpiresAt;
+  const needsRefresh = !expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000;
+
+  let accessToken = decryptedAccessToken;
+
+  if (needsRefresh && decryptedRefreshToken) {
+    try {
+      const newTokens = await refreshAccessToken(decryptedRefreshToken);
+      accessToken = newTokens.access_token;
+
+      // Update stored tokens
+      const encryptedAccessToken = await safeEncrypt(newTokens.access_token);
+      const encryptedRefreshToken = await safeEncrypt(newTokens.refresh_token);
+      const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
+      await db
+        .update(connectedProviders)
+        .set({
+          accessToken: encryptedAccessToken!,
+          refreshToken: encryptedRefreshToken || provider.refreshToken,
+          tokenExpiresAt: newExpiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(connectedProviders.id, provider.id));
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+    }
+  }
+
+  try {
+    // Fetch apps from AdMob API
+    const accountId = provider.publisherId?.startsWith("pub-")
+      ? provider.publisherId
+      : `pub-${provider.publisherId}`;
+
+    const response = await fetch(
+      `https://admob.googleapis.com/v1/accounts/${accountId}/apps?pageSize=100`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AdMob apps API error:", errorText);
+      return c.json({ apps: [], error: "Failed to fetch apps" });
+    }
+
+    const data = (await response.json()) as {
+      apps?: Array<{
+        name?: string;
+        appId?: string;
+        platform?: string;
+        manualAppInfo?: { displayName?: string };
+        linkedAppInfo?: { appStoreId?: string; displayName?: string };
+        appApprovalState?: string;
+      }>;
+    };
+
+    const apps = (data.apps || []).map((app) => ({
+      id: app.appId || app.name?.split("/").pop() || "",
+      name: app.linkedAppInfo?.displayName || app.manualAppInfo?.displayName || "Unnamed App",
+      platform: app.platform || "UNKNOWN",
+      appStoreId: app.linkedAppInfo?.appStoreId,
+      approvalState: app.appApprovalState,
+    }));
+
+    return c.json({ apps });
+  } catch (error) {
+    console.error("Error fetching apps:", error);
+    return c.json({ apps: [], error: "Failed to fetch apps" });
+  }
+});
+
+/**
  * DELETE /providers/:id - Disconnect provider
  */
 providers.delete("/:id", async (c) => {

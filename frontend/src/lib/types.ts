@@ -43,6 +43,14 @@ export interface Provider {
   }
 }
 
+export interface ProviderApp {
+  id: string
+  name: string
+  platform: "IOS" | "ANDROID" | "UNKNOWN"
+  appStoreId?: string
+  approvalState?: string
+}
+
 export interface ChatSession {
   id: string
   title: string
