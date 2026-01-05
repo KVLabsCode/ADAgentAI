@@ -187,7 +187,7 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
               "px-4 py-2.5"
             )}
           >
-            <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed prose-p:my-2 prose-p:leading-relaxed prose-pre:bg-background prose-pre:text-foreground prose-pre:text-xs prose-code:bg-background prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5">
+            <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] prose-p:my-3 prose-p:leading-[1.8] prose-pre:bg-background prose-pre:text-foreground prose-pre:text-xs prose-code:bg-background prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-strong:text-foreground [&_br]:block [&_br]:my-1">
               <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                 {message.content}
               </ReactMarkdown>
