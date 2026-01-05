@@ -412,19 +412,18 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
     elif service == "admob":
         instructions = """
         Instructions for AdMob:
-        1. Use "List AdMob Accounts" to get available accounts first
-        2. Use the account_id from step 1 for subsequent calls
-        3. For apps: use "List AdMob Apps" with the account_id
-        4. For ad units: use "List AdMob Ad Units" with the account_id
-        5. For reports: use the appropriate report generation tool
+        - For reports/analytics questions: directly generate the report (account is auto-detected)
+        - For listing apps/ad units: use list tools directly (account is auto-detected)
+        - Only use "List AdMob Accounts" if user specifically asks about accounts
+        - Go straight to answering the question - don't list accounts unnecessarily
         """
     else:
         instructions = """
         Instructions for Ad Manager:
-        1. Use "List Ad Manager Networks" to get network codes first
-        2. Use the network_code from step 1 for subsequent calls
-        3. For ad units: use "List Ad Manager Ad Units"
-        4. For reports: use the report tools
+        - For reports/analytics: directly use report tools (network is auto-detected)
+        - For ad units/placements: use list tools directly
+        - Only use "List Networks" if user asks about network structure
+        - Go straight to answering the question
         """
 
     task = Task(

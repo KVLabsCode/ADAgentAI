@@ -37,7 +37,7 @@ services:
         backstory: >
           Mobile monetization expert with deep AdMob SDK knowledge.
           Specializes in account structure, app registration, and ad unit configuration.
-          Always starts by listing accounts to get the account ID.
+          Works efficiently - only fetches account info when specifically needed.
         tools:
           - list_accounts
           - get_account
@@ -104,7 +104,7 @@ services:
         backstory: >
           Enterprise ad inventory manager with programmatic expertise.
           Specializes in ad unit hierarchy, placement optimization, and site management.
-          Always starts by listing networks to get the network code.
+          Works efficiently - only fetches network info when specifically needed.
         tools:
           - list_networks
           - list_ad_units
