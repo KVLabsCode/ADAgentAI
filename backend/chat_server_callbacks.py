@@ -808,14 +808,13 @@ def index():
 def chat_stream():
     """Stream chat responses using proper CrewAI streaming API."""
     user_message = request.args.get('message', '')
+    # Get user_id from query param (passed by frontend since cookies don't work cross-domain)
+    user_id = request.args.get('user_id', None)
 
     if not user_message:
         return Response("data: " + json.dumps({"type": "error", "content": "No message provided"}) + "\n\n",
                        mimetype='text/event-stream')
 
-    # Authenticate user and get user_id
-    user = get_current_user()
-    user_id = user.get("id") if user else None
     print(f"  Chat request from user: {user_id or 'anonymous'}")
 
     @stream_with_context

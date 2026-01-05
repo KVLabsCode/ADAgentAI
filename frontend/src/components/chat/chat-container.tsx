@@ -8,6 +8,7 @@ import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
 import { ChatSettingsPanel } from "./chat-settings-panel"
 import { streamChat } from "@/lib/api"
+import { authClient } from "@/lib/auth-client"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -20,6 +21,7 @@ interface ChatContainerProps {
 
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const router = useRouter()
+  const { data: session } = authClient.useSession()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
   const [settingsOpen, setSettingsOpen] = React.useState(false)
@@ -31,6 +33,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
 
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
+  const userId = session?.user?.id
 
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {
@@ -237,7 +240,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
           }
         },
       },
-      abortControllerRef.current.signal
+      abortControllerRef.current.signal,
+      userId // Pass user ID for OAuth token fetching
     )
 
     setIsLoading(false)
@@ -310,7 +314,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
           <div className="h-full flex flex-col">
             <ChatMessages messages={messages} isLoading={isLoading} />
             <div className="border-t border-border/30 px-6 py-3">
-              <div className="max-w-4xl mx-auto w-full">
+              <div className="max-w-6xl mx-auto w-full">
                 <ChatInput
                   onSend={handleSendMessage}
                   disabled={!hasProviders}

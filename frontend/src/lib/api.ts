@@ -37,9 +37,14 @@ export interface ChatStreamCallbacks {
 export async function streamChat(
   message: string,
   callbacks: ChatStreamCallbacks,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  userId?: string
 ): Promise<void> {
-  const url = `${AGENT_URL}/chat/stream?message=${encodeURIComponent(message)}`;
+  // Pass userId as query param since cookies don't work cross-domain
+  let url = `${AGENT_URL}/chat/stream?message=${encodeURIComponent(message)}`;
+  if (userId) {
+    url += `&user_id=${encodeURIComponent(userId)}`;
+  }
   let doneHandled = false; // Prevent duplicate onDone calls
 
   try {

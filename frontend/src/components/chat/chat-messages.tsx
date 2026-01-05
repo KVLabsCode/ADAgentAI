@@ -28,7 +28,7 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 
   return (
     <ScrollArea className="flex-1" ref={scrollRef}>
-      <div className="max-w-4xl mx-auto py-6 px-4 space-y-5">
+      <div className="max-w-6xl mx-auto py-6 px-4 space-y-5">
         {messages.map((message) => (
           <div key={message.id}>
             {message.role === "user" ? (
