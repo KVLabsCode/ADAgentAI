@@ -22,7 +22,7 @@ interface ChatContainerProps {
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const router = useRouter()
   const { data: session } = authClient.useSession()
-  const { enabledProviderIds, responseStyle, autoIncludeContext } = useChatSettings()
+  const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext } = useChatSettings()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
@@ -35,9 +35,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   // Build context for API calls
   const chatContext: ChatContext = React.useMemo(() => ({
     enabledProviderIds,
+    enabledAppIds,
     responseStyle,
     autoIncludeContext,
-  }), [enabledProviderIds, responseStyle, autoIncludeContext])
+  }), [enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext])
 
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {

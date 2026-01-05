@@ -38,6 +38,8 @@ export interface ChatHistoryMessage {
 
 export interface ChatContext {
   enabledProviderIds: string[];
+  // App IDs enabled per provider: { "provider-id": ["app-id-1", "app-id-2"] }
+  enabledAppIds: Record<string, string[]>;
   responseStyle: "concise" | "detailed";
   autoIncludeContext: boolean;
 }

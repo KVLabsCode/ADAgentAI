@@ -121,6 +121,8 @@ class ChatMessage(BaseModel):
 class ChatContext(BaseModel):
     """User's chat context settings."""
     enabledProviderIds: list[str] = []  # Empty means all enabled
+    # App IDs enabled per provider: { "provider-id": ["app-id-1", "app-id-2"] }
+    enabledAppIds: dict[str, list[str]] = {}  # Empty means all apps enabled
     responseStyle: str = "concise"  # "concise" or "detailed"
     autoIncludeContext: bool = True
 
@@ -506,6 +508,29 @@ def build_kickoff_inputs(
     inputs["admob_account_id"] = admob_account_id
     inputs["gam_network_code"] = gam_network_code
 
+    # App restrictions from user context (enabledAppIds)
+    app_restriction_lines = []
+    if context and context.enabledAppIds:
+        for provider_id, app_ids in context.enabledAppIds.items():
+            if app_ids:  # Only add restriction if specific apps are selected
+                # Find provider info
+                matching_provider = next(
+                    (p for p in (providers or []) if p.get("id") == provider_id),
+                    None
+                )
+                if matching_provider:
+                    provider_name = matching_provider.get("name", provider_id)
+                    provider_type = matching_provider.get("type", "unknown")
+                    if provider_type == "admob":
+                        app_restriction_lines.append(
+                            f"For {provider_name}: Only query data for these app IDs: {', '.join(app_ids)}"
+                        )
+
+    if app_restriction_lines:
+        inputs["app_restrictions"] = "\n\nAPP RESTRICTIONS (User has limited scope to specific apps):\n" + "\n".join(app_restriction_lines) + "\nDo NOT query or return data for apps outside this list."
+    else:
+        inputs["app_restrictions"] = ""
+
     # Response style from user context
     response_style = context.responseStyle if context else "concise"
 
@@ -597,10 +622,12 @@ def create_crew_for_query(
         """ + service_instructions + """
 
         {style_instructions}
+        {app_restrictions}
 
         IMPORTANT:
         - Do NOT list accounts/networks when they are already provided above
         - Use the provided account/network IDs directly without verification
+        - If app restrictions are specified, ONLY query data for those apps
         - If referring to previous conversation, be contextual
         - Use blank lines between sections for readability
         """,
