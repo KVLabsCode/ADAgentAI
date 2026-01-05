@@ -1,5 +1,6 @@
 // Sequential event types for streaming
 export type StreamEventItem =
+  | { type: "routing"; service: string; capability: string }
   | { type: "thinking"; content: string }
   | { type: "tool"; name: string; params: Record<string, unknown> }
   | { type: "tool_result"; name: string; result: unknown }

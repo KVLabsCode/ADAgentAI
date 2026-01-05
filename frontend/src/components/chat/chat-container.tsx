@@ -132,10 +132,12 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
       content,
       {
         onRouting: (service, capability) => {
+          // Add routing event to show the decision process
+          events.push({ type: "routing", service, capability })
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, agentName: `${service} / ${capability}` }
+                ? { ...m, agentName: `${service} / ${capability}`, events: [...events] }
                 : m
             )
           )

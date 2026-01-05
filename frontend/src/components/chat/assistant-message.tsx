@@ -4,7 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Bot, Brain, Wrench, CheckCircle2, ChevronDown, Clock, ShieldCheck, ShieldX } from "lucide-react"
+import { Bot, Brain, Wrench, CheckCircle2, ChevronDown, Clock, ShieldCheck, ShieldX, Route } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -66,6 +66,29 @@ function StatusBadge({ status }: { status: ApprovalStatus }) {
         </Badge>
       )
   }
+}
+
+// Routing block - shows the router decision
+function RoutingBlock({ service, capability }: { service: string; capability: string }) {
+  return (
+    <div className={cn(
+      "rounded-lg border transition-colors",
+      "border-violet-200/60 dark:border-violet-800/50",
+      "bg-gradient-to-r from-violet-50/80 to-purple-50/40 dark:from-violet-950/30 dark:to-purple-950/20"
+    )}>
+      <div className="flex items-center gap-2.5 px-3 py-2">
+        <div className="p-1 rounded-md bg-violet-100 dark:bg-violet-900/50">
+          <Route className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+        </div>
+        <span className="text-xs text-violet-700 dark:text-violet-300">
+          <span className="font-medium">Routing to</span>{" "}
+          <span className="font-semibold">{service}</span>
+          <span className="mx-1.5 text-violet-400 dark:text-violet-500">→</span>
+          <span className="font-semibold">{capability}</span>
+        </span>
+      </div>
+    </div>
+  )
 }
 
 // Thinking block using shadcn Collapsible
@@ -240,6 +263,7 @@ function ToolResultBlock({ name, result }: { name: string; result: unknown }) {
 function CompactActivityBlock({ events }: { events: StreamEventItem[] }) {
   const [isOpen, setIsOpen] = React.useState(false)
 
+  const routingEvent = events.find(e => e.type === "routing") as { type: "routing"; service: string; capability: string } | undefined
   const thinkingCount = events.filter(e => e.type === "thinking").length
   const toolCount = events.filter(e => e.type === "tool").length
   const pendingApprovals = events.filter(
@@ -259,6 +283,12 @@ function CompactActivityBlock({ events }: { events: StreamEventItem[] }) {
               <Brain className="h-3 w-3 text-slate-600 dark:text-slate-400" />
             </div>
             <span className="text-xs font-medium text-slate-700 dark:text-slate-300 flex-1">
+              {routingEvent && (
+                <>
+                  <span className="text-violet-600 dark:text-violet-400">{routingEvent.service} → {routingEvent.capability}</span>
+                  {(thinkingCount > 0 || toolCount > 0) && " · "}
+                </>
+              )}
               {thinkingCount > 0 && `${thinkingCount} thinking`}
               {thinkingCount > 0 && toolCount > 0 && " · "}
               {toolCount > 0 && `${toolCount} tool${toolCount > 1 ? "s" : ""}`}
@@ -279,6 +309,19 @@ function CompactActivityBlock({ events }: { events: StreamEventItem[] }) {
           <div className="px-3 pb-3">
             <div className="pt-2 border-t border-slate-200/40 dark:border-slate-700/30 space-y-2">
               {events.map((event, i) => {
+                if (event.type === "routing") {
+                  return (
+                    <div key={`routing-${i}`} className="text-xs flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 font-medium">
+                        <Route className="h-3 w-3" />
+                        Routing:
+                      </div>
+                      <span className="text-violet-700 dark:text-violet-300">
+                        {event.service} <span className="text-violet-400">→</span> {event.capability}
+                      </span>
+                    </div>
+                  )
+                }
                 if (event.type === "thinking") {
                   return (
                     <div key={`thinking-${i}`} className="text-xs">
@@ -381,6 +424,9 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
           ) : (
             <div className="space-y-2">
               {events.map((event, i) => {
+                if (event.type === "routing") {
+                  return <RoutingBlock key={`routing-${i}`} service={event.service} capability={event.capability} />
+                }
                 if (event.type === "thinking") {
                   return <ThinkingBlock key={`thinking-${i}`} content={event.content} />
                 }
