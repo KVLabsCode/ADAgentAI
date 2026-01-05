@@ -43,7 +43,7 @@ export default async function BlogPostPage({ params }: Props) {
   return (
     <article className="py-12">
       <div className="container mx-auto px-4">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           {/* Back link */}
           <Link
             href="/blog"

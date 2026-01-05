@@ -117,7 +117,7 @@ export function BlogList({ posts }: BlogListProps) {
                   <Link
                     key={post.slug}
                     href={`/blog/${post.slug}`}
-                    className="group block rounded-lg border border-border/50 p-5 hover:border-border hover:bg-muted/20 transition-all"
+                    className="group flex flex-col rounded-lg border border-border/50 p-5 hover:border-border hover:bg-muted/20 transition-all h-full"
                   >
                     <div className="flex items-center gap-2 mb-3">
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-border/50">
@@ -130,18 +130,34 @@ export function BlogList({ posts }: BlogListProps) {
                     <h3 className="text-sm font-medium mb-2 group-hover:text-foreground/80 transition-colors line-clamp-2">
                       {post.title}
                     </h3>
-                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2 flex-1">
                       {post.excerpt}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{post.readTime}</span>
+                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/30">
+                      <div className="flex items-center gap-2">
+                        {post.author.image ? (
+                          <img
+                            src={post.author.image}
+                            alt={post.author.name}
+                            className="h-5 w-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center text-[8px] font-semibold">
+                            {post.author.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-[11px] text-muted-foreground">{post.author.name}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
-                        Read more
-                        <ArrowRight className="h-3 w-3" />
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>{post.readTime}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
+                          Read
+                          <ArrowRight className="h-3 w-3" />
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 ))}
