@@ -2,8 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import { Search, Download, Trash2, MessageSquare, MoreHorizontal, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -187,11 +185,9 @@ export default function ChatHistoryPage() {
                     {formatRelativeDate(chat.date)}
                   </span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1 prose prose-sm dark:prose-invert max-w-none prose-p:m-0 prose-p:inline">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {chat.preview}
-                  </ReactMarkdown>
-                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                  {chat.preview}
+                </p>
               </Link>
 
               <DropdownMenu>
