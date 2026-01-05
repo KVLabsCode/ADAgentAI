@@ -109,6 +109,31 @@ class DoneEvent(BaseModel):
 
 
 # =============================================================================
+# Chat Request Models (defined early for use in function signatures)
+# =============================================================================
+
+class ChatMessage(BaseModel):
+    """A single message in the conversation history."""
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ChatContext(BaseModel):
+    """User's chat context settings."""
+    enabledProviderIds: list[str] = []  # Empty means all enabled
+    responseStyle: str = "concise"  # "concise" or "detailed"
+    autoIncludeContext: bool = True
+
+
+class ChatRequest(BaseModel):
+    """Request body for chat endpoint."""
+    message: str
+    history: list[ChatMessage] = []
+    user_id: Optional[str] = None
+    context: Optional[ChatContext] = None
+
+
+# =============================================================================
 # User Authentication
 # =============================================================================
 
@@ -810,27 +835,6 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
-
-
-class ChatMessage(BaseModel):
-    """A single message in the conversation history."""
-    role: str  # "user" or "assistant"
-    content: str
-
-
-class ChatContext(BaseModel):
-    """User's chat context settings."""
-    enabledProviderIds: list[str] = []  # Empty means all enabled
-    responseStyle: str = "concise"  # "concise" or "detailed"
-    autoIncludeContext: bool = True
-
-
-class ChatRequest(BaseModel):
-    """Request body for chat endpoint."""
-    message: str
-    history: list[ChatMessage] = []
-    user_id: Optional[str] = None
-    context: Optional[ChatContext] = None
 
 
 @app.get("/chat/stream")
