@@ -13,21 +13,23 @@ interface ChatMessagesProps {
 }
 
 export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-
-  // Scroll to bottom on new messages
-  React.useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages, isLoading])
+  const bottomRef = React.useRef<HTMLDivElement>(null)
 
   // Check if last message is an empty assistant message (streaming in progress)
   const lastMessage = messages[messages.length - 1]
   const isStreaming = lastMessage?.role === "assistant" && !lastMessage.content && isLoading
 
+  // Track last message content/events for scroll trigger during streaming
+  const lastMessageContent = lastMessage?.content
+  const lastMessageEventsLength = lastMessage?.events?.length ?? 0
+
+  // Scroll to bottom on new messages or when content updates
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages.length, isLoading, lastMessageContent, lastMessageEventsLength])
+
   return (
-    <ScrollArea className="flex-1" ref={scrollRef}>
+    <ScrollArea className="flex-1">
       <div className="max-w-6xl mx-auto py-6 px-4 space-y-5">
         {messages.map((message) => (
           <div key={message.id}>
@@ -51,6 +53,9 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
             </div>
           </div>
         )}
+
+        {/* Scroll anchor */}
+        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   )
