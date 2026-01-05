@@ -86,6 +86,11 @@ app.use("*", errorHandler);
 // Routes
 // ============================================================
 
+// Root endpoint for Render health checks (HEAD /)
+app.get("/", (c) => {
+  return c.json({ status: "ok", service: "kvlabs-api" });
+});
+
 // Health check endpoints
 app.route("/health", healthRoutes);
 
