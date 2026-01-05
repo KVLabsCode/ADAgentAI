@@ -97,9 +97,9 @@ export default function AuthenticatedLayout({
         <header className="flex h-12 shrink-0 items-center justify-end border-b border-border/40 px-3">
           <ThemeToggle />
         </header>
-        <main className="flex-1 overflow-auto">
+        <div className="flex-1 min-h-0 flex flex-col overflow-auto">
           {children}
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

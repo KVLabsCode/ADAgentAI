@@ -7,7 +7,7 @@ import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
 import { ChatSettingsPanel } from "./chat-settings-panel"
-import { streamChat } from "@/lib/api"
+import { streamChat, type ChatHistoryMessage } from "@/lib/api"
 import { authClient } from "@/lib/auth-client"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
 
@@ -120,6 +120,13 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     const toolCalls: { name: string; params: Record<string, unknown> }[] = []
     const toolResults: { name: string; result: unknown }[] = []
     let finalContent = ""
+
+    // Build conversation history from existing messages (excluding the ones we just added)
+    const history: ChatHistoryMessage[] = messages
+      .filter((m): m is Message & { role: "user" | "assistant" } =>
+        (m.role === "user" || m.role === "assistant") && !!m.content?.trim()
+      )
+      .map(m => ({ role: m.role, content: m.content }))
 
     await streamChat(
       content,
@@ -241,7 +248,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         },
       },
       abortControllerRef.current.signal,
-      userId // Pass user ID for OAuth token fetching
+      userId, // Pass user ID for OAuth token fetching
+      history // Pass conversation history for context
     )
 
     setIsLoading(false)
@@ -267,9 +275,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Fixed Header - always visible at top */}
+      <div className="shrink-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40">
         <ChatHeader
           onSettingsClick={() => setSettingsOpen(true)}
           hasProviders={hasProviders}
@@ -284,9 +292,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         onToggleProvider={handleToggleProvider}
       />
 
-      <div className="flex-1 overflow-hidden flex flex-col">
+      {/* Scrollable content area */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {!hasMessages ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
+          <div className="h-full flex flex-col items-center justify-center px-6 py-4">
             <div className="max-w-xl w-full space-y-5">
               <div className="text-center space-y-1">
                 <h2 className="text-lg font-medium tracking-tight">
@@ -302,34 +311,23 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
               {hasProviders && (
                 <ExamplePrompts onPromptClick={handlePromptClick} />
               )}
-
-              <div className="max-w-lg mx-auto w-full">
-                <ChatInput
-                  onSend={handleSendMessage}
-                  disabled={!hasProviders}
-                  isLoading={isLoading}
-                  placeholder={hasProviders ? "Ask anything about your ads..." : "Connect a provider first"}
-                />
-              </div>
             </div>
           </div>
         ) : (
-          <>
-            <div className="flex-1 overflow-y-auto">
-              <ChatMessages messages={messages} isLoading={isLoading} />
-            </div>
-            {/* Sticky Input at Bottom */}
-            <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border/30 px-6 py-3">
-              <div className="max-w-6xl mx-auto w-full">
-                <ChatInput
-                  onSend={handleSendMessage}
-                  disabled={!hasProviders}
-                  isLoading={isLoading}
-                />
-              </div>
-            </div>
-          </>
+          <ChatMessages messages={messages} isLoading={isLoading} />
         )}
+      </div>
+
+      {/* Fixed Input - always visible at bottom */}
+      <div className="shrink-0 bg-background/95 backdrop-blur-sm border-t border-border/30 px-6 py-3">
+        <div className="max-w-6xl mx-auto w-full">
+          <ChatInput
+            onSend={handleSendMessage}
+            disabled={!hasProviders}
+            isLoading={isLoading}
+            placeholder={!hasMessages && hasProviders ? "Ask anything about your ads..." : !hasProviders ? "Connect a provider first" : undefined}
+          />
+        </div>
       </div>
     </div>
   )

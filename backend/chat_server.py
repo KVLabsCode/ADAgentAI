@@ -430,16 +430,33 @@ def create_crew_for_query(
     service: str,
     capability: str,
     user_id: Optional[str] = None,
-    providers: Optional[list[dict]] = None
+    providers: Optional[list[dict]] = None,
+    history: Optional[list] = None
 ) -> Crew:
     """Create a streaming crew routed to the appropriate specialist."""
     factory = get_factory()
+    history = history or []
 
     # Pass user_id to factory so tools can fetch user-specific tokens
     if user_id:
         os.environ["CURRENT_USER_ID"] = user_id
 
     specialist = factory.create_specialist(service, capability, verbose=False)
+
+    # Build conversation history context (last 6 messages max)
+    history_context = ""
+    if history:
+        recent_history = history[-6:]  # Keep last 6 messages for context
+        history_lines = []
+        for msg in recent_history:
+            role = msg.get("role", msg.role if hasattr(msg, "role") else "user")
+            content = msg.get("content", msg.content if hasattr(msg, "content") else "")
+            # Truncate very long messages
+            if len(content) > 500:
+                content = content[:500] + "..."
+            history_lines.append(f"{role.upper()}: {content}")
+        if history_lines:
+            history_context = "\n\nConversation history:\n" + "\n".join(history_lines)
 
     # Build provider context for the agent
     provider_context = ""
@@ -506,6 +523,7 @@ def create_crew_for_query(
     task = Task(
         description=f"""
         User request: {{user_query}}
+        {history_context}
 
         {instructions}
 
@@ -515,6 +533,7 @@ def create_crew_for_query(
         - Use bullet points for lists of data
         - For metrics, show key numbers prominently
         - NO caveats or disclaimers unless critical
+        - If referring to previous conversation, be contextual
         """,
         expected_output="A direct, concise answer to the user's question.",
         agent=specialist,
@@ -541,18 +560,24 @@ def format_sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-async def stream_crew_response(user_message: str, user_id: Optional[str] = None) -> AsyncGenerator[str, None]:
+async def stream_crew_response(
+    user_message: str,
+    user_id: Optional[str] = None,
+    history: Optional[list] = None
+) -> AsyncGenerator[str, None]:
     """
     Async generator for streaming crew responses as SSE events.
 
     Args:
         user_message: The user's chat message
         user_id: Optional user ID for fetching user-specific OAuth tokens
+        history: Optional list of previous messages for context
 
     Yields:
         SSE-formatted strings with event data
     """
     global _current_collector
+    history = history or []
 
     try:
         # Fetch user's connected providers
@@ -569,8 +594,11 @@ async def stream_crew_response(user_message: str, user_id: Optional[str] = None)
         # Set up event collector for tool calls
         _current_collector = ToolEventCollector()
 
-        # Create crew with user context for OAuth tokens and provider info
-        crew = create_crew_for_query(user_message, service, capability, user_id=user_id, providers=providers)
+        # Create crew with user context for OAuth tokens, provider info, and conversation history
+        crew = create_crew_for_query(
+            user_message, service, capability,
+            user_id=user_id, providers=providers, history=history
+        )
 
         # Start async streaming
         streaming = await crew.kickoff_async(inputs={'user_query': user_message})
@@ -718,47 +746,74 @@ async def health():
     return {"status": "healthy"}
 
 
+class ChatMessage(BaseModel):
+    """A single message in the conversation history."""
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Request body for chat endpoint."""
+    message: str
+    history: list[ChatMessage] = []
+    user_id: Optional[str] = None
+
+
 @app.get("/chat/stream")
-async def chat_stream(
+async def chat_stream_get(
     request: Request,
     message: str = Query(..., description="User message"),
     user_id: Optional[str] = Query(None, description="User ID for OAuth token lookup"),
 ):
-    """
-    Stream chat responses using Server-Sent Events.
-
-    Authentication via user_id query parameter (passed from frontend session).
-
-    Connects to CrewAI agent and streams:
-    - routing: Which specialist handles the query
-    - agent: Agent/task transitions
-    - thought: Agent thinking process
-    - tool: Tool calls being made
-    - tool_result: Tool execution results
-    - result: Final response
-    - error: Any errors
-    - done: Stream complete
-    """
+    """GET endpoint for simple requests without history."""
     if not message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # Get user_id from query param (cross-domain cookie workaround)
-    # If not provided, try to get from session cookie (same-domain)
     if not user_id:
         user = await get_current_user(request)
         user_id = user.get("id") if user else None
 
-    # Note: user_id can be None for unauthenticated users
-    # The crew will still work but won't be able to access user-specific data
-    print(f"  Chat request from user: {user_id or 'anonymous'}")
+    print(f"  Chat request (GET) from user: {user_id or 'anonymous'}")
 
     return StreamingResponse(
-        stream_crew_response(message, user_id=user_id),
+        stream_crew_response(message, user_id=user_id, history=[]),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+@app.post("/chat/stream")
+async def chat_stream_post(
+    request: Request,
+    body: ChatRequest,
+):
+    """
+    POST endpoint for chat with conversation history.
+
+    Streams responses using Server-Sent Events.
+    Includes conversation history for context continuity.
+    """
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    user_id = body.user_id
+    if not user_id:
+        user = await get_current_user(request)
+        user_id = user.get("id") if user else None
+
+    print(f"  Chat request (POST) from user: {user_id or 'anonymous'}, history: {len(body.history)} messages")
+
+    return StreamingResponse(
+        stream_crew_response(body.message, user_id=user_id, history=body.history),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         }
     )
 

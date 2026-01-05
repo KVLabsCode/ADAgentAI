@@ -31,6 +31,11 @@ export interface ChatStreamCallbacks {
   onDone?: () => void;
 }
 
+export interface ChatHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /**
  * Stream chat responses from CrewAI agent
  */
@@ -38,22 +43,25 @@ export async function streamChat(
   message: string,
   callbacks: ChatStreamCallbacks,
   signal?: AbortSignal,
-  userId?: string
+  userId?: string,
+  history?: ChatHistoryMessage[]
 ): Promise<void> {
-  // Pass userId as query param since cookies don't work cross-domain
-  let url = `${AGENT_URL}/chat/stream?message=${encodeURIComponent(message)}`;
-  if (userId) {
-    url += `&user_id=${encodeURIComponent(userId)}`;
-  }
+  const url = `${AGENT_URL}/chat/stream`;
   let doneHandled = false; // Prevent duplicate onDone calls
 
   try {
     const response = await fetch(url, {
-      method: "GET",
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
       credentials: "include", // Send cookies for auth
+      body: JSON.stringify({
+        message,
+        user_id: userId,
+        history: history || [],
+      }),
       signal,
     });
 
