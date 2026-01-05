@@ -539,9 +539,11 @@ def create_crew_for_query(
         - For metrics, show key numbers prominently
         - NO caveats or disclaimers unless critical
         - If referring to previous conversation, be contextual
+        - Use blank lines between sections for readability
         """,
-        expected_output="A direct, concise answer to the user's question.",
+        expected_output="A direct, concise answer to the user's question with proper markdown formatting.",
         agent=specialist,
+        markdown=True,  # Enable proper markdown formatting with newlines
     )
 
     return Crew(

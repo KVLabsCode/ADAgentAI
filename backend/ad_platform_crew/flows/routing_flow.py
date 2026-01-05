@@ -127,9 +127,11 @@ class AdPlatformRoutingFlow(Flow[FlowState]):
                 Use your available tools to gather the requested information.
                 Provide a clear, helpful response with specific data.
                 If you encounter errors, explain them clearly.
+                Use blank lines between sections for readability.
                 """,
-                expected_output="A clear response with relevant data from the ad platform.",
+                expected_output="A clear response with relevant data from the ad platform, using proper markdown formatting.",
                 agent=agent,
+                markdown=True,  # Enable proper markdown formatting with newlines
             )
 
             crew = Crew(
