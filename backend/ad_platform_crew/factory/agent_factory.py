@@ -124,6 +124,10 @@ class AgentFactory:
         # Get allowed tool names from config
         allowed_tools = cap_config.get("tools", [])
 
+        # If no tools defined or module is null, return empty list
+        if not allowed_tools or not service.get("module"):
+            return []
+
         # Get the tool registry
         tool_registry = self._get_tool_module(service_key)
 

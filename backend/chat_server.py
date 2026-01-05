@@ -154,8 +154,7 @@ async def get_current_user(request: Request) -> Optional[dict]:
 CLASSIFICATION_PROMPT = """Classify this user query into ONE category.
 
 Categories:
-- simple_greeting: Greetings like "hi", "hello", "hey", "good morning"
-- simple_help: Questions about capabilities like "what can you do", "help", "how do you work"
+- general: Greetings, help requests, capability questions, or unclear queries
 - admob_inventory: AdMob accounts, apps, ad units (list, create, view setup)
 - admob_reporting: AdMob performance, revenue, eCPM, reports, analytics
 - admob_mediation: AdMob mediation groups, ad sources, waterfall, networks
@@ -170,37 +169,8 @@ Query: {query}
 
 Respond with ONLY the category name, nothing else."""
 
-# Simple responses that don't need the crew
-SIMPLE_RESPONSES = {
-    "simple_greeting": """Hello! I'm your Ad Platform Assistant. I can help you with:
-
-• **AdMob**: View accounts, apps, ad units, revenue reports, mediation setup
-• **Google Ad Manager**: Networks, ad units, orders, line items, reports
-
-What would you like to know about your ad performance today?""",
-
-    "simple_help": """I'm an AI assistant specialized in ad platform management. Here's what I can do:
-
-**AdMob:**
-• List your accounts, apps, and ad units
-• Generate revenue and performance reports
-• Analyze mediation groups and ad sources
-• Review A/B test experiments
-
-**Google Ad Manager:**
-• View networks and ad unit inventory
-• Manage orders and line items
-• Generate custom reports
-• Analyze targeting and deals
-
-Just ask me something like:
-• "Show my AdMob revenue for the last 7 days"
-• "List my ad units"
-• "What's my eCPM this month?"
-"""
-}
-
 ROUTE_MAP = {
+    "general": ("general", "assistant"),
     "admob_inventory": ("admob", "inventory"),
     "admob_reporting": ("admob", "reporting"),
     "admob_mediation": ("admob", "mediation"),
@@ -228,21 +198,13 @@ def get_router_llm() -> LLM:
     return _router_llm
 
 
-async def classify_query(user_query: str) -> tuple[str, str, Optional[str]]:
+async def classify_query(user_query: str) -> tuple[str, str]:
     """
     Classify a user query to determine routing.
 
     Returns:
-        Tuple of (service, capability, simple_response) where simple_response
-        is not None if this is a simple query that doesn't need the crew.
+        Tuple of (service, capability) for the specialist.
     """
-    # Quick check for obvious simple queries (no LLM needed)
-    query_lower = user_query.lower().strip()
-    if query_lower in ["hi", "hello", "hey", "hi!", "hello!", "hey!"]:
-        return ("simple", "greeting", SIMPLE_RESPONSES["simple_greeting"])
-    if query_lower in ["help", "?", "what can you do", "what can you do?", "how do you work", "how do you work?"]:
-        return ("simple", "help", SIMPLE_RESPONSES["simple_help"])
-
     llm = get_router_llm()
     prompt = CLASSIFICATION_PROMPT.format(query=user_query)
 
@@ -255,17 +217,13 @@ async def classify_query(user_query: str) -> tuple[str, str, Optional[str]]:
         )
         category = response.strip().lower().replace('"', '').replace("'", "")
 
-        # Check for simple responses first
-        if category in SIMPLE_RESPONSES:
-            return ("simple", category.replace("simple_", ""), SIMPLE_RESPONSES[category])
-
         if category in ROUTE_MAP:
-            return (*ROUTE_MAP[category], None)
-        print(f"Unknown category '{category}', defaulting to admob_inventory")
-        return ("admob", "inventory", None)
+            return ROUTE_MAP[category]
+        print(f"Unknown category '{category}', defaulting to general")
+        return ("general", "assistant")
     except Exception as e:
-        print(f"Classification error: {e}, defaulting to admob_inventory")
-        return ("admob", "inventory", None)
+        print(f"Classification error: {e}, defaulting to general")
+        return ("general", "assistant")
 
 
 # =============================================================================
@@ -444,7 +402,14 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
     specialist = factory.create_specialist(service, capability, verbose=False)
 
     # Service-specific instructions
-    if service == "admob":
+    if service == "general":
+        instructions = """
+        You are a helpful ad platform assistant. Respond naturally and directly.
+        For greetings, respond briefly and offer to help with AdMob or Ad Manager.
+        For capability questions, briefly list what you can do.
+        Keep responses short and friendly.
+        """
+    elif service == "admob":
         instructions = """
         Instructions for AdMob:
         1. Use "List AdMob Accounts" to get available accounts first
@@ -464,19 +429,18 @@ def create_crew_for_query(user_query: str, service: str, capability: str, user_i
 
     task = Task(
         description=f"""
-        Process this user request: {{user_query}}
+        User request: {{user_query}}
 
         {instructions}
 
-        RESPONSE FORMAT:
-        - Be DIRECT and CONCISE - answer the question asked
-        - Start with the key data/answer immediately
-        - Use bullet points for lists
-        - Include only relevant metrics
-        - NO lengthy explanations or caveats unless requested
-        - If comparing data, show a clear comparison table/list
+        IMPORTANT - Response style:
+        - Be DIRECT - answer the specific question first
+        - Be CONCISE - no unnecessary explanations
+        - Use bullet points for lists of data
+        - For metrics, show key numbers prominently
+        - NO caveats or disclaimers unless critical
         """,
-        expected_output="A concise, direct response with the requested data. No verbose explanations.",
+        expected_output="A direct, concise answer to the user's question.",
         agent=specialist,
     )
 
@@ -516,16 +480,10 @@ async def stream_crew_response(user_message: str, user_id: Optional[str] = None)
 
     try:
         # Classify and route query
-        service, capability, simple_response = await classify_query(user_message)
+        service, capability = await classify_query(user_message)
         print(f"  Routed to: {service}/{capability} (user: {user_id or 'anonymous'})")
 
         yield format_sse(RoutingEvent(service=service, capability=capability).model_dump())
-
-        # Handle simple queries without crew
-        if simple_response:
-            yield format_sse(ResultEvent(content=simple_response).model_dump())
-            yield format_sse(DoneEvent().model_dump())
-            return
 
         # Set up event collector for tool calls
         _current_collector = ToolEventCollector()
@@ -708,13 +666,9 @@ async def chat_stream(
         user = await get_current_user(request)
         user_id = user.get("id") if user else None
 
-    if not user_id:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required. Please log in to use chat."
-        )
-
-    print(f"  Chat request from user: {user_id}")
+    # Note: user_id can be None for unauthenticated users
+    # The crew will still work but won't be able to access user-specific data
+    print(f"  Chat request from user: {user_id or 'anonymous'}")
 
     return StreamingResponse(
         stream_crew_response(message, user_id=user_id),

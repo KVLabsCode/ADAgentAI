@@ -11,6 +11,20 @@
 # 3. Allowing easy addition of new services (just add YAML!)
 
 services:
+  general:
+    display_name: "General Assistant"
+    description: "Handles greetings, help requests, and general questions"
+    module: null  # No tools needed for general queries
+
+    capabilities:
+      assistant:
+        description: "Respond to greetings and general questions"
+        backstory: >
+          Friendly ad platform assistant who helps users understand what's possible.
+          Responds naturally to greetings and explains capabilities clearly.
+          Keeps responses brief and helpful.
+        tools: []
+
   admob:
     display_name: "AdMob"
     description: "Google AdMob for mobile app monetization"
