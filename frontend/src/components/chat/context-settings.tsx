@@ -17,9 +17,10 @@ import {
   FileText,
   Target,
   Palette,
+  Check,
+  Minus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -31,9 +32,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { useChatSettings, type ResponseStyle } from "@/lib/chat-settings"
+import { useChatSettings } from "@/lib/chat-settings"
 import type { Provider, ProviderApp } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
@@ -42,18 +42,62 @@ interface ContextSettingsProps {
   providers: Provider[]
 }
 
+// Custom checkbox with indeterminate state
+function TreeCheckbox({
+  checked,
+  indeterminate,
+  onCheckedChange,
+  className,
+}: {
+  checked: boolean
+  indeterminate?: boolean
+  onCheckedChange: () => void
+  className?: string
+}) {
+  return (
+    <button
+      onClick={onCheckedChange}
+      className={cn(
+        "h-4 w-4 shrink-0 rounded border transition-all duration-150",
+        "flex items-center justify-center",
+        checked || indeterminate
+          ? "bg-primary border-primary text-primary-foreground"
+          : "border-muted-foreground/30 hover:border-muted-foreground/50 bg-background",
+        className
+      )}
+    >
+      {indeterminate ? (
+        <Minus className="h-3 w-3" strokeWidth={3} />
+      ) : checked ? (
+        <Check className="h-3 w-3" strokeWidth={3} />
+      ) : null}
+    </button>
+  )
+}
+
+// Tree connector line component
+function TreeLine({ isLast, hasChildren, isExpanded }: { isLast: boolean; hasChildren?: boolean; isExpanded?: boolean }) {
+  return (
+    <div className="relative w-5 h-full flex items-center justify-center">
+      {/* Vertical line */}
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 w-px bg-border/50",
+          isLast ? "top-0 h-1/2" : "top-0 bottom-0"
+        )}
+      />
+      {/* Horizontal line */}
+      <div className="absolute left-1/2 w-1/2 h-px bg-border/50" />
+    </div>
+  )
+}
+
 export function ContextSettings({ providers }: ContextSettingsProps) {
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
-  // Track which sections are expanded
-  const [expandedSections, setExpandedSections] = React.useState<Set<string>>(
-    new Set(["admob", "gam"])
-  )
-  // Track which providers have their children expanded
+  const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(["admob", "gam"]))
   const [expandedProviders, setExpandedProviders] = React.useState<Set<string>>(new Set())
-  // Fetched apps per provider
   const [providerApps, setProviderApps] = React.useState<Record<string, ProviderApp[]>>({})
-  // Loading state per provider
   const [loadingApps, setLoadingApps] = React.useState<Set<string>>(new Set())
 
   const {
@@ -73,57 +117,64 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
   const gamProviders = providers.filter((p) => p.type === "gam")
   const hasProviders = providers.length > 0
 
-  // Initialize enabled providers when providers load (if empty, enable all)
+  // Initialize enabled providers
   React.useEffect(() => {
     if (providers.length > 0 && enabledProviderIds.length === 0) {
       setEnabledProviderIds(providers.map((p) => p.id))
     }
   }, [providers, enabledProviderIds.length, setEnabledProviderIds])
 
-  // Check if a provider is enabled
+  // Auto-expand providers when searching and they have matching apps
+  React.useEffect(() => {
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      const providersWithMatchingApps = Object.entries(providerApps)
+        .filter(([_, apps]) => apps.some(app => app.name.toLowerCase().includes(query)))
+        .map(([providerId]) => providerId)
+
+      if (providersWithMatchingApps.length > 0) {
+        setExpandedProviders(prev => {
+          const next = new Set(prev)
+          providersWithMatchingApps.forEach(id => next.add(id))
+          return next
+        })
+      }
+    }
+  }, [searchQuery, providerApps])
+
   const isProviderEnabled = (id: string) => {
     if (enabledProviderIds.length === 0) return true
     return enabledProviderIds.includes(id)
   }
 
-  // Check if an app is enabled
   const isAppEnabled = (providerId: string, appId: string) => {
     const providerAppIds = enabledAppIds[providerId]
     if (!providerAppIds || providerAppIds.length === 0) return true
     return providerAppIds.includes(appId)
   }
 
-  // Get app selection state for a provider (all, some, none)
   const getProviderAppState = (providerId: string): "all" | "some" | "none" => {
     const apps = providerApps[providerId] || []
     if (apps.length === 0) return "all"
-
     const providerAppIds = enabledAppIds[providerId]
     if (!providerAppIds || providerAppIds.length === 0) return "all"
-
     const enabledCount = apps.filter((app) => providerAppIds.includes(app.id)).length
     if (enabledCount === 0) return "none"
     if (enabledCount === apps.length) return "all"
     return "some"
   }
 
-  // Fetch apps for a provider
   const fetchApps = React.useCallback(
     async (providerId: string) => {
       if (providerApps[providerId] || loadingApps.has(providerId)) return
-
       setLoadingApps((prev) => new Set(prev).add(providerId))
-
       try {
         const response = await fetch(`${API_URL}/api/providers/${providerId}/apps`, {
           credentials: "include",
         })
-
         if (response.ok) {
           const data = await response.json()
           setProviderApps((prev) => ({ ...prev, [providerId]: data.apps || [] }))
-
-          // Initialize all apps as enabled if not set
           if (!enabledAppIds[providerId]) {
             const allAppIds = (data.apps || []).map((app: ProviderApp) => app.id)
             setEnabledAppIds(providerId, allAppIds)
@@ -142,20 +193,15 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
     [providerApps, loadingApps, enabledAppIds, setEnabledAppIds]
   )
 
-  // Toggle section expansion
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev)
-      if (next.has(section)) {
-        next.delete(section)
-      } else {
-        next.add(section)
-      }
+      if (next.has(section)) next.delete(section)
+      else next.add(section)
       return next
     })
   }
 
-  // Toggle provider expansion and fetch apps
   const toggleProviderExpanded = (providerId: string, providerType: string) => {
     setExpandedProviders((prev) => {
       const next = new Set(prev)
@@ -163,20 +209,15 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         next.delete(providerId)
       } else {
         next.add(providerId)
-        // Fetch apps when expanding (only for AdMob currently)
-        if (providerType === "admob") {
-          fetchApps(providerId)
-        }
+        if (providerType === "admob") fetchApps(providerId)
       }
       return next
     })
   }
 
-  // Toggle all apps for a provider
   const toggleAllApps = (providerId: string) => {
     const apps = providerApps[providerId] || []
     const currentState = getProviderAppState(providerId)
-
     if (currentState === "all") {
       setEnabledAppIds(providerId, [])
     } else {
@@ -184,160 +225,225 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
     }
   }
 
-  // Filter items by search
-  const filterBySearch = <T extends { name?: string; displayName?: string }>(
-    items: T[]
-  ): T[] => {
-    if (!searchQuery.trim()) return items
-    const query = searchQuery.toLowerCase()
-    return items.filter(
-      (item) =>
-        item.name?.toLowerCase().includes(query) ||
-        item.displayName?.toLowerCase().includes(query)
-    )
+  // Check if item matches search (for highlighting)
+  const matchesSearch = (text: string) => {
+    if (!searchQuery.trim()) return false
+    return text.toLowerCase().includes(searchQuery.toLowerCase())
   }
 
-  // Count enabled items
-  const enabledProviderCount =
-    enabledProviderIds.length === 0
-      ? providers.length
-      : enabledProviderIds.filter((id) => providers.some((p) => p.id === id)).length
+  // Filter providers - show if provider matches OR has matching apps
+  const filterProviders = (providerList: Provider[]) => {
+    if (!searchQuery.trim()) return providerList
+    const query = searchQuery.toLowerCase()
+    return providerList.filter((provider) => {
+      const providerMatches =
+        provider.displayName.toLowerCase().includes(query) ||
+        provider.identifiers.publisherId?.toLowerCase().includes(query) ||
+        provider.identifiers.networkCode?.toLowerCase().includes(query)
+      const apps = providerApps[provider.id] || []
+      const hasMatchingApps = apps.some(app => app.name.toLowerCase().includes(query))
+      return providerMatches || hasMatchingApps
+    })
+  }
+
+  // Filter apps
+  const filterApps = (apps: ProviderApp[]) => {
+    if (!searchQuery.trim()) return apps
+    const query = searchQuery.toLowerCase()
+    return apps.filter(app => app.name.toLowerCase().includes(query))
+  }
+
+  const enabledProviderCount = enabledProviderIds.length === 0
+    ? providers.length
+    : enabledProviderIds.filter((id) => providers.some((p) => p.id === id)).length
 
   const totalAppsCount = Object.values(providerApps).reduce((acc, apps) => acc + apps.length, 0)
-  const enabledAppsCount = Object.entries(enabledAppIds).reduce((acc, [providerId, appIds]) => {
-    const allApps = providerApps[providerId] || []
-    if (!appIds || appIds.length === 0) return acc + allApps.length
-    return acc + appIds.length
-  }, 0)
 
-  // Render provider item
-  const renderProvider = (provider: Provider) => {
+  const filteredAdmobProviders = filterProviders(admobProviders)
+  const filteredGamProviders = filterProviders(gamProviders)
+
+  // Render a provider row
+  const renderProvider = (provider: Provider, index: number, total: number) => {
     const isExpanded = expandedProviders.has(provider.id)
     const isLoading = loadingApps.has(provider.id)
-    const apps = filterBySearch(providerApps[provider.id] || [])
     const allApps = providerApps[provider.id] || []
+    const filteredAppsList = filterApps(allApps)
     const appState = getProviderAppState(provider.id)
-    const canExpand = provider.type === "admob" // Only AdMob has apps for now
+    const canExpand = provider.type === "admob"
+    const isLast = index === total - 1
+    const highlighted = matchesSearch(provider.displayName)
 
     return (
-      <div key={provider.id} className="border-b border-border/10 last:border-b-0">
+      <div key={provider.id} className="relative">
+        {/* Provider Row */}
         <div
           className={cn(
-            "flex items-center gap-2 py-2 px-3 hover:bg-muted/40 transition-colors",
+            "flex items-center gap-2 py-2.5 pr-4 transition-colors group",
+            "hover:bg-muted/40",
             isExpanded && "bg-muted/20"
           )}
+          style={{ paddingLeft: "2.5rem" }}
         >
-          {/* Expand button */}
-          {canExpand && (
+          {/* Tree connector */}
+          <div className="absolute left-4 top-0 bottom-0 flex">
+            <TreeLine isLast={isLast && !isExpanded} />
+          </div>
+
+          {/* Expand/collapse */}
+          {canExpand ? (
             <button
               onClick={() => toggleProviderExpanded(provider.id, provider.type)}
-              className="p-1 hover:bg-muted rounded transition-colors"
+              className={cn(
+                "p-1 rounded transition-all duration-200",
+                "hover:bg-muted-foreground/10",
+                isExpanded && "bg-muted-foreground/5"
+              )}
             >
               {isLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-              ) : isExpanded ? (
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                    isExpanded && "rotate-90"
+                  )}
+                />
               )}
             </button>
+          ) : (
+            <div className="w-6" />
           )}
-          {!canExpand && <div className="w-6" />}
 
           {/* Checkbox */}
-          <Checkbox
-            id={`provider-${provider.id}`}
+          <TreeCheckbox
             checked={isProviderEnabled(provider.id)}
+            indeterminate={appState === "some"}
             onCheckedChange={() => toggleProvider(provider.id)}
-            className="h-4 w-4"
           />
 
           {/* Provider info */}
-          <div className="flex-1 min-w-0">
-            <label
-              htmlFor={`provider-${provider.id}`}
-              className="text-sm font-medium cursor-pointer block truncate"
-            >
-              {provider.displayName}
-            </label>
-            <p className="text-[11px] text-muted-foreground truncate">
+          <div className="flex-1 min-w-0 ml-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "text-sm font-medium truncate",
+                  highlighted && "bg-yellow-500/20 text-yellow-200 px-1 -mx-1 rounded"
+                )}
+              >
+                {provider.displayName}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground/70 truncate font-mono">
               {provider.type === "admob"
                 ? provider.identifiers.publisherId
                 : `Network: ${provider.identifiers.networkCode}`}
             </p>
           </div>
 
-          {/* Apps count badge */}
+          {/* App count pill */}
           {allApps.length > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            <div
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors",
+                appState === "all"
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : appState === "none"
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-amber-500/10 text-amber-400"
+              )}
+            >
               {appState === "all"
                 ? `${allApps.length} apps`
-                : appState === "none"
-                  ? "0 apps"
-                  : `${enabledAppIds[provider.id]?.length || 0}/${allApps.length}`}
-            </Badge>
+                : `${enabledAppIds[provider.id]?.length || 0}/${allApps.length}`}
+            </div>
           )}
         </div>
 
-        {/* Expanded apps list */}
+        {/* Apps (expanded) */}
         {isExpanded && canExpand && (
-          <div className="bg-muted/10 border-t border-border/10">
+          <div
+            className={cn(
+              "relative overflow-hidden transition-all duration-200",
+              "border-l border-border/30"
+            )}
+            style={{ marginLeft: "2.25rem" }}
+          >
             {isLoading ? (
-              <div className="flex items-center gap-2 px-6 py-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3 py-4 pl-6 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading apps...
+                <span>Loading apps...</span>
               </div>
-            ) : apps.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 py-3">
+            ) : filteredAppsList.length === 0 ? (
+              <div className="py-3 pl-6 text-sm text-muted-foreground/60">
                 {searchQuery ? "No matching apps" : "No apps found"}
-              </p>
+              </div>
             ) : (
               <div className="py-1">
-                {/* Select all row */}
-                <div className="flex items-center gap-3 px-6 py-1.5 hover:bg-muted/30">
-                  <Checkbox
-                    id={`all-apps-${provider.id}`}
+                {/* Select all */}
+                <div className="flex items-center gap-3 py-2 pl-6 pr-4 hover:bg-muted/30 transition-colors">
+                  <TreeCheckbox
                     checked={appState === "all"}
+                    indeterminate={appState === "some"}
                     onCheckedChange={() => toggleAllApps(provider.id)}
                     className="h-3.5 w-3.5"
                   />
-                  <label
-                    htmlFor={`all-apps-${provider.id}`}
-                    className="text-xs text-muted-foreground cursor-pointer"
-                  >
-                    Select all apps
-                  </label>
+                  <span className="text-xs text-muted-foreground">Select all</span>
                 </div>
 
-                {/* Individual apps */}
-                {apps.map((app) => (
-                  <div
-                    key={app.id}
-                    className="flex items-center gap-3 px-6 py-1.5 hover:bg-muted/30"
-                  >
-                    <Checkbox
-                      id={`app-${app.id}`}
-                      checked={isAppEnabled(provider.id, app.id)}
-                      onCheckedChange={() => toggleApp(provider.id, app.id)}
-                      className="h-3.5 w-3.5"
-                    />
-                    <Smartphone
+                {/* App list */}
+                {filteredAppsList.map((app, appIndex) => {
+                  const appHighlighted = matchesSearch(app.name)
+                  const isLastApp = appIndex === filteredAppsList.length - 1
+
+                  return (
+                    <div
+                      key={app.id}
                       className={cn(
-                        "h-3.5 w-3.5 shrink-0",
-                        app.platform === "ANDROID" ? "text-green-500" : "text-blue-500"
+                        "flex items-center gap-3 py-2 pl-6 pr-4 transition-colors",
+                        "hover:bg-muted/30 group/app"
                       )}
-                    />
-                    <label
-                      htmlFor={`app-${app.id}`}
-                      className="text-xs cursor-pointer flex-1 truncate"
                     >
-                      {app.name}
-                    </label>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                      {app.platform === "ANDROID" ? "Android" : app.platform === "IOS" ? "iOS" : ""}
-                    </span>
-                  </div>
-                ))}
+                      {/* App tree connector */}
+                      <div className="relative -ml-2 w-4 h-full flex items-center">
+                        <div
+                          className={cn(
+                            "absolute left-0 w-px bg-border/40",
+                            isLastApp ? "top-0 h-1/2" : "top-0 bottom-0 -translate-y-full h-[200%]"
+                          )}
+                        />
+                        <div className="absolute left-0 w-2 h-px bg-border/40" />
+                      </div>
+
+                      <TreeCheckbox
+                        checked={isAppEnabled(provider.id, app.id)}
+                        onCheckedChange={() => toggleApp(provider.id, app.id)}
+                        className="h-3.5 w-3.5"
+                      />
+
+                      <Smartphone
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 transition-colors",
+                          app.platform === "ANDROID"
+                            ? "text-green-500"
+                            : "text-blue-500"
+                        )}
+                      />
+
+                      <span
+                        className={cn(
+                          "text-xs flex-1 truncate",
+                          appHighlighted && "bg-yellow-500/20 text-yellow-200 px-1 -mx-1 rounded"
+                        )}
+                      >
+                        {app.name}
+                      </span>
+
+                      <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wide">
+                        {app.platform === "ANDROID" ? "Android" : app.platform === "IOS" ? "iOS" : ""}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -346,8 +452,89 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
     )
   }
 
-  const filteredAdmobProviders = filterBySearch(admobProviders)
-  const filteredGamProviders = filterBySearch(gamProviders)
+  // Render section (AdMob, GAM, etc.)
+  const renderSection = (
+    id: string,
+    title: string,
+    icon: React.ReactNode,
+    iconColor: string,
+    providerList: Provider[],
+    filteredList: Provider[]
+  ) => {
+    const isExpanded = expandedSections.has(id)
+    const enabledCount = providerList.filter((p) => isProviderEnabled(p.id)).length
+
+    return (
+      <div className="border-b border-border/20 last:border-b-0">
+        {/* Section header */}
+        <button
+          onClick={() => toggleSection(id)}
+          className={cn(
+            "flex items-center gap-3 w-full px-5 py-3 transition-colors",
+            "hover:bg-muted/30",
+            isExpanded && "bg-muted/10"
+          )}
+        >
+          <ChevronRight
+            className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform duration-200",
+              isExpanded && "rotate-90"
+            )}
+          />
+          <div className={cn("p-1.5 rounded-md", iconColor)}>
+            {icon}
+          </div>
+          <span className="text-sm font-semibold flex-1 text-left">{title}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {enabledCount}/{providerList.length}
+            </span>
+            <div
+              className={cn(
+                "w-2 h-2 rounded-full",
+                enabledCount === providerList.length
+                  ? "bg-emerald-500"
+                  : enabledCount > 0
+                    ? "bg-amber-500"
+                    : "bg-muted-foreground/30"
+              )}
+            />
+          </div>
+        </button>
+
+        {/* Section content */}
+        {isExpanded && (
+          <div className="pb-2">
+            {filteredList.length === 0 ? (
+              <p className="text-sm text-muted-foreground/60 px-5 py-3">
+                {searchQuery ? "No matching accounts" : "No accounts"}
+              </p>
+            ) : (
+              filteredList.map((provider, idx) =>
+                renderProvider(provider, idx, filteredList.length)
+              )
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Placeholder section
+  const renderPlaceholder = (title: string, icon: React.ReactNode, iconColor: string) => (
+    <div className="border-b border-border/20 last:border-b-0">
+      <div className="flex items-center gap-3 w-full px-5 py-3 opacity-40">
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        <div className={cn("p-1.5 rounded-md", iconColor)}>
+          {icon}
+        </div>
+        <span className="text-sm font-medium flex-1 text-left">{title}</span>
+        <span className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+          Coming soon
+        </span>
+      </div>
+    </div>
+  )
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -356,10 +543,10 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
           variant="ghost"
           size="icon"
           className={cn(
-            "h-7 w-7 rounded-full transition-colors",
+            "h-7 w-7 rounded-full transition-all duration-200",
             hasProviders
-              ? "text-muted-foreground/70 hover:text-foreground/80"
-              : "text-muted-foreground/40 cursor-not-allowed"
+              ? "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50"
+              : "text-muted-foreground/30 cursor-not-allowed"
           )}
           disabled={!hasProviders}
         >
@@ -368,273 +555,160 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[520px] p-0 gap-0 max-h-[85vh] flex flex-col">
-        <DialogHeader className="px-4 py-3 border-b border-border/50 shrink-0">
-          <div className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4 text-muted-foreground" />
-            <DialogTitle className="text-base">Context Settings</DialogTitle>
+      <DialogContent className="sm:max-w-[680px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden border-border/50 bg-background/95 backdrop-blur-xl">
+        {/* Header */}
+        <DialogHeader className="px-6 py-4 border-b border-border/30 shrink-0 bg-muted/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Settings2 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-semibold">Context Settings</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Select which accounts and apps to include in your queries
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Configure which accounts, apps, and resources to include in queries
-          </p>
         </DialogHeader>
 
         {/* Search */}
-        <div className="px-4 py-2 border-b border-border/30 shrink-0">
+        <div className="px-6 py-3 border-b border-border/20 shrink-0 bg-background">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
             <Input
-              placeholder="Search providers, apps..."
+              placeholder="Search accounts, apps..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
+              className={cn(
+                "pl-10 h-10 text-sm bg-muted/30 border-border/30",
+                "focus:bg-muted/50 focus:border-border/50 transition-colors"
+              )}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-md transition-colors"
               >
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
+                <X className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Scrollable content */}
+        {/* Content */}
         <ScrollArea className="flex-1 min-h-0">
-          <div className="divide-y divide-border/30">
+          <div className="py-2">
             {/* AdMob Section */}
-            {admobProviders.length > 0 && (
-              <div>
-                <button
-                  onClick={() => toggleSection("admob")}
-                  className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    {expandedSections.has("admob") ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <Building2 className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm font-medium">AdMob Accounts</span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      {admobProviders.filter((p) => isProviderEnabled(p.id)).length}/
-                      {admobProviders.length}
-                    </Badge>
-                  </div>
-                </button>
-
-                {expandedSections.has("admob") && (
-                  <div className="border-t border-border/20">
-                    {filteredAdmobProviders.length === 0 ? (
-                      <p className="text-sm text-muted-foreground px-4 py-3">
-                        No matching accounts
-                      </p>
-                    ) : (
-                      filteredAdmobProviders.map(renderProvider)
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            {admobProviders.length > 0 &&
+              renderSection(
+                "admob",
+                "AdMob Accounts",
+                <Building2 className="h-4 w-4 text-orange-400" />,
+                "bg-orange-500/10",
+                admobProviders,
+                filteredAdmobProviders
+              )}
 
             {/* GAM Section */}
-            {gamProviders.length > 0 && (
-              <div>
-                <button
-                  onClick={() => toggleSection("gam")}
-                  className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    {expandedSections.has("gam") ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <Layers className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm font-medium">Ad Manager Networks</span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      {gamProviders.filter((p) => isProviderEnabled(p.id)).length}/
-                      {gamProviders.length}
-                    </Badge>
-                  </div>
-                </button>
+            {gamProviders.length > 0 &&
+              renderSection(
+                "gam",
+                "Ad Manager Networks",
+                <Layers className="h-4 w-4 text-blue-400" />,
+                "bg-blue-500/10",
+                gamProviders,
+                filteredGamProviders
+              )}
 
-                {expandedSections.has("gam") && (
-                  <div className="border-t border-border/20">
-                    {filteredGamProviders.length === 0 ? (
-                      <p className="text-sm text-muted-foreground px-4 py-3">
-                        No matching networks
-                      </p>
-                    ) : (
-                      filteredGamProviders.map(renderProvider)
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* AdMob Placeholders */}
+            {/* Placeholders */}
             {admobProviders.length > 0 && (
               <>
-                {/* Ad Units placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <LayoutGrid className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-medium">Ad Units</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Mediation Groups placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <Layers className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium">Mediation Groups</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Ad Sources/Networks placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <Network className="h-4 w-4 text-cyan-500" />
-                      <span className="text-sm font-medium">Ad Sources</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
+                {renderPlaceholder(
+                  "Ad Units",
+                  <LayoutGrid className="h-4 w-4 text-emerald-400" />,
+                  "bg-emerald-500/10"
+                )}
+                {renderPlaceholder(
+                  "Mediation Groups",
+                  <Layers className="h-4 w-4 text-purple-400" />,
+                  "bg-purple-500/10"
+                )}
+                {renderPlaceholder(
+                  "Ad Sources",
+                  <Network className="h-4 w-4 text-cyan-400" />,
+                  "bg-cyan-500/10"
+                )}
               </>
             )}
 
-            {/* GAM Placeholders */}
             {gamProviders.length > 0 && (
               <>
-                {/* GAM Ad Units placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <LayoutGrid className="h-4 w-4 text-indigo-500" />
-                      <span className="text-sm font-medium">GAM Ad Units</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Line Items placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <FileText className="h-4 w-4 text-amber-500" />
-                      <span className="text-sm font-medium">Line Items</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Orders placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <Target className="h-4 w-4 text-red-500" />
-                      <span className="text-sm font-medium">Orders</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Creatives placeholder */}
-                <div>
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/40 transition-colors opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      <Palette className="h-4 w-4 text-pink-500" />
-                      <span className="text-sm font-medium">Creatives</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        Coming soon
-                      </Badge>
-                    </div>
-                  </button>
-                </div>
+                {renderPlaceholder(
+                  "GAM Ad Units",
+                  <LayoutGrid className="h-4 w-4 text-indigo-400" />,
+                  "bg-indigo-500/10"
+                )}
+                {renderPlaceholder(
+                  "Line Items",
+                  <FileText className="h-4 w-4 text-amber-400" />,
+                  "bg-amber-500/10"
+                )}
+                {renderPlaceholder(
+                  "Orders",
+                  <Target className="h-4 w-4 text-red-400" />,
+                  "bg-red-500/10"
+                )}
+                {renderPlaceholder(
+                  "Creatives",
+                  <Palette className="h-4 w-4 text-pink-400" />,
+                  "bg-pink-500/10"
+                )}
               </>
             )}
           </div>
         </ScrollArea>
 
-        {/* Settings footer */}
-        <div className="border-t border-border/30 p-4 space-y-3 shrink-0 bg-muted/20">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 space-y-1">
-              <Label className="text-xs font-medium">Response Style</Label>
-              <div className="flex gap-1">
-                <Button
-                  variant={responseStyle === "concise" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 text-xs flex-1"
+        {/* Footer */}
+        <div className="border-t border-border/30 p-5 shrink-0 bg-muted/10">
+          <div className="flex items-start justify-between gap-6">
+            {/* Response Style */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Response Style
+              </Label>
+              <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
+                <button
                   onClick={() => setResponseStyle("concise")}
+                  className={cn(
+                    "px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+                    responseStyle === "concise"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
                 >
                   Concise
-                </Button>
-                <Button
-                  variant={responseStyle === "detailed" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 text-xs flex-1"
+                </button>
+                <button
                   onClick={() => setResponseStyle("detailed")}
+                  className={cn(
+                    "px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+                    responseStyle === "detailed"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
                 >
                   Detailed
-                </Button>
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Auto-context */}
+            <div className="flex items-center gap-3">
               <div className="text-right">
-                <Label className="text-xs font-medium">Auto-context</Label>
-                <p className="text-[10px] text-muted-foreground">Include account info</p>
+                <Label className="text-xs font-medium">Auto-include context</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Attach account info to queries
+                </p>
               </div>
               <Switch
                 checked={autoIncludeContext}
@@ -644,15 +718,31 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
           </div>
 
           {/* Summary */}
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-border/20">
-            <span>
-              {enabledProviderCount} of {providers.length} accounts active
-            </span>
-            {totalAppsCount > 0 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/20">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span>
-                {enabledAppsCount} of {totalAppsCount} apps selected
+                <span className="font-medium text-foreground">{enabledProviderCount}</span>
+                {" "}of {providers.length} accounts
               </span>
-            )}
+              {totalAppsCount > 0 && (
+                <span>
+                  <span className="font-medium text-foreground">
+                    {Object.entries(enabledAppIds).reduce((acc, [pid, ids]) => {
+                      const all = providerApps[pid]?.length || 0
+                      return acc + (ids?.length || all)
+                    }, 0)}
+                  </span>
+                  {" "}of {totalAppsCount} apps
+                </span>
+              )}
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setOpen(false)}
+              className="h-8 px-4"
+            >
+              Done
+            </Button>
           </div>
         </div>
       </DialogContent>
