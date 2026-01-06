@@ -34,6 +34,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useChatSettings } from "@/lib/chat-settings"
+import { useSidebar } from "@/components/ui/sidebar"
 import type { Provider, ProviderApp } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
@@ -99,6 +100,12 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
   const [expandedProviders, setExpandedProviders] = React.useState<Set<string>>(new Set())
   const [providerApps, setProviderApps] = React.useState<Record<string, ProviderApp[]>>({})
   const [loadingApps, setLoadingApps] = React.useState<Set<string>>(new Set())
+
+  const { state: sidebarState, isMobile } = useSidebar()
+
+  // Calculate dialog offset based on sidebar state
+  // Sidebar expanded = 16rem (8rem offset), collapsed = 3rem (1.5rem offset), mobile = 0
+  const dialogOffset = isMobile ? "50%" : sidebarState === "expanded" ? "calc(50% + 8rem)" : "calc(50% + 1.5rem)"
 
   const {
     responseStyle,
@@ -555,7 +562,10 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[680px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden border-border/50 bg-background/95 backdrop-blur-xl">
+      <DialogContent
+        className="sm:max-w-[680px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden border-border/50 bg-background/95 backdrop-blur-xl"
+        style={{ left: dialogOffset }}
+      >
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b border-border/30 shrink-0 bg-muted/20">
           <div className="flex items-center gap-3">
