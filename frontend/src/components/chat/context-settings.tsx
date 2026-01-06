@@ -680,17 +680,16 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
 
         {/* Footer */}
         <div className="border-t border-border/30 p-5 shrink-0 bg-muted/10">
-          <div className="flex items-start justify-between gap-6">
-            {/* Response Style */}
-            <div className="space-y-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Response Style
-              </Label>
+          {/* Controls row - Response Style + Auto-context on same level */}
+          <div className="flex items-center justify-between gap-4">
+            {/* Response Style - segmented control */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">Response:</span>
               <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
                 <button
                   onClick={() => setResponseStyle("concise")}
                   className={cn(
-                    "px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+                    "px-3 py-1 text-xs font-medium rounded-md transition-all duration-200",
                     responseStyle === "concise"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -701,7 +700,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
                 <button
                   onClick={() => setResponseStyle("detailed")}
                   className={cn(
-                    "px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+                    "px-3 py-1 text-xs font-medium rounded-md transition-all duration-200",
                     responseStyle === "detailed"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -712,17 +711,16 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
               </div>
             </div>
 
-            {/* Auto-context */}
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <Label className="text-xs font-medium">Auto-include context</Label>
-                <p className="text-[10px] text-muted-foreground">
-                  Attach account info to queries
-                </p>
-              </div>
+            {/* Auto-context - inline with switch */}
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground cursor-pointer" htmlFor="auto-context">
+                Auto-include context
+              </Label>
               <Switch
+                id="auto-context"
                 checked={autoIncludeContext}
                 onCheckedChange={setAutoIncludeContext}
+                className="scale-90"
               />
             </div>
           </div>
