@@ -12,7 +12,6 @@ import {
   CreditCard,
   HelpCircle,
   Settings,
-  User,
   LogOut,
   ChevronUp,
   PanelLeftClose,
@@ -37,7 +36,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -117,10 +115,10 @@ export function AppSidebar() {
                     asChild
                     isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
                     tooltip={item.title}
-                    className="h-8 text-xs"
+                    className="h-9 text-sm"
                   >
                     <Link href={item.url}>
-                      <item.icon className="h-3.5 w-3.5" />
+                      <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -142,10 +140,10 @@ export function AppSidebar() {
                         asChild
                         isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
                         tooltip={item.title}
-                        className="h-8 text-xs"
+                        className="h-9 text-sm"
                       >
                         <Link href={item.url}>
-                          <item.icon className="h-3.5 w-3.5" />
+                          <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -168,10 +166,10 @@ export function AppSidebar() {
                     asChild
                     isActive={pathname === item.url}
                     tooltip={item.title}
-                    className="h-8 text-xs"
+                    className="h-9 text-sm"
                   >
                     <Link href={item.url}>
-                      <item.icon className="h-3.5 w-3.5" />
+                      <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -212,13 +210,6 @@ export function AppSidebar() {
                   align="start"
                   sideOffset={4}
                 >
-                  <DropdownMenuItem asChild className="text-xs">
-                    <Link href="/settings" className="cursor-pointer">
-                      <User className="mr-2 h-3.5 w-3.5" />
-                      Account
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={signOut}
                     className="cursor-pointer text-xs text-destructive focus:text-destructive"

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Moon, Sun, Loader2 } from "lucide-react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 
@@ -94,10 +94,11 @@ export default function AuthenticatedLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center justify-end border-b border-border/40 px-3">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/40 px-3">
+          <SidebarTrigger className="md:hidden" />
           <ThemeToggle />
         </header>
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
           {children}
         </div>
       </SidebarInset>

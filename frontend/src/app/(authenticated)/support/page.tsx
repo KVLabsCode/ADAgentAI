@@ -18,10 +18,11 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 p-6 max-w-4xl mx-auto">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Support</h1>
-        <p className="text-muted-foreground">
+    <div className="flex-1 overflow-y-auto">
+    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto pb-12">
+      <div className="space-y-0.5">
+        <h1 className="text-base font-medium tracking-tight">Support</h1>
+        <p className="text-xs text-muted-foreground/80">
           Get help with ADAgent or contact our team.
         </p>
       </div>
@@ -150,6 +151,7 @@ export default function SupportPage() {
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   )
 }

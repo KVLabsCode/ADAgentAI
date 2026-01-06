@@ -28,6 +28,20 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
 
+  // Tool approval state: Map<messageId, Map<toolName, approved | null>>
+  const [pendingApprovals, setPendingApprovals] = React.useState<Map<string, Map<string, boolean | null>>>(new Map())
+
+  // Handle tool approval from user
+  const handleToolApproval = React.useCallback((messageId: string, toolName: string, approved: boolean) => {
+    setPendingApprovals(prev => {
+      const newMap = new Map(prev)
+      const messageApprovals = new Map(newMap.get(messageId) || new Map())
+      messageApprovals.set(toolName, approved)
+      newMap.set(messageId, messageApprovals)
+      return newMap
+    })
+  }, [])
+
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
   const userId = session?.user?.id
@@ -317,7 +331,12 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         /* With messages - scrollable content + sticky input */
         <>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <ChatMessages messages={messages} isLoading={isLoading} />
+            <ChatMessages
+              messages={messages}
+              isLoading={isLoading}
+              onToolApproval={handleToolApproval}
+              pendingApprovals={pendingApprovals}
+            />
           </div>
 
           {/* Sticky Input at bottom */}

@@ -60,8 +60,8 @@ function LoginContent() {
     try {
       // Use absolute URLs to ensure redirect goes to frontend, not backend
       const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-      // Use redirect param if provided, otherwise default to dashboard
       const callbackPath = redirectTo || "/dashboard"
+
       await authClient.signIn.social({
         provider: "google",
         callbackURL: `${frontendUrl}${callbackPath}`,

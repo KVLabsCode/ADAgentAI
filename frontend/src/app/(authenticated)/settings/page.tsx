@@ -24,10 +24,10 @@ export default function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-    <div className="flex flex-col gap-6 p-6 max-w-2xl mx-auto pb-12">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
+    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto pb-12">
+      <div className="space-y-0.5">
+        <h1 className="text-base font-medium tracking-tight">Settings</h1>
+        <p className="text-xs text-muted-foreground/80">
           Manage your application preferences.
         </p>
       </div>

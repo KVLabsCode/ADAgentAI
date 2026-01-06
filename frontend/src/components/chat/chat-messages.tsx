@@ -10,9 +10,16 @@ import type { Message } from "@/lib/types"
 interface ChatMessagesProps {
   messages: Message[]
   isLoading?: boolean
+  onToolApproval?: (messageId: string, toolName: string, approved: boolean) => void
+  pendingApprovals?: Map<string, Map<string, boolean | null>>
 }
 
-export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
+export function ChatMessages({
+  messages,
+  isLoading,
+  onToolApproval,
+  pendingApprovals = new Map()
+}: ChatMessagesProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null)
 
   // Check if last message is an empty assistant message (streaming in progress)
@@ -36,7 +43,14 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
             {message.role === "user" ? (
               <UserMessage content={message.content} />
             ) : message.role === "assistant" ? (
-              <AssistantMessage message={message} />
+              <AssistantMessage
+                message={message}
+                onToolApproval={onToolApproval
+                  ? (toolName, approved) => onToolApproval(message.id, toolName, approved)
+                  : undefined
+                }
+                pendingApprovals={pendingApprovals.get(message.id)}
+              />
             ) : null}
           </div>
         ))}
