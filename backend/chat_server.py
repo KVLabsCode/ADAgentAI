@@ -132,7 +132,6 @@ class ToolApprovalRequest(BaseModel):
 @app.post("/chat/stream")
 async def chat_stream(request: Request, body: ChatRequest):
     """Stream chat responses via SSE with CrewAI agents."""
-    print(f"\n[Chat] Received: {body.message[:50]}...")
 
     # Validate session
     user_id = await validate_user_session(request)
@@ -168,9 +167,6 @@ async def approve_tool(body: ToolApprovalRequest):
             detail=f"Approval ID not found or already resolved: {body.approval_id}"
         )
 
-    action = "approved" if body.approved else "denied"
-    print(f"  [APPROVAL] Tool {action}: {body.approval_id}")
-
     return {"success": True, "approval_id": body.approval_id, "approved": body.approved}
 
 
@@ -191,10 +187,12 @@ async def get_pending_approvals_list():
         }
 
 
+@app.get("/")
+@app.head("/")
 @app.get("/health")
 @app.head("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint (also serves root for Render probes)."""
     return {"status": "ok", "service": "ad-platform-chat", "version": "4.0.0"}
 
 
