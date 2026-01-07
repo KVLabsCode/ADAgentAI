@@ -156,7 +156,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           id: org.id,
           name: org.name,
           slug: org.slug,
-          logo: org.logo,
+          logo: org.logo ?? null,
           createdAt: typeof org.createdAt === 'string' ? org.createdAt : org.createdAt.toISOString(),
         }
       }
