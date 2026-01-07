@@ -30,9 +30,10 @@ const UserContext = createContext<UserContextValue | null>(null)
 interface NeonAuthOrg {
   id: string
   name: string
-  slug: string | null
-  logo: string | null
-  createdAt: Date | string
+  slug: string
+  logo?: string | null
+  createdAt: Date
+  metadata?: unknown
 }
 
 // Initialize selected org from localStorage (runs only once)
@@ -66,12 +67,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   } : null
 
   // Map organizations from Neon Auth hook
-  const organizations: Organization[] = (orgList || []).map((org: NeonAuthOrg) => ({
+  const organizations: Organization[] = (orgList || []).map((org) => ({
     id: org.id,
     name: org.name,
     slug: org.slug,
-    logo: org.logo,
-    createdAt: typeof org.createdAt === 'string' ? org.createdAt : org.createdAt.toISOString(),
+    logo: org.logo ?? null,
+    createdAt: org.createdAt instanceof Date ? org.createdAt.toISOString() : String(org.createdAt),
   }))
 
   // Find selected organization from list
