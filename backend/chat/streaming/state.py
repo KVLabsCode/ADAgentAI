@@ -30,8 +30,8 @@ def _write_json_file(filepath: Path, data):
     """Write JSON to file."""
     try:
         filepath.write_text(json.dumps(data))
-    except Exception as e:
-        print(f"  [FILE ERROR] Failed to write {filepath}: {e}")
+    except Exception:
+        pass  # Silently ignore file write errors
 
 
 def is_streaming_active() -> bool:
@@ -46,7 +46,6 @@ def start_stream(stream_id: str) -> None:
     if stream_id not in data:
         data.append(stream_id)
         _write_json_file(_ACTIVE_STREAMS_FILE, data)
-    print(f"  [STREAM] Started: {stream_id} (active={len(data)})", flush=True)
 
 
 def end_stream(stream_id: str) -> None:
@@ -55,7 +54,6 @@ def end_stream(stream_id: str) -> None:
     if stream_id in data:
         data.remove(stream_id)
         _write_json_file(_ACTIVE_STREAMS_FILE, data)
-    print(f"  [STREAM] Ended: {stream_id} (active={len(data)})", flush=True)
 
 
 def push_event(event: dict) -> bool:
@@ -63,18 +61,13 @@ def push_event(event: dict) -> bool:
 
     Returns True if pushed, False if no active stream.
     """
-    event_type = event.get("type", "unknown")
-
     if not is_streaming_active():
-        print(f"  [QUEUE SKIP] {event_type} - no active stream", flush=True)
         return False
 
     try:
         _event_queue.put_nowait(event)
-        print(f"  [QUEUE] {event_type}", flush=True)
         return True
-    except Exception as e:
-        print(f"  [QUEUE ERROR] {event_type}: {e}", flush=True)
+    except Exception:
         return False
 
 
@@ -98,6 +91,5 @@ def cleanup_state_files() -> None:
         try:
             if filepath.exists():
                 filepath.unlink()
-                print(f"  Cleaned up: {filepath}")
-        except Exception as e:
-            print(f"  Warning: couldn't clean {filepath}: {e}")
+        except Exception:
+            pass  # Silently ignore cleanup errors

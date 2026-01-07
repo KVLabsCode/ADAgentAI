@@ -29,8 +29,7 @@ async def get_user_providers(user_id: str) -> list[dict]:
             if response.status_code == 200:
                 return response.json().get("providers", [])
         return []
-    except Exception as e:
-        print(f"  Error fetching providers: {e}")
+    except Exception:
         return []
 
 
@@ -50,6 +49,5 @@ async def validate_user_session(request: Request) -> Optional[str]:
                 session_data = response.json()
                 return session_data.get("user", {}).get("id")
         return None
-    except Exception as e:
-        print(f"  Session validation error: {e}")
+    except Exception:
         return None

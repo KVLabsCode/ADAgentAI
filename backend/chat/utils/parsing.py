@@ -114,8 +114,7 @@ def extract_json_with_nested_braces(text: str, start_marker: str = "Action Input
         if brace_count == 0 and end_idx > start_idx:
             return text[start_idx:end_idx]
         return "{}"
-    except Exception as e:
-        print(f"  [JSON-EXTRACT] Error: {e}")
+    except Exception:
         return "{}"
 
 

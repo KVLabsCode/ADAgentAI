@@ -39,8 +39,8 @@ def _write_json_file(filepath: Path, data):
     """Write JSON to file."""
     try:
         filepath.write_text(json.dumps(data))
-    except Exception as e:
-        print(f"  [FILE ERROR] Failed to write {filepath}: {e}")
+    except Exception:
+        pass  # Silently ignore file write errors
 
 
 # =============================================================================
@@ -162,7 +162,6 @@ def add_pre_approved_tool(tool_name: str) -> None:
     if tool_name not in data:
         data.append(tool_name)
         _write_json_file(_PRE_APPROVED_FILE, data)
-    print(f"  [PRE-APPROVE] Added: {tool_name}")
 
 
 def check_and_consume_pre_approval(tool_name: str) -> bool:
@@ -171,7 +170,6 @@ def check_and_consume_pre_approval(tool_name: str) -> bool:
     if tool_name in data:
         data.remove(tool_name)
         _write_json_file(_PRE_APPROVED_FILE, data)
-        print(f"  [PRE-APPROVE] Consumed: {tool_name}")
         return True
     return False
 
@@ -190,15 +188,12 @@ def mark_stream_handling_approval(tool_name: str, approval_id: str) -> None:
     data = _read_json_file(_STREAM_HANDLING_FILE, {})
     data[tool_name] = approval_id
     _write_json_file(_STREAM_HANDLING_FILE, data)
-    print(f"  [STREAM-HANDLE] Marked: {tool_name} -> {approval_id}")
 
 
 def get_stream_handling_approval(tool_name: str) -> Optional[str]:
     """Get the approval_id if stream is handling approval for this tool."""
     data = _read_json_file(_STREAM_HANDLING_FILE, {})
-    result = data.get(tool_name)
-    print(f"  [STREAM-HANDLE] Check: {tool_name} -> {result}")
-    return result
+    return data.get(tool_name)
 
 
 def clear_stream_handling_approval(tool_name: str) -> None:
@@ -206,7 +201,6 @@ def clear_stream_handling_approval(tool_name: str) -> None:
     data = _read_json_file(_STREAM_HANDLING_FILE, {})
     data.pop(tool_name, None)
     _write_json_file(_STREAM_HANDLING_FILE, data)
-    print(f"  [STREAM-HANDLE] Cleared: {tool_name}")
 
 
 # =============================================================================
@@ -218,7 +212,6 @@ def add_blocked_tool(tool_name: str, reason: str = "User denied") -> None:
     data = _read_json_file(_BLOCKED_TOOLS_FILE, {})
     data[tool_name] = reason
     _write_json_file(_BLOCKED_TOOLS_FILE, data)
-    print(f"  [BLOCKED] Added: {tool_name} ({reason})")
 
 
 def is_tool_blocked(tool_name: str) -> tuple[bool, str]:
@@ -232,7 +225,6 @@ def is_tool_blocked(tool_name: str) -> tuple[bool, str]:
 def clear_blocked_tools() -> None:
     """Clear all blocked tools (call at start of new request)."""
     _write_json_file(_BLOCKED_TOOLS_FILE, {})
-    print(f"  [BLOCKED] Cleared all blocked tools")
 
 
 # =============================================================================
@@ -245,6 +237,5 @@ def cleanup_approval_files() -> None:
         try:
             if filepath.exists():
                 filepath.unlink()
-                print(f"  Cleaned up: {filepath}")
-        except Exception as e:
-            print(f"  Warning: couldn't clean {filepath}: {e}")
+        except Exception:
+            pass  # Silently ignore cleanup errors

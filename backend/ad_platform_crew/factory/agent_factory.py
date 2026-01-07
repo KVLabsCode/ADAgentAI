@@ -146,7 +146,7 @@ class AgentFactory:
                         found = True
                         break
                 if not found:
-                    print(f"Warning: Tool '{tool_name}' not found in {service_key} registry")
+                    pass  # Tool not found in registry
 
         return filtered
 

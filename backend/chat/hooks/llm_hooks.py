@@ -13,7 +13,7 @@ from ..utils.parsing import extract_thought
 
 def register_llm_hooks():
     """Explicit function to ensure LLM hooks are registered."""
-    print("[STARTUP] CrewAI LLM hooks registered (capture_thinking)")
+    pass  # Hooks are registered at import time via decorators
 
 
 @after_llm_call
@@ -33,4 +33,3 @@ def capture_thinking(context):
 
     if thinking and len(thinking) > 30:
         push_event(ThinkingEvent(content=thinking).model_dump(mode='json'))
-        print(f"  [LLM-HOOK] Thinking: {thinking[:60]}...", flush=True)

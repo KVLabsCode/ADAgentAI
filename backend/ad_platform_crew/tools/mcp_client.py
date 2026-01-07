@@ -75,10 +75,8 @@ class MCPClient:
 
         user_id = os.environ.get("CURRENT_USER_ID")
         if user_id:
-            print(f"[MCPClient] Creating AdMobClient with user_id: {user_id}")
             return self._AdMobClient(user_id=user_id)
         else:
-            print("[MCPClient] WARNING: No CURRENT_USER_ID set, using default client")
             return self._AdMobClient()
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> MCPResponse:
@@ -97,7 +95,6 @@ class MCPClient:
             from chat.approval.handlers import is_tool_blocked
             blocked, reason = is_tool_blocked(tool_name)
             if blocked:
-                print(f"[MCPClient] Tool '{tool_name}' was blocked: {reason}")
                 return MCPResponse(
                     success=False,
                     data=None,

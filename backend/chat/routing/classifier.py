@@ -111,9 +111,7 @@ def classify_query(user_query: str, conversation_context: str = "") -> tuple[str
             service, capability = ROUTE_MAP[route]
             return service, capability, thinking
 
-        print(f"  Unknown route '{route}', defaulting to general")
         return "general", "assistant", thinking
 
-    except Exception as e:
-        print(f"  Classification error: {e}, defaulting to general")
+    except Exception:
         return "general", "assistant", ""

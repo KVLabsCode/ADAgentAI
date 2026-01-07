@@ -31,7 +31,6 @@ def get_crew_for_query(
     # Pass user_id to factory for OAuth tokens
     if user_id:
         os.environ["CURRENT_USER_ID"] = user_id
-        print(f"  Set CURRENT_USER_ID: {user_id}")
 
     # Build conversation context string for task description
     conversation_context = _build_conversation_context(conversation_history)
@@ -110,9 +109,6 @@ def _build_specialist_crew(
 
     # Create the appropriate specialist
     specialist = factory.create_specialist(service, capability, verbose=False)
-
-    # Debug: log the tools the specialist has
-    print(f"  [DEBUG] Specialist {service}/{capability} has tools: {[t.name for t in specialist.tools]}", flush=True)
 
     # Create task with service-specific instructions
     instructions = _get_service_instructions(service)

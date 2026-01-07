@@ -103,8 +103,7 @@ class AdPlatformRoutingFlow(Flow[FlowState]):
             self.state.query_type = category
             return category
 
-        except Exception as e:
-            print(f"Classification error: {e}")
+        except Exception:
             self.state.query_type = QueryType.GENERAL.value
             return QueryType.GENERAL.value
 

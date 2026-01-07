@@ -38,7 +38,7 @@ def register_hooks():
     Note: CrewAI hooks are registered at import time via decorators.
     This function exists for explicit initialization if needed.
     """
-    print("[STARTUP] CrewAI tool hooks registered (capture_tool_call, capture_tool_result)")
+    pass  # Hooks are registered at import time via decorators
 
 
 def _block_tool(tool_name: str, reason: str):
@@ -48,7 +48,6 @@ def _block_tool(tool_name: str, reason: str):
     mcp_name = get_mcp_tool_name(tool_name)
     if mcp_name:
         add_blocked_tool(mcp_name, reason)
-        print(f"  [BLOCKED] Also blocking MCP name: {mcp_name}")
 
 
 @before_tool_call
@@ -60,44 +59,30 @@ def capture_tool_call(context):
     2. If not pre-approved, emits an approval_required event and blocks
     3. Returns False to deny if user rejects, None to proceed if approved
     """
-    thread_id = threading.current_thread().name
     is_active = is_streaming_active()
-    print(f"  [HOOK] capture_tool_call triggered! thread={thread_id}, streaming_active={is_active}", flush=True)
-
-    # Debug: show all context attributes
-    print(f"  [HOOK-DEBUG] context attrs: {[a for a in dir(context) if not a.startswith('_')]}", flush=True)
 
     tool_name = context.tool_name
     tool_input = str(context.tool_input) if context.tool_input else ""
 
-    print(f"  [HOOK] Tool: {tool_name} -> dangerous={is_dangerous_tool(tool_name)}", flush=True)
-
     # For dangerous tools, wait a bit if streaming isn't active yet (race condition)
     if is_dangerous_tool(tool_name) and not is_active:
-        print(f"  [HOOK] Waiting for stream to become active...", flush=True)
         for _ in range(20):  # Wait up to 2 seconds
             time.sleep(0.1)
             if is_streaming_active():
                 is_active = True
-                print(f"  [HOOK] Stream became active!", flush=True)
                 break
-        if not is_active:
-            print(f"  [HOOK] Stream never became active, blocking dangerous tool", flush=True)
 
     # Check if this is a dangerous tool that needs approval
     if is_dangerous_tool(tool_name):
         # First check if approval was already handled during streaming
         if check_and_consume_pre_approval(tool_name):
-            print(f"  [HOOK] Pre-approved, proceeding: {tool_name}")
             _emit_tool_event(tool_name, tool_input, approved=True)
             return None  # Proceed with tool execution
 
         # Check if stream is already handling approval for this tool
         existing_approval_id = get_stream_handling_approval(tool_name)
-        print(f"  [HOOK] Stream handling check: tool={tool_name!r}, found={existing_approval_id}")
 
         if existing_approval_id:
-            print(f"  [HOOK] Stream handling approval, waiting for result: {tool_name} (ID: {existing_approval_id})")
             return _wait_for_stream_approval(tool_name, tool_input, context)
 
         # Not pre-approved and stream not handling - fallback to hook-based approval
@@ -131,15 +116,12 @@ def _wait_for_stream_approval(tool_name: str, tool_input: str, context):
     while True:
         # Check if approved
         if check_and_consume_pre_approval(tool_name):
-            print(f"  [HOOK] Stream approved: {tool_name}")
             clear_stream_handling_approval(tool_name)
             _emit_tool_event(tool_name, tool_input, approved=True)
             return None  # Proceed
 
         # Check if stream stopped handling (denied or timeout)
         if not get_stream_handling_approval(tool_name):
-            print(f"  [HOOK] Stream denied/timeout: {tool_name}")
-            print(f"  [HOOK] *** BLOCKING {tool_name} ***", flush=True)
             _block_tool(tool_name, "User denied")
             blocked_msg = f"TOOL BLOCKED: The user explicitly DENIED permission to execute '{tool_name}'. This is NOT a technical error - the user chose to block this action. Do not retry this tool."
             context.tool_result = blocked_msg
@@ -147,8 +129,6 @@ def _wait_for_stream_approval(tool_name: str, tool_input: str, context):
 
         # Timeout check
         if time.time() - start_time > timeout:
-            print(f"  [HOOK] Timeout waiting for stream approval: {tool_name}")
-            print(f"  [HOOK] *** BLOCKING {tool_name} (timeout) ***", flush=True)
             _block_tool(tool_name, "Approval timeout")
             blocked_msg = f"TOOL BLOCKED: Approval for '{tool_name}' timed out. The user did not respond within 2 minutes. Do not retry this tool."
             context.tool_result = blocked_msg
@@ -171,21 +151,16 @@ def _request_hook_approval(tool_name: str, tool_input: str, context):
     pushed = push_event(approval_event.model_dump(mode='json'))
 
     if not pushed:
-        print(f"  [APPROVAL] Stream ended, cannot request approval: {tool_name}")
         raise Exception(f"TOOL BLOCKED: Cannot execute '{tool_name}' - streaming session ended. Try again in a new conversation.")
-
-    print(f"  [APPROVAL] Waiting for approval: {tool_name} (ID: {approval_id})")
 
     # Block and wait for approval (timeout: 2 minutes)
     approved = wait_for_approval_sync(approval_id, timeout=120.0)
 
     if approved is None:
-        print(f"  [APPROVAL] Timeout waiting for approval: {tool_name}")
         push_event(ToolDeniedEvent(
             tool_name=tool_name,
             reason="Approval timed out (2 minutes)"
         ).model_dump(mode='json'))
-        print(f"  [APPROVAL] *** BLOCKING {tool_name} (timeout) ***", flush=True)
         _block_tool(tool_name, "Approval timeout")
         # Set tool_result directly on context - this becomes the tool's output
         blocked_msg = f"TOOL BLOCKED: The user did not respond to the approval request for '{tool_name}' within 2 minutes. The tool was NOT executed. Do not retry this tool."
@@ -193,19 +168,16 @@ def _request_hook_approval(tool_name: str, tool_input: str, context):
         return blocked_msg
 
     if not approved:
-        print(f"  [APPROVAL] User denied: {tool_name}")
         push_event(ToolDeniedEvent(
             tool_name=tool_name,
             reason="User denied tool execution"
         ).model_dump(mode='json'))
-        print(f"  [APPROVAL] *** BLOCKING {tool_name} (denied) ***", flush=True)
         _block_tool(tool_name, "User denied")
         # Set tool_result directly on context - this becomes the tool's output
         blocked_msg = f"TOOL BLOCKED: The user explicitly DENIED permission to execute '{tool_name}'. This is NOT a technical error or permissions issue - the user chose to block this action. Do not retry this tool."
         context.tool_result = blocked_msg
         return blocked_msg
 
-    print(f"  [APPROVAL] User approved: {tool_name}")
     _emit_tool_event(tool_name, tool_input, approved=True)
     return None  # Proceed with tool execution
 

@@ -90,10 +90,6 @@ async def stream_chat_response(
             thinking=routing_thinking if routing_thinking else None
         ).model_dump(mode='json'))
 
-        if routing_thinking:
-            print(f"  Routed to: {service}/{capability} (reason: {routing_thinking[:50]}...)")
-        else:
-            print(f"  Routed to: {service}/{capability}")
 
         # Emit agent event
         agent_name = f"{service.title()} {capability.title()} Specialist"
@@ -123,18 +119,12 @@ async def stream_chat_response(
                         async for chunk in streaming:
                             chunk_count += 1
 
-                            # Log progress periodically
-                            if chunk_count <= 3 or chunk_count % 50 == 0:
-                                chunk_type = chunk.chunk_type.name if hasattr(chunk.chunk_type, 'name') else str(chunk.chunk_type)
-                                print(f"  [BG-CHUNK #{chunk_count}] type={chunk_type}", flush=True)
-
-                    except Exception as e:
-                        print(f"  [BG-STREAM] Error consuming chunks: {e}", flush=True)
+                    except Exception:
+                        pass  # Silently handle stream consumption errors
 
                     return chunk_count
 
                 chunk_count = loop.run_until_complete(consume_stream())
-                print(f"  [BG-STREAM] Finished consuming {chunk_count} chunks", flush=True)
 
                 # Get final result
                 result = streaming.result
@@ -150,7 +140,6 @@ async def stream_chat_response(
 
         # Submit to thread pool
         future = _crew_executor.submit(run_crew_sync)
-        print(f"  [STREAM] CrewAI running in background thread", flush=True)
 
         # Main loop: drain queue while CrewAI runs
         # This loop can run because we're in the main asyncio event loop,
@@ -167,8 +156,6 @@ async def stream_chat_response(
                     event = event_queue.get_nowait()
                     events_found = True
                     idle_count = 0
-                    event_type = event.get('type', 'unknown')
-                    print(f"  [MAIN] Yielding event: {event_type}", flush=True)
                     yield format_sse(event)
                 except:
                     break
@@ -176,7 +163,6 @@ async def stream_chat_response(
             # Check if CrewAI finished
             try:
                 status, result = result_queue.get_nowait()
-                print(f"  [MAIN] CrewAI finished: status={status}", flush=True)
 
                 # Drain any remaining events
                 while True:
@@ -203,7 +189,6 @@ async def stream_chat_response(
 
             # Safety timeout (shouldn't hit this normally)
             if idle_count > max_idle and future.done():
-                print(f"  [MAIN] Safety timeout reached", flush=True)
                 break
 
             # Yield control and wait
