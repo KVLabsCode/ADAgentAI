@@ -9,9 +9,6 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 
-// CopilotKit styles (provider moved to chat pages only)
-import "@copilotkit/react-ui/styles.css"
-
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
