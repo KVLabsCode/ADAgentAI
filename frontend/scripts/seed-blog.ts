@@ -36,22 +36,22 @@ const client = createClient({
   token,
 })
 
-// Sample blog posts for ADAgent
+// Sample blog posts for ADAgentAI
 const samplePosts = [
   {
     _type: "post",
-    title: "Introducing ADAgent: Your AI-Powered Ad Management Assistant",
-    slug: { current: "introducing-adagent" },
-    excerpt: "Meet ADAgent, the intelligent assistant that transforms how you manage AdMob and Google Ad Manager accounts. Ask questions in plain English and get instant insights.",
-    content: `## What is ADAgent?
+    title: "Introducing ADAgentAI: Your AI-Powered Ad Management Assistant",
+    slug: { current: "introducing-adagentai" },
+    excerpt: "Meet ADAgentAI, the intelligent assistant that transforms how you manage AdMob and Google Ad Manager accounts. Ask questions in plain English and get instant insights.",
+    content: `## What is ADAgentAI?
 
-ADAgent is an AI-powered assistant designed specifically for app developers and publishers who use Google's advertising platforms. Whether you're managing AdMob for mobile ads or Google Ad Manager for more complex setups, ADAgent helps you get answers and insights through natural conversation.
+ADAgentAI is an AI-powered assistant designed specifically for app developers and publishers who use Google's advertising platforms. Whether you're managing AdMob for mobile ads or Google Ad Manager for more complex setups, ADAgentAI helps you get answers and insights through natural conversation.
 
 ## Why We Built This
 
 Managing ad monetization can be overwhelming. Between understanding eCPM fluctuations, optimizing ad placements, debugging mediation issues, and generating reports, there's a lot to keep track of.
 
-We built ADAgent to simplify this. Instead of navigating complex dashboards or reading through documentation, you can simply ask questions like:
+We built ADAgentAI to simplify this. Instead of navigating complex dashboards or reading through documentation, you can simply ask questions like:
 
 - "What was my revenue yesterday?"
 - "Show me my top performing ad units"
@@ -67,7 +67,7 @@ Ask questions in plain English and get instant answers about your ad performance
 Connect both AdMob and Google Ad Manager accounts to get a unified view of your ad monetization across all your apps and properties.
 
 ### Real-Time Insights
-Get up-to-date information about your ad performance without waiting for reports to generate. ADAgent pulls data directly from your connected accounts.
+Get up-to-date information about your ad performance without waiting for reports to generate. ADAgentAI pulls data directly from your connected accounts.
 
 ### Secure OAuth Connection
 Your data stays secure with industry-standard OAuth authentication. We never store your Google credentials - you authenticate directly with Google.
@@ -82,7 +82,7 @@ We're currently in early access and would love your feedback. Join us today and 
 
 ## What's Next
 
-We're constantly improving ADAgent based on user feedback. Coming soon:
+We're constantly improving ADAgentAI based on user feedback. Coming soon:
 - Automated performance alerts
 - Scheduled reports via email
 - A/B testing recommendations
@@ -92,7 +92,7 @@ Stay tuned for more updates!`,
     category: "Product",
     status: "published",
     featured: true,
-    authorName: "ADAgent Team",
+    authorName: "ADAgentAI Team",
     publishedAt: new Date().toISOString(),
   },
   {
@@ -114,7 +114,7 @@ The location of your ads significantly impacts performance. Users are more likel
 - Test both banner and interstitial formats to see what works best
 - Consider native ads that blend with your app's design
 
-**Pro tip:** Use ADAgent to ask "Which ad placements have the highest eCPM?" to identify your best-performing spots.
+**Pro tip:** Use ADAgentAI to ask "Which ad placements have the highest eCPM?" to identify your best-performing spots.
 
 ## 2. Focus on Fill Rate
 
@@ -136,7 +136,7 @@ Understanding your eCPM patterns helps identify optimization opportunities and c
 - Sudden drops that might indicate issues
 - Differences across ad units and countries
 
-**Pro tip:** Ask ADAgent "How has my eCPM changed over the last 30 days?" for quick trend analysis.
+**Pro tip:** Ask ADAgentAI "How has my eCPM changed over the last 30 days?" for quick trend analysis.
 
 ## 4. A/B Test Ad Formats
 
@@ -165,11 +165,11 @@ Let data guide your optimization efforts, not assumptions or gut feelings.
 
 Maximizing ad revenue is an ongoing process, not a one-time task. By following these tips and continuously monitoring your performance, you can significantly improve your earnings while maintaining a great user experience.
 
-**Need help analyzing your ad data?** Try ADAgent - ask questions in plain English and get instant insights about your AdMob and Google Ad Manager performance.`,
+**Need help analyzing your ad data?** Try ADAgentAI - ask questions in plain English and get instant insights about your AdMob and Google Ad Manager performance.`,
     category: "Tips",
     status: "published",
     featured: false,
-    authorName: "ADAgent Team",
+    authorName: "ADAgentAI Team",
     publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
   },
   {
@@ -254,9 +254,9 @@ If possible, target or prioritize users from high-eCPM regions.
 **Mistake 3:** Not segmenting data
 - Overall eCPM hides important variations by country, ad unit, and format
 
-## Tracking Your eCPM with ADAgent
+## Tracking Your eCPM with ADAgentAI
 
-Instead of manually calculating eCPM across different reports, use ADAgent to get instant answers:
+Instead of manually calculating eCPM across different reports, use ADAgentAI to get instant answers:
 
 - "What's my average eCPM this month?"
 - "Which ad unit has the highest eCPM?"
@@ -271,7 +271,7 @@ Understanding eCPM deeply will help you make smarter monetization decisions and 
     category: "Education",
     status: "published",
     featured: false,
-    authorName: "ADAgent Team",
+    authorName: "ADAgentAI Team",
     publishedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
   },
 ]

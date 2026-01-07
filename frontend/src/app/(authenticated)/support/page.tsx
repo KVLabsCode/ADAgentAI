@@ -2,11 +2,56 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { HelpCircle, MessageCircle, Book, FileText, ExternalLink, Mail } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { HelpCircle, MessageCircle, Book, FileText, Mail, ChevronDown, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
+
+const faqs = [
+  {
+    question: "How do I connect my AdMob account?",
+    answer: "Go to Connected Providers, click \"Connect Provider\", and select AdMob. You'll be redirected to Google to authorize access."
+  },
+  {
+    question: "What data does ADAgentAI access?",
+    answer: "ADAgentAI only accesses read-only data from your ad platforms, including performance metrics and ad unit configurations. We never modify your account settings."
+  },
+  {
+    question: "Can I use multiple ad platforms?",
+    answer: "Yes! Pro and Enterprise plans support unlimited provider connections. The Free plan supports one provider."
+  },
+  {
+    question: "Is my data secure?",
+    answer: "Absolutely. We use industry-standard encryption and never store your ad platform credentials. All connections use OAuth 2.0."
+  },
+]
+
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [isOpen, setIsOpen] = React.useState(false)
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className="w-full flex items-center justify-between py-2.5 text-left hover:bg-muted/30 -mx-2 px-2 rounded transition-colors">
+        <span className="text-xs font-medium">{question}</span>
+        <ChevronDown className={cn(
+          "h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200",
+          isOpen && "rotate-180"
+        )} />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <p className="text-[11px] text-muted-foreground/80 leading-relaxed pb-2 pl-0.5">
+          {answer}
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
 
 export default function SupportPage() {
   const [submitted, setSubmitted] = React.useState(false)
@@ -18,140 +63,124 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto pb-12">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       <div className="space-y-0.5">
         <h1 className="text-base font-medium tracking-tight">Support</h1>
         <p className="text-xs text-muted-foreground/80">
-          Get help with ADAgent or contact our team.
+          Get help with ADAgentAI or contact our team.
         </p>
       </div>
 
       {/* Quick Links */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="group cursor-pointer hover:border-primary/50 transition-colors">
-          <CardHeader className="pb-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-              <Book className="h-5 w-5 text-primary" />
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Link
+          href="#"
+          className="group rounded border border-border/30 px-3 py-2.5 hover:border-border/50 hover:bg-muted/20 transition-all duration-150"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
+              <Book className="h-3 w-3 text-primary" />
             </div>
-            <CardTitle className="text-base group-hover:text-primary transition-colors">
-              Documentation
-            </CardTitle>
-            <CardDescription>
-              Learn how to use ADAgent effectively.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            <span className="text-xs font-medium group-hover:text-primary transition-colors">Documentation</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60">
+            Learn how to use ADAgentAI effectively.
+          </p>
+        </Link>
 
-        <Card className="group cursor-pointer hover:border-primary/50 transition-colors">
-          <CardHeader className="pb-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-              <FileText className="h-5 w-5 text-primary" />
+        <Link
+          href="#"
+          className="group rounded border border-border/30 px-3 py-2.5 hover:border-border/50 hover:bg-muted/20 transition-all duration-150"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
+              <FileText className="h-3 w-3 text-primary" />
             </div>
-            <CardTitle className="text-base group-hover:text-primary transition-colors">
-              API Reference
-            </CardTitle>
-            <CardDescription>
-              Technical documentation for developers.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            <span className="text-xs font-medium group-hover:text-primary transition-colors">API Reference</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60">
+            Technical documentation for developers.
+          </p>
+        </Link>
 
-        <Card className="group cursor-pointer hover:border-primary/50 transition-colors">
-          <CardHeader className="pb-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-              <MessageCircle className="h-5 w-5 text-primary" />
+        <Link
+          href="#"
+          className="group rounded border border-border/30 px-3 py-2.5 hover:border-border/50 hover:bg-muted/20 transition-all duration-150"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
+              <MessageCircle className="h-3 w-3 text-primary" />
             </div>
-            <CardTitle className="text-base group-hover:text-primary transition-colors">
-              Community
-            </CardTitle>
-            <CardDescription>
-              Join our Discord community.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            <span className="text-xs font-medium group-hover:text-primary transition-colors">Community</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60">
+            Join our Discord community.
+          </p>
+        </Link>
       </div>
 
       {/* FAQ */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <HelpCircle className="h-4 w-4" />
-            Frequently Asked Questions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm">How do I connect my AdMob account?</h4>
-            <p className="text-sm text-muted-foreground">
-              Go to Connected Providers, click "Connect Provider", and select AdMob. You'll be redirected to Google to authorize access.
-            </p>
+      <div className="rounded border border-border/30">
+        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
+          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/70" />
+          <div>
+            <h2 className="text-xs font-medium">Frequently Asked Questions</h2>
+            <p className="text-[10px] text-muted-foreground/60">Common questions about ADAgentAI.</p>
           </div>
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm">What data does ADAgent access?</h4>
-            <p className="text-sm text-muted-foreground">
-              ADAgent only accesses read-only data from your ad platforms, including performance metrics and ad unit configurations. We never modify your account settings.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm">Can I use multiple ad platforms?</h4>
-            <p className="text-sm text-muted-foreground">
-              Yes! Pro and Enterprise plans support unlimited provider connections. The Free plan supports one provider.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm">Is my data secure?</h4>
-            <p className="text-sm text-muted-foreground">
-              Absolutely. We use industry-standard encryption and never store your ad platform credentials. All connections use OAuth 2.0.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="px-3 py-2 divide-y divide-border/20">
+          {faqs.map((faq, i) => (
+            <FAQItem key={i} question={faq.question} answer={faq.answer} />
+          ))}
+        </div>
+      </div>
 
       {/* Contact Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            Contact Us
-          </CardTitle>
-          <CardDescription>
-            Can't find what you're looking for? Send us a message.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded border border-border/30">
+        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
+          <Mail className="h-3.5 w-3.5 text-muted-foreground/70" />
+          <div>
+            <h2 className="text-xs font-medium">Contact Us</h2>
+            <p className="text-[10px] text-muted-foreground/60">Can't find what you're looking for? Send us a message.</p>
+          </div>
+        </div>
+        <div className="px-3 py-3">
           {submitted ? (
-            <div className="flex items-center justify-center py-8 text-center">
-              <div>
-                <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
-                  <MessageCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-                <h3 className="font-medium mb-1">Message sent!</h3>
-                <p className="text-sm text-muted-foreground">
-                  We'll get back to you within 24 hours.
-                </p>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center mb-2">
+                <MessageCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
               </div>
+              <p className="text-xs font-medium mb-0.5">Message sent!</p>
+              <p className="text-[10px] text-muted-foreground/60">
+                We'll get back to you within 24 hours.
+              </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Subject</label>
-                <Input placeholder="What can we help you with?" required />
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-medium block mb-1">Subject</label>
+                <Input
+                  placeholder="What can we help you with?"
+                  required
+                  className="h-8 text-xs"
+                />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Message</label>
+              <div>
+                <label className="text-[11px] font-medium block mb-1">Message</label>
                 <Textarea
-                  placeholder="Describe your issue or question in detail..."
-                  className="min-h-[120px] resize-none"
+                  placeholder="Describe your issue or question..."
+                  className="min-h-[80px] resize-none text-xs"
                   required
                 />
               </div>
-              <Button type="submit">Send Message</Button>
+              <Button type="submit" size="sm" className="h-7 text-xs">
+                <Send className="h-3 w-3 mr-1.5" />
+                Send Message
+              </Button>
             </form>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -84,7 +84,7 @@ export function AppSidebar() {
             AD
           </div>
           <span className="text-sm font-medium tracking-tight">
-            ADAgent
+            ADAgentAI
           </span>
         </Link>
         <Tooltip>

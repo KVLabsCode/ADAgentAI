@@ -4,7 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Bot, Brain, ChevronDown, ChevronUp, Clock, Check, X, Route, Zap, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck } from "lucide-react"
+import { Sparkles, Brain, ChevronDown, Clock, Check, X, Route, Zap, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,116 +25,151 @@ import type { Message, StreamEventItem } from "@/lib/types"
 
 interface AssistantMessageProps {
   message: Message
-  onToolApproval?: (toolName: string, approved: boolean) => void
+  onToolApproval?: (approvalId: string, approved: boolean) => void
   pendingApprovals?: Map<string, boolean | null>
-}
-
-// Check if a tool is a write/dangerous operation that needs approval
-function isWriteOperation(toolName: string): boolean {
-  const writePatterns = [
-    "create", "update", "delete", "write", "post", "put", "patch",
-    "remove", "add", "set", "modify", "insert", "save", "upload",
-    "send", "submit", "execute", "run", "apply"
-  ]
-  const lowerName = toolName.toLowerCase()
-  return writePatterns.some(pattern => lowerName.includes(pattern))
 }
 
 // Extract short tool name from full MCP tool path
 function getShortToolName(fullName: string): string {
-  // Handle patterns like "mcp__server__tool_name" or just "tool_name"
   const parts = fullName.split("__")
   return parts[parts.length - 1] || fullName
+}
+
+// List of dangerous tools that require approval
+const DANGEROUS_TOOLS = [
+  "Create AdMob App", "Create AdMob Ad Unit",
+  "Create Ad Unit Mapping", "Batch Create Ad Unit Mappings",
+  "Create Mediation Group", "Update Mediation Group",
+  "Create Mediation A/B Experiment", "Stop Mediation A/B Experiment",
+  "Create Ad Unit", "Update Ad Unit",
+  "Create Order", "Update Order",
+  "Create Line Item", "Update Line Item",
+  "Create Creative", "Create Site", "Update Site",
+  "Submit Sites for Approval",
+]
+
+function isWriteOperation(toolName: string): boolean {
+  return DANGEROUS_TOOLS.includes(toolName)
 }
 
 // Syntax highlighting for JSON
 function highlightJSON(obj: unknown): React.ReactNode {
   const json = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2)
-
-  // Simple syntax highlighting
   const highlighted = json
-    .replace(/"([^"]+)":/g, '<span class="text-cyan-400">"$1"</span>:')
+    .replace(/"([^"]+)":/g, '<span class="text-sky-400">"$1"</span>:')
     .replace(/: "([^"]+)"/g, ': <span class="text-amber-300">"$1"</span>')
-    .replace(/: (\d+)/g, ': <span class="text-purple-400">$1</span>')
-    .replace(/: (true|false)/g, ': <span class="text-pink-400">$1</span>')
-    .replace(/: (null)/g, ': <span class="text-gray-500">$1</span>')
-
+    .replace(/: (\d+)/g, ': <span class="text-violet-400">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="text-emerald-400">$1</span>')
+    .replace(/: (null)/g, ': <span class="text-zinc-500">$1</span>')
   return <span dangerouslySetInnerHTML={{ __html: highlighted }} />
 }
 
-// Code block component with dark theme
+// Compact code block with scroll and resize
 function CodeBlock({
   title,
   content,
-  maxHeight = "200px",
-  className
+  maxHeight = "280px",
+  resizable = false,
 }: {
   title: string
   content: unknown
   maxHeight?: string
-  className?: string
+  resizable?: boolean
 }) {
   const formattedContent = typeof content === "string"
     ? content
     : JSON.stringify(content, null, 2)
 
   return (
-    <div className={cn("rounded-lg overflow-hidden", className)}>
-      <div className="bg-zinc-800 dark:bg-zinc-900 px-3 py-1.5 border-b border-zinc-700/50">
-        <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+    <div className="rounded-lg overflow-hidden border border-zinc-700/50">
+      <div className="bg-zinc-800/80 px-3 py-1.5 border-b border-zinc-700/50">
+        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
           {title}
         </span>
       </div>
-      <ScrollArea className={`bg-zinc-900 dark:bg-zinc-950`} style={{ maxHeight }}>
-        <pre className="p-3 text-[12px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap break-all">
+      <div
+        className={cn(
+          "bg-zinc-900/80 overflow-auto",
+          resizable && "resize-y min-h-[60px]"
+        )}
+        style={{ maxHeight: resizable ? "400px" : maxHeight }}
+      >
+        <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap break-all">
           {highlightJSON(content)}
         </pre>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
 
-// Routing block - shows the router decision with solid background
-function RoutingBlock({ service, capability }: { service: string; capability: string }) {
+// Unified compact card height
+const CARD_HEIGHT = "h-10"
+const CARD_PADDING = "px-3"
+
+// Icon box component - colored square behind icon (higher contrast)
+function IconBox({ color, children }: { color: "violet" | "amber" | "emerald" | "red" | "zinc"; children: React.ReactNode }) {
+  const bgColors = {
+    violet: "bg-violet-600/60",
+    amber: "bg-amber-600/60",
+    emerald: "bg-emerald-600/60",
+    red: "bg-red-600/60",
+    zinc: "bg-zinc-600/60",
+  }
   return (
-    <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-violet-600 dark:bg-violet-700 shadow-sm">
-      <Route className="h-4 w-4 text-violet-100" />
-      <span className="text-xs text-white">
-        <span className="text-violet-200">Routing to</span>{" "}
-        <span className="font-semibold">{service}</span>
-        <span className="mx-2 text-violet-300">→</span>
-        <span className="font-semibold">{capability}</span>
-      </span>
+    <div className={cn("w-6 h-6 rounded flex items-center justify-center shrink-0", bgColors[color])}>
+      {children}
     </div>
   )
 }
 
-// Thinking block with solid background
-function ThinkingBlock({ content }: { content: string }) {
+// Routing block - compact collapsed
+function RoutingBlock({ service, capability, thinking }: { service: string; capability: string; thinking?: string }) {
   const [isOpen, setIsOpen] = React.useState(false)
+
+  if (!thinking) {
+    return (
+      <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50")}>
+        <IconBox color="violet">
+          <Route className="h-3.5 w-3.5 text-violet-400" />
+        </IconBox>
+        <span className="text-xs text-zinc-200">
+          <span className="text-zinc-400">Routing to</span>{" "}
+          <span className="font-medium text-zinc-100">{service}</span>
+          <span className="mx-1.5 text-zinc-500">→</span>
+          <span className="font-medium text-zinc-100">{capability}</span>
+        </span>
+      </div>
+    )
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg bg-amber-600 dark:bg-amber-700 shadow-sm overflow-hidden">
+      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-amber-500 dark:hover:bg-amber-600 transition-colors">
-            <Brain className="h-4 w-4 text-amber-100" />
-            <span className="text-xs font-semibold text-white flex-1">
-              Thinking...
-            </span>
-            <ChevronDown className={cn(
-              "h-4 w-4 text-amber-200 transition-transform duration-200",
-              isOpen && "rotate-180"
-            )} />
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+            <div className="flex items-center gap-2.5 min-w-0 h-full">
+              <IconBox color="violet">
+                <Route className="h-3.5 w-3.5 text-violet-400" />
+              </IconBox>
+              <span className="text-xs text-zinc-200 truncate">
+                <span className="text-zinc-400">Routing to</span>{" "}
+                <span className="font-medium text-zinc-100">{service}</span>
+                <span className="mx-1.5 text-zinc-500">→</span>
+                <span className="font-medium text-zinc-100">{capability}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-zinc-400 shrink-0 h-full">
+              <Brain className="h-3 w-3" />
+              <span className="text-[10px]">reasoning</span>
+              <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", isOpen && "rotate-180")} />
+            </div>
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-3.5 pb-3 pt-0">
-            <div className="bg-amber-700/50 dark:bg-amber-800/50 rounded-md p-3 mt-2">
-              <p className="text-xs text-amber-50 whitespace-pre-wrap leading-relaxed">
-                {content}
-              </p>
-            </div>
+          <div className="px-4 pb-3 pt-2">
+            <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">
+              {thinking}
+            </p>
           </div>
         </CollapsibleContent>
       </div>
@@ -142,158 +177,100 @@ function ThinkingBlock({ content }: { content: string }) {
   )
 }
 
-// MCP Tool Block - Combined tool call and result with Request/Response design
-interface MCPToolBlockProps {
-  name: string
-  params: Record<string, unknown>
-  result?: unknown
-  hasResult: boolean
-  onApproval?: (approved: boolean) => void
-  approvalState?: boolean | null // null = pending, true = approved, false = denied
-}
-
-function MCPToolBlock({
-  name,
-  params,
-  result,
-  hasResult,
-  onApproval,
-  approvalState
-}: MCPToolBlockProps) {
-  const [isOpen, setIsOpen] = React.useState(true)
-  const shortName = getShortToolName(name)
-  const needsApproval = isWriteOperation(name)
-  const isPending = needsApproval && approvalState === null
-  const isApproved = !needsApproval || approvalState === true
-  const isDenied = approvalState === false
+// Thinking block - compact, no preview
+function ThinkingBlock({ content }: { content: string }) {
+  const [isOpen, setIsOpen] = React.useState(false)
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className={cn(
-        "rounded-xl overflow-hidden transition-all duration-200 shadow-sm",
-        isPending
-          ? "bg-amber-600 dark:bg-amber-700"
-          : isDenied
-            ? "bg-red-600 dark:bg-red-700"
-            : "bg-slate-700 dark:bg-slate-800"
-      )}>
-        {/* Header */}
+      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
-          <button className={cn(
-            "w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors",
-            isPending
-              ? "hover:bg-amber-500 dark:hover:bg-amber-600"
-              : isDenied
-                ? "hover:bg-red-500 dark:hover:bg-red-600"
-                : "hover:bg-slate-600 dark:hover:bg-slate-700"
-          )}>
-            {/* Tool Icon */}
-            <div className={cn(
-              "flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-lg shrink-0",
-              isPending
-                ? "bg-amber-700/50"
-                : isDenied
-                  ? "bg-red-700/50"
-                  : "bg-emerald-600"
-            )}>
-              <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+            <div className="flex items-center gap-2.5">
+              <IconBox color="amber">
+                <Brain className="h-3.5 w-3.5 text-amber-400" />
+              </IconBox>
+              <span className="text-xs font-medium text-zinc-200">Thinking...</span>
             </div>
-
-            {/* Tool Name */}
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <code className="text-xs sm:text-sm font-semibold text-white font-mono truncate block">
-                {shortName}
-              </code>
-              {name !== shortName && (
-                <p className={cn(
-                  "text-[9px] sm:text-[10px] font-mono truncate mt-0.5",
-                  isPending ? "text-amber-200" : isDenied ? "text-red-200" : "text-slate-300"
-                )}>
-                  {name}
-                </p>
-              )}
-            </div>
-
-            {/* Status Badge */}
-            {needsApproval && (
-              <Badge
-                className={cn(
-                  "h-5 sm:h-6 gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide shrink-0 px-1.5 sm:px-2 border-0",
-                  isPending && "bg-amber-800 text-amber-100",
-                  isApproved && "bg-emerald-600 text-white",
-                  isDenied && "bg-red-800 text-red-100"
-                )}
-              >
-                {isPending && <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
-                {isApproved && <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
-                {isDenied && <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
-                <span className="hidden xs:inline">{isPending ? "Awaiting" : isApproved ? "Allowed" : "Denied"}</span>
-              </Badge>
-            )}
-
-            {/* Expand/Collapse */}
-            <ChevronUp className={cn(
-              "h-4 w-4 transition-transform duration-200 shrink-0",
-              isPending ? "text-amber-200" : isDenied ? "text-red-200" : "text-slate-300",
-              !isOpen && "rotate-180"
-            )} />
+            <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
           </button>
         </CollapsibleTrigger>
-
         <CollapsibleContent>
-          <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-2.5 sm:space-y-3">
-            {/* Request Block */}
-            <CodeBlock
-              title="Request"
-              content={params}
-              maxHeight="150px"
-            />
+          <div className="px-4 pb-3 pt-2">
+            <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">
+              {content}
+            </p>
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  )
+}
 
-            {/* Response Block - only show if we have result and approved */}
-            {hasResult && isApproved && (
-              <CodeBlock
-                title="Response"
-                content={result}
-                maxHeight="200px"
-              />
-            )}
+// Tool Approval Required - auto-expanded
+interface ToolApprovalBlockProps {
+  approvalId: string
+  toolName: string
+  toolInput: string
+  onApproval: (approved: boolean) => void
+  isPending: boolean
+}
 
-            {/* Denied Message */}
-            {isDenied && (
-              <div className="flex items-center gap-2 px-2.5 sm:px-3 py-2 rounded-lg bg-red-800">
-                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-200 shrink-0" />
-                <span className="text-[11px] sm:text-xs text-red-100">Tool execution was denied</span>
-              </div>
-            )}
+function ToolApprovalBlock({ approvalId, toolName, toolInput, onApproval, isPending }: ToolApprovalBlockProps) {
+  const [isOpen, setIsOpen] = React.useState(true) // Auto-expand for approval
+  const shortName = getShortToolName(toolName)
 
-            {/* Approval Buttons */}
-            {isPending && onApproval && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 pt-2 border-t border-amber-500/30">
-                <p className="text-[10px] sm:text-[11px] text-amber-200">
-                  Approval required to proceed
+  let parsedInput: Record<string, unknown> = {}
+  try {
+    parsedInput = JSON.parse(toolInput)
+  } catch {
+    parsedInput = { raw: toolInput }
+  }
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+        <CollapsibleTrigger asChild>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+            <div className="flex items-center gap-2.5 min-w-0 h-full">
+              <IconBox color="amber">
+                <Zap className="h-3.5 w-3.5 text-amber-400" />
+              </IconBox>
+              <code className="text-xs font-medium text-zinc-100 font-mono truncate">{shortName}</code>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-amber-500/30 text-amber-300">
+                <Clock className="h-2.5 w-2.5" />
+                Approval
+              </Badge>
+              <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 transition-transform duration-200", isOpen && "rotate-180")} />
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-700/50 mt-1">
+            <CodeBlock title="Request" content={parsedInput} maxHeight="140px" />
+            {isPending && (
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-zinc-700/30">
+                <p className="text-[10px] text-zinc-400">
+                  This action will modify data
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs text-amber-100 hover:text-white hover:bg-red-600 flex-1 sm:flex-none"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onApproval(false)
-                    }}
+                    className="h-7 px-3 text-[11px] text-zinc-300 hover:text-white hover:bg-red-500/80"
+                    onClick={(e) => { e.stopPropagation(); onApproval(false) }}
                   >
-                    <X className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
+                    <X className="h-3 w-3 mr-1" />
                     Deny
                   </Button>
                   <Button
                     size="sm"
-                    className="h-7 sm:h-8 px-3 sm:px-4 text-[11px] sm:text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex-1 sm:flex-none"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onApproval(true)
-                    }}
+                    className="h-7 px-3 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white"
+                    onClick={(e) => { e.stopPropagation(); onApproval(true) }}
                   >
-                    <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
+                    <Check className="h-3 w-3 mr-1" />
                     Allow
                   </Button>
                 </div>
@@ -306,35 +283,156 @@ function MCPToolBlock({
   )
 }
 
-// Activity summary block - shows step count and quick overview with solid background
-function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[], children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = React.useState(true)
+// Tool Denied - always collapsed/compact
+function ToolDeniedBlock({ toolName, reason }: { toolName: string; reason: string }) {
+  const shortName = getShortToolName(toolName)
 
-  const toolEvents = events.filter(e => e.type === "tool")
-  const stepCount = toolEvents.length
+  return (
+    <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2 rounded-lg bg-zinc-800/50 border border-zinc-700/50")}>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <IconBox color="red">
+          <X className="h-3.5 w-3.5 text-red-400" />
+        </IconBox>
+        <code className="text-xs font-medium text-zinc-300 font-mono truncate">{shortName}</code>
+        <span className="text-[10px] text-zinc-500 truncate">{reason}</span>
+      </div>
+      <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-red-500/20 text-red-400 shrink-0">
+        Denied
+      </Badge>
+    </div>
+  )
+}
 
-  if (stepCount === 0) {
-    return <>{children}</>
-  }
+// MCP Tool Block - collapsed by default
+interface MCPToolBlockProps {
+  name: string
+  params: Record<string, unknown>
+  result?: unknown
+  hasResult: boolean
+  onApproval?: (approved: boolean) => void
+  approvalState?: boolean | null
+}
+
+function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalState }: MCPToolBlockProps) {
+  const shortName = getShortToolName(name)
+  const needsApproval = isWriteOperation(name)
+  const isPending = needsApproval && approvalState === null
+  const isApproved = !needsApproval || approvalState === true
+  const isDenied = approvalState === false
+
+  // Auto-expand when approval is pending, otherwise collapsed
+  const [isOpen, setIsOpen] = React.useState(isPending)
+
+  // Auto-collapse after approval/denial
+  React.useEffect(() => {
+    if (!isPending && isOpen) {
+      setIsOpen(false)
+    }
+  }, [isPending])
+
+  // Icon color based on state
+  const iconColor = isPending ? "amber" : isDenied ? "red" : "emerald"
+  const iconTextColor = isPending ? "text-amber-400" : isDenied ? "text-red-400" : "text-emerald-400"
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-xl bg-zinc-700 dark:bg-zinc-800 overflow-hidden shadow-sm">
+      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-600 dark:hover:bg-zinc-700 transition-colors">
-            <Terminal className="h-4 w-4 text-zinc-200" />
-            <span className="text-sm text-white flex-1">
-              <span className="font-semibold">{stepCount}</span>
-              <span className="text-zinc-300 ml-1">{stepCount === 1 ? 'step' : 'steps'}</span>
-            </span>
-            <ChevronUp className={cn(
-              "h-4 w-4 text-zinc-300 transition-transform duration-200",
-              !isOpen && "rotate-180"
-            )} />
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+            <div className="flex items-center gap-2.5 min-w-0 h-full">
+              <IconBox color={iconColor}>
+                <Zap className={cn("h-3.5 w-3.5", iconTextColor)} />
+              </IconBox>
+              <code className="text-xs font-medium text-zinc-100 font-mono truncate">{shortName}</code>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {needsApproval && (
+                <Badge className={cn(
+                  "h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none",
+                  isPending && "bg-amber-500/30 text-amber-300",
+                  isApproved && "bg-emerald-500/20 text-emerald-400",
+                  isDenied && "bg-red-500/20 text-red-400"
+                )}>
+                  {isPending && <Clock className="h-2.5 w-2.5" />}
+                  {isApproved && <Check className="h-2.5 w-2.5" />}
+                  {isDenied && <X className="h-2.5 w-2.5" />}
+                  {isPending ? "Pending" : isApproved ? "Allowed" : "Denied"}
+                </Badge>
+              )}
+              <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-500 transition-transform duration-200", isOpen && "rotate-180")} />
+            </div>
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-4 pb-4 space-y-3">
+          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-700/50 mt-1">
+            <CodeBlock title="Request" content={params} maxHeight="140px" />
+            {hasResult && isApproved && (
+              <CodeBlock title="Response" content={result} maxHeight="160px" resizable />
+            )}
+            {isDenied && (
+              <div className="flex items-center gap-2 px-2.5 py-2 rounded bg-red-500/10 border border-red-500/20">
+                <X className="h-3.5 w-3.5 text-red-400" />
+                <span className="text-[11px] text-red-300">Execution denied by user</span>
+              </div>
+            )}
+            {isPending && onApproval && (
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-zinc-700/30">
+                <p className="text-[10px] text-zinc-500">Approval required</p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-3 text-[11px] text-zinc-300 hover:text-white hover:bg-red-500/80"
+                    onClick={(e) => { e.stopPropagation(); onApproval(false) }}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Deny
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 px-3 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white"
+                    onClick={(e) => { e.stopPropagation(); onApproval(true) }}
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    Allow
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  )
+}
+
+// Activity summary block
+function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[], children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = React.useState(true)
+  const toolEvents = events.filter(e => e.type === "tool")
+  const stepCount = toolEvents.length
+
+  if (stepCount === 0) return <>{children}</>
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+            <div className="flex items-center gap-2.5 h-full">
+              <IconBox color="zinc">
+                <Terminal className="h-3.5 w-3.5 text-zinc-300" />
+              </IconBox>
+              <span className="text-xs text-zinc-200">
+                <span className="font-medium">{stepCount}</span>
+                <span className="text-zinc-400 ml-1">{stepCount === 1 ? 'tool call' : 'tool calls'}</span>
+              </span>
+            </div>
+            <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-500 transition-transform duration-200", isOpen && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-3 pb-3 pt-2 space-y-2 border-t border-zinc-700/50 mt-1">
             {children}
           </div>
         </CollapsibleContent>
@@ -343,15 +441,8 @@ function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[],
   )
 }
 
-// Message Actions - copy, like, dislike buttons shown on hover
-interface MessageActionsProps {
-  content: string
-  messageId: string
-  onLike?: (liked: boolean) => void
-  onDislike?: (disliked: boolean) => void
-}
-
-function MessageActions({ content, messageId, onLike, onDislike }: MessageActionsProps) {
+// Message Actions
+function MessageActions({ content, messageId }: { content: string; messageId: string }) {
   const [copied, setCopied] = React.useState(false)
   const [liked, setLiked] = React.useState(false)
   const [disliked, setDisliked] = React.useState(false)
@@ -366,78 +457,32 @@ function MessageActions({ content, messageId, onLike, onDislike }: MessageAction
     }
   }
 
-  const handleLike = () => {
-    const newState = !liked
-    setLiked(newState)
-    if (newState && disliked) setDisliked(false)
-    onLike?.(newState)
-  }
-
-  const handleDislike = () => {
-    const newState = !disliked
-    setDisliked(newState)
-    if (newState && liked) setLiked(false)
-    onDislike?.(newState)
-  }
-
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              onClick={handleCopy}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                copied
-                  ? "text-emerald-500"
-                  : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50"
-              )}
-            >
+            <button onClick={handleCopy} className={cn("p-1.5 rounded-md transition-colors", copied ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
               {copied ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            {copied ? "Copied!" : "Copy message"}
-          </TooltipContent>
+          <TooltipContent side="top" className="text-xs">{copied ? "Copied!" : "Copy"}</TooltipContent>
         </Tooltip>
-
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              onClick={handleLike}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                liked
-                  ? "text-emerald-500"
-                  : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50"
-              )}
-            >
+            <button onClick={() => { setLiked(!liked); if (!liked && disliked) setDisliked(false) }} className={cn("p-1.5 rounded-md transition-colors", liked ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
               <ThumbsUp className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            {liked ? "Liked" : "Like response"}
-          </TooltipContent>
+          <TooltipContent side="top" className="text-xs">{liked ? "Liked" : "Like"}</TooltipContent>
         </Tooltip>
-
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              onClick={handleDislike}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                disliked
-                  ? "text-red-500"
-                  : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50"
-              )}
-            >
+            <button onClick={() => { setDisliked(!disliked); if (!disliked && liked) setLiked(false) }} className={cn("p-1.5 rounded-md transition-colors", disliked ? "text-red-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
               <ThumbsDown className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            {disliked ? "Disliked" : "Dislike response"}
-          </TooltipContent>
+          <TooltipContent side="top" className="text-xs">{disliked ? "Disliked" : "Dislike"}</TooltipContent>
         </Tooltip>
       </div>
     </TooltipProvider>
@@ -446,187 +491,174 @@ function MessageActions({ content, messageId, onLike, onDislike }: MessageAction
 
 // Convert legacy message format to events
 function getEventsFromMessage(message: Message): StreamEventItem[] {
-  if (message.events && message.events.length > 0) {
-    return message.events
-  }
-
+  if (message.events && message.events.length > 0) return message.events
   const events: StreamEventItem[] = []
-
-  if (message.thinking) {
-    events.push({ type: "thinking", content: message.thinking })
-  }
-
+  if (message.thinking) events.push({ type: "thinking", content: message.thinking })
   if (message.toolCalls) {
     message.toolCalls.forEach((tool, i) => {
       events.push({ type: "tool", name: tool.name, params: tool.params })
       const result = message.toolResults?.[i]
-      if (result) {
-        events.push({ type: "tool_result", name: result.name, result: result.result })
-      }
+      if (result) events.push({ type: "tool_result", name: result.name, result: result.result })
     })
   }
-
   return events
 }
 
-// Group tool calls with their results
-function groupToolEvents(events: StreamEventItem[]): Array<{
-  tool: { name: string; params: Record<string, unknown> }
-  result?: unknown
-}> {
-  const groups: Array<{ tool: { name: string; params: Record<string, unknown> }; result?: unknown }> = []
-
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i]
-    if (event.type === "tool") {
-      const group: { tool: { name: string; params: Record<string, unknown> }; result?: unknown } = {
-        tool: { name: event.name, params: event.params }
-      }
-
-      // Look for matching result
-      const nextEvent = events[i + 1]
-      if (nextEvent?.type === "tool_result" && nextEvent.name === event.name) {
-        group.result = nextEvent.result
-        i++ // Skip the result event
-      }
-
-      groups.push(group)
-    }
-  }
-
-  return groups
-}
-
-export function AssistantMessage({
-  message,
-  onToolApproval,
-  pendingApprovals = new Map()
-}: AssistantMessageProps) {
+export function AssistantMessage({ message, onToolApproval, pendingApprovals = new Map() }: AssistantMessageProps) {
   const events = getEventsFromMessage(message)
   const { displayMode } = useChatSettings()
 
-  // Local approval state for tools without external management
   const [localApprovals, setLocalApprovals] = React.useState<Map<string, boolean | null>>(new Map())
 
   const handleApproval = (toolName: string, approved: boolean) => {
-    if (onToolApproval) {
-      onToolApproval(toolName, approved)
-    } else {
-      setLocalApprovals(prev => new Map(prev).set(toolName, approved))
-    }
+    if (onToolApproval) onToolApproval(toolName, approved)
+    else setLocalApprovals(prev => new Map(prev).set(toolName, approved))
   }
 
   const getApprovalState = (toolName: string): boolean | null => {
-    if (pendingApprovals.has(toolName)) {
-      return pendingApprovals.get(toolName) ?? null
-    }
-    if (localApprovals.has(toolName)) {
-      return localApprovals.get(toolName) ?? null
-    }
-    // Default: non-write operations are auto-approved
+    if (pendingApprovals.has(toolName)) return pendingApprovals.get(toolName) ?? null
+    if (localApprovals.has(toolName)) return localApprovals.get(toolName) ?? null
     return isWriteOperation(toolName) ? null : true
   }
 
-  // Separate events by type
-  const routingEvents = events.filter(e => e.type === "routing") as Array<{ type: "routing"; service: string; capability: string }>
-  const thinkingEvents = events.filter(e => e.type === "thinking") as Array<{ type: "thinking"; content: string }>
-  const toolGroups = groupToolEvents(events)
+  // Collect approved/denied tool names
+  const approvedToolNames = new Set<string>()
+  const deniedToolNames = new Set<string>()
+  for (const event of events) {
+    if (event.type === "tool" && event.approved === true) approvedToolNames.add(event.name)
+    if (event.type === "tool_denied") deniedToolNames.add(event.tool_name)
+  }
+
+  // Process events
+  const processedEvents: Array<
+    | { type: "routing"; service: string; capability: string; thinking?: string; key: string }
+    | { type: "thinking"; content: string; key: string }
+    | { type: "tool_group"; tool: { name: string; params: Record<string, unknown>; approved?: boolean }; result?: unknown; key: string }
+    | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; key: string }
+    | { type: "tool_denied"; tool_name: string; reason: string; key: string }
+  > = []
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (event.type === "routing") processedEvents.push({ ...event, key: `routing-${i}` })
+    else if (event.type === "thinking") processedEvents.push({ ...event, key: `thinking-${i}` })
+    else if (event.type === "tool_approval_required") {
+      if (!approvedToolNames.has(event.tool_name) && !deniedToolNames.has(event.tool_name)) {
+        processedEvents.push({ ...event, key: `approval-${i}` })
+      }
+    } else if (event.type === "tool_denied") processedEvents.push({ ...event, key: `denied-${i}` })
+    else if (event.type === "tool") {
+      const nextEvent = events[i + 1]
+      const toolGroup: typeof processedEvents[number] & { type: "tool_group" } = {
+        type: "tool_group",
+        tool: { name: event.name, params: event.params, approved: event.approved },
+        key: `tool-${i}`
+      }
+      if (nextEvent?.type === "tool_result" && nextEvent.name === event.name) {
+        toolGroup.result = nextEvent.result
+        i++
+      }
+      processedEvents.push(toolGroup)
+    }
+  }
+
+  const toolGroups = processedEvents.filter(e => e.type === "tool_group")
 
   return (
-    <div className="flex gap-3 group">
-      {/* Agent Avatar - Solid violet, no gradient */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shadow-md">
-        <Bot className="h-4 w-4 text-white" />
+    <div className="flex gap-2.5 group">
+      {/* Agent Avatar - matches h-10 message height */}
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center">
+        <Sparkles className="h-5 w-5 text-white" />
       </div>
 
-      <div className="flex-1 min-w-0 space-y-3">
-        {/* Agent Name Badge */}
+      {/* Content - limited width for chat bubble feel */}
+      <div className="flex-1 min-w-0 max-w-[85%] space-y-2">
+        {/* Agent Name */}
         {message.agentName && (
-          <Badge className="gap-1.5 bg-violet-600 text-white border-0 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-pulse" />
+          <Badge className="gap-1.5 bg-violet-500/20 text-violet-300 border border-violet-500/30 text-[10px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
             {message.agentName}
           </Badge>
         )}
 
-        {/* Routing Events */}
-        {routingEvents.map((event, i) => (
-          <RoutingBlock key={`routing-${i}`} service={event.service} capability={event.capability} />
-        ))}
-
-        {/* Thinking Events */}
-        {thinkingEvents.map((event, i) => (
-          <ThinkingBlock key={`thinking-${i}`} content={event.content} />
-        ))}
-
-        {/* Tool Events - Wrapped in Activity Summary */}
-        {toolGroups.length > 0 && (
-          displayMode === "compact" ? (
-            <ActivitySummaryBlock events={events}>
-              {toolGroups.map((group, i) => (
-                <MCPToolBlock
-                  key={`tool-${i}`}
-                  name={group.tool.name}
-                  params={group.tool.params}
-                  result={group.result}
-                  hasResult={group.result !== undefined}
-                  onApproval={(approved) => handleApproval(group.tool.name, approved)}
-                  approvalState={getApprovalState(group.tool.name)}
-                />
-              ))}
-            </ActivitySummaryBlock>
-          ) : (
-            <div className="space-y-3">
-              {toolGroups.map((group, i) => (
-                <MCPToolBlock
-                  key={`tool-${i}`}
-                  name={group.tool.name}
-                  params={group.tool.params}
-                  result={group.result}
-                  hasResult={group.result !== undefined}
-                  onApproval={(approved) => handleApproval(group.tool.name, approved)}
-                  approvalState={getApprovalState(group.tool.name)}
-                />
-              ))}
-            </div>
-          )
+        {/* Events */}
+        {displayMode === "compact" ? (
+          <>
+            {processedEvents.filter(e => e.type !== "tool_group").map((event) => {
+              if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={event.thinking} />
+              if (event.type === "thinking") return <ThinkingBlock key={event.key} content={event.content} />
+              if (event.type === "tool_approval_required") {
+                const approvalState = pendingApprovals.get(event.approval_id)
+                const isPending = approvalState === undefined || approvalState === null
+                return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} onApproval={(approved) => onToolApproval?.(event.approval_id, approved)} isPending={isPending} />
+              }
+              if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
+              return null
+            })}
+            {toolGroups.length > 0 && (
+              <ActivitySummaryBlock events={events}>
+                {toolGroups.map((group) => group.type === "tool_group" && (
+                  <MCPToolBlock key={group.key} name={group.tool.name} params={group.tool.params} result={group.result} hasResult={group.result !== undefined} onApproval={(approved) => handleApproval(group.tool.name, approved)} approvalState={group.tool.approved === true ? true : getApprovalState(group.tool.name)} />
+                ))}
+              </ActivitySummaryBlock>
+            )}
+          </>
+        ) : (
+          processedEvents.map((event) => {
+            if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={event.thinking} />
+            if (event.type === "thinking") return <ThinkingBlock key={event.key} content={event.content} />
+            if (event.type === "tool_approval_required") {
+              const approvalState = pendingApprovals.get(event.approval_id)
+              const isPending = approvalState === undefined || approvalState === null
+              return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} onApproval={(approved) => onToolApproval?.(event.approval_id, approved)} isPending={isPending} />
+            }
+            if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
+            if (event.type === "tool_group") return <MCPToolBlock key={event.key} name={event.tool.name} params={event.tool.params} result={event.result} hasResult={event.result !== undefined} onApproval={(approved) => handleApproval(event.tool.name, approved)} approvalState={event.tool.approved === true ? true : getApprovalState(event.tool.name)} />
+            return null
+          })
         )}
 
-        {/* Final Content - Speech Bubble with improved contrast */}
+        {/* Final Content - Markdown rendered */}
         {message.content && (
           <div className="space-y-2">
-            <div className={cn(
-              "relative inline-block max-w-[95%]",
-              // Light theme: solid light gray background
-              // Dark theme: solid dark background
-              "bg-slate-100 dark:bg-zinc-800",
-              "rounded-2xl rounded-tl-md",
-              "px-4 py-3",
-              "shadow-sm"
-            )}>
-              <div className={cn(
-                "prose prose-sm max-w-none text-[13px] leading-relaxed",
-                // Light theme prose colors
-                "prose-p:my-3 prose-p:leading-relaxed",
-                "prose-pre:bg-slate-200 dark:prose-pre:bg-zinc-900",
-                "prose-pre:text-slate-700 dark:prose-pre:text-zinc-300 prose-pre:text-xs",
-                "prose-code:bg-slate-200 dark:prose-code:bg-zinc-700",
-                "prose-code:text-violet-700 dark:prose-code:text-emerald-400",
-                "prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-normal",
-                "prose-code:before:content-none prose-code:after:content-none",
-                "prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2",
-                "prose-ul:my-3 prose-ul:list-disc prose-ul:pl-5",
-                "prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-5",
-                "prose-li:my-1",
-                "prose-strong:text-slate-800 dark:prose-strong:text-zinc-200",
-                "text-slate-700 dark:text-zinc-200"
-              )}>
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                  {message.content}
-                </ReactMarkdown>
+            <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+              <div className="px-4 py-3">
+                  <div className={cn(
+                    "prose prose-sm prose-invert max-w-none",
+                    "text-[13px] leading-relaxed text-zinc-200",
+                    // Headings - clear hierarchy
+                    "prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
+                    "prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",
+                    "prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2",
+                    "prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1.5",
+                    // Paragraphs
+                    "prose-p:my-2 prose-p:leading-relaxed",
+                    // Lists
+                    "prose-ul:my-2 prose-ul:pl-4",
+                    "prose-ol:my-2 prose-ol:pl-4",
+                    "prose-li:my-0.5 prose-li:marker:text-zinc-500",
+                    // Code
+                    "prose-code:bg-zinc-700/60 prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:font-normal",
+                    "prose-code:before:content-none prose-code:after:content-none",
+                    "prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-700/50 prose-pre:rounded-lg prose-pre:text-zinc-300",
+                    // Strong/emphasis
+                    "prose-strong:text-zinc-100 prose-strong:font-semibold",
+                    "prose-em:text-zinc-300",
+                    // Links
+                    "prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
+                    // Blockquotes
+                    "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-300",
+                    // Tables
+                    "prose-table:border prose-table:border-zinc-700/50",
+                    "prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-200 prose-th:font-medium",
+                    "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-700/50"
+                  )}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
               </div>
             </div>
-
-            {/* Message Actions - shown on hover */}
             <MessageActions content={message.content} messageId={message.id} />
           </div>
         )}

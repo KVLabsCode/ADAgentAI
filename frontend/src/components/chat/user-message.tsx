@@ -12,20 +12,24 @@ interface UserMessageProps {
 export function UserMessage({ content }: UserMessageProps) {
   const { user } = useUser()
 
+  // Check if content is short (single line)
+  const isShort = content.length <= 80 && !content.includes('\n')
+
   return (
-    <div className="flex gap-3 justify-end">
+    <div className="flex gap-2.5 justify-end">
       <div
         className={cn(
           "max-w-[80%]",
-          // Light theme: blue-tinted background for user messages
-          // Dark theme: slate/blue tinted background
-          "bg-blue-100 dark:bg-slate-700",
-          "rounded-2xl rounded-tr-sm",
-          "px-4 py-2.5",
-          "shadow-sm"
+          "bg-sky-900/80 border border-sky-700/50",
+          "rounded-lg",
+          // Match card height for short messages, allow expansion for longer
+          isShort ? "h-10 px-3 flex items-center" : "px-3 py-2.5"
         )}
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-700 dark:text-slate-100">
+        <p className={cn(
+          "text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-100",
+          isShort && "truncate"
+        )}>
           {content}
         </p>
       </div>
@@ -33,13 +37,13 @@ export function UserMessage({ content }: UserMessageProps) {
         <Image
           src={user.avatar}
           alt={user.name}
-          width={28}
-          height={28}
-          className="flex-shrink-0 w-7 h-7 rounded-full object-cover shadow-sm"
+          width={40}
+          height={40}
+          className="flex-shrink-0 w-10 h-10 rounded-full object-cover"
         />
       ) : (
-        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shadow-sm">
-          <User className="h-4 w-4 text-slate-500 dark:text-slate-300" />
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-sky-600 flex items-center justify-center">
+          <User className="h-5 w-5 text-white" />
         </div>
       )}
     </div>

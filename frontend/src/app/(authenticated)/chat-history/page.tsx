@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Search, Download, Trash2, MessageSquare, MoreHorizontal, Loader2 } from "lucide-react"
+import { Search, Download, Trash2, MessageSquare, MoreHorizontal, Loader2, X, CheckSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { cn } from "@/lib/utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +16,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
@@ -35,16 +36,16 @@ interface ChatHistoryItem {
 
 function stripMarkdown(text: string): string {
   return text
-    .replace(/^#{1,6}\s+/gm, '') // Remove headers
-    .replace(/\*\*(.+?)\*\*/g, '$1') // Bold **text**
-    .replace(/\*(.+?)\*/g, '$1') // Italic *text*
-    .replace(/__(.+?)__/g, '$1') // Bold __text__
-    .replace(/_(.+?)_/g, '$1') // Italic _text_
-    .replace(/^[\s]*[-*+]\s+/gm, '') // Bullet points
-    .replace(/^\d+\.\s+/gm, '') // Numbered lists
-    .replace(/`(.+?)`/g, '$1') // Inline code
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Links [text](url)
-    .replace(/\n+/g, ' ') // Collapse newlines to spaces
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    .replace(/^[\s]*[-*+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/\n+/g, ' ')
     .trim()
 }
 
@@ -64,6 +65,12 @@ export default function ChatHistoryPage() {
   const [chats, setChats] = React.useState<ChatHistoryItem[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+  const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null)
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
 
   // Fetch chat sessions from API
   const fetchChats = React.useCallback(async () => {
@@ -98,6 +105,57 @@ export default function ChatHistoryPage() {
       chat.preview.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Selection handlers
+  const handleSelect = (chatId: string, event: React.MouseEvent) => {
+    const newSelected = new Set(selectedIds)
+
+    if (event.shiftKey && lastSelectedId) {
+      // Shift-click: select range
+      const chatIds = filteredChats.map(c => c.id)
+      const lastIndex = chatIds.indexOf(lastSelectedId)
+      const currentIndex = chatIds.indexOf(chatId)
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex)
+        const end = Math.max(lastIndex, currentIndex)
+
+        for (let i = start; i <= end; i++) {
+          newSelected.add(chatIds[i])
+        }
+      }
+    } else if (event.ctrlKey || event.metaKey) {
+      // Ctrl/Cmd-click: toggle individual
+      if (newSelected.has(chatId)) {
+        newSelected.delete(chatId)
+      } else {
+        newSelected.add(chatId)
+      }
+    } else {
+      // Regular click on checkbox: toggle individual
+      if (newSelected.has(chatId)) {
+        newSelected.delete(chatId)
+      } else {
+        newSelected.add(chatId)
+      }
+    }
+
+    setSelectedIds(newSelected)
+    setLastSelectedId(chatId)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredChats.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredChats.map(c => c.id)))
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    setLastSelectedId(null)
+  }
+
   const handleDelete = async (chatId: string) => {
     try {
       const response = await fetch(`${API_URL}/api/chat/session/${chatId}`, {
@@ -107,9 +165,35 @@ export default function ChatHistoryPage() {
 
       if (response.ok) {
         setChats(prev => prev.filter(c => c.id !== chatId))
+        selectedIds.delete(chatId)
+        setSelectedIds(new Set(selectedIds))
       }
     } catch (error) {
       console.error('Failed to delete chat:', error)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true)
+    try {
+      // Delete all selected chats
+      const deletePromises = Array.from(selectedIds).map(id =>
+        fetch(`${API_URL}/api/chat/session/${id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+      )
+
+      await Promise.all(deletePromises)
+
+      setChats(prev => prev.filter(c => !selectedIds.has(c.id)))
+      setSelectedIds(new Set())
+      setLastSelectedId(null)
+    } catch (error) {
+      console.error('Failed to delete chats:', error)
+    } finally {
+      setIsDeleting(false)
+      setShowBulkDeleteDialog(false)
     }
   }
 
@@ -136,6 +220,9 @@ export default function ChatHistoryPage() {
     }
   }
 
+  const isAllSelected = filteredChats.length > 0 && selectedIds.size === filteredChats.length
+  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < filteredChats.length
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -146,9 +233,10 @@ export default function ChatHistoryPage() {
 
   return (
     <div className="flex flex-col gap-5 p-6 max-w-3xl mx-auto">
+      {/* Header */}
       <div className="space-y-0.5">
-        <h1 className="text-lg font-semibold tracking-tight">Chat History</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-base font-medium tracking-tight">Chat History</h1>
+        <p className="text-xs text-muted-foreground/80">
           Browse and manage your conversations.
         </p>
       </div>
@@ -163,6 +251,20 @@ export default function ChatHistoryPage() {
           className="pl-8 h-8 text-sm"
         />
       </div>
+
+      {/* Select All Row - only show when there are chats */}
+      {filteredChats.length > 0 && (
+        <div className="flex items-center gap-2 -mt-2">
+          <Checkbox
+            checked={isAllSelected}
+            onCheckedChange={handleSelectAll}
+            className="h-3.5 w-3.5"
+          />
+          <span className="text-[11px] text-muted-foreground">
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+          </span>
+        </div>
+      )}
 
       {/* Chat List */}
       {filteredChats.length === 0 ? (
@@ -186,79 +288,161 @@ export default function ChatHistoryPage() {
         </div>
       ) : (
         <div className="space-y-1">
-          {filteredChats.map((chat) => (
-            <div
-              key={chat.id}
-              className="group relative flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
-            >
-              <Link href={`/chat/${chat.id}`} className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-medium truncate group-hover:text-foreground transition-colors">
-                    {chat.title}
-                  </h3>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {formatRelativeDate(chat.date)}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                  {stripMarkdown(chat.preview)}
-                </p>
-              </Link>
+          {filteredChats.map((chat) => {
+            const isSelected = selectedIds.has(chat.id)
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-xs">
-                    <Download className="h-3 w-3 mr-2" />
-                    Export as MD
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport(chat.id, "json")} className="text-xs">
-                    <Download className="h-3 w-3 mr-2" />
-                    Export as JSON
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem
-                        onSelect={(e) => e.preventDefault()}
-                        className="text-xs text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-3 w-3 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-base">Delete conversation?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-sm">
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="h-8 text-xs">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(chat.id)}
-                          className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
+            return (
+              <div
+                key={chat.id}
+                className={cn(
+                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                  isSelected
+                    ? "bg-primary/5"
+                    : "hover:bg-muted/50"
+                )}
+              >
+                {/* Checkbox - visible on hover or when selected */}
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => {}}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleSelect(chat.id, e)
+                  }}
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 transition-opacity",
+                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  )}
+                />
+
+                {/* Chat content - clickable link */}
+                <Link
+                  href={`/chat/${chat.id}`}
+                  className="flex-1 min-w-0"
+                  onClick={(e) => {
+                    // Prevent navigation if shift or ctrl is held
+                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                      e.preventDefault()
+                      handleSelect(chat.id, e)
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-medium truncate group-hover:text-foreground transition-colors">
+                      {chat.title}
+                    </h3>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {formatRelativeDate(chat.date)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                    {stripMarkdown(chat.preview)}
+                  </p>
+                </Link>
+
+                {/* Dropdown menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-xs">
+                      <Download className="h-3 w-3 mr-2" />
+                      Export as MD
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport(chat.id, "json")} className="text-xs">
+                      <Download className="h-3 w-3 mr-2" />
+                      Export as JSON
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => handleDelete(chat.id)}
+                      className="text-xs text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )
+          })}
         </div>
       )}
+
+      {/* Floating action bar when items selected */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-full shadow-xl">
+            <div className="flex items-center gap-2 text-sm text-zinc-300">
+              <CheckSquare className="h-4 w-4 text-violet-400" />
+              <span className="font-medium">{selectedIds.size}</span>
+              <span className="text-zinc-500">selected</span>
+            </div>
+
+            <div className="w-px h-4 bg-zinc-700 mx-1" />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear
+            </Button>
+
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteDialog(true)}
+              className="h-7 px-3 text-xs"
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk delete confirmation dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base">
+              Delete {selectedIds.size} conversation{selectedIds.size > 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              This action cannot be undone. All selected conversations will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-8 text-xs" disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+              className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedIds.size} conversation${selectedIds.size > 1 ? 's' : ''}`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

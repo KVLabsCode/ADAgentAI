@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node ../scripts/kill-ports.js && concurrently --names \"next,api,agent\" -c \"cyan,yellow,magenta\" \"next dev\" \"cd ../backend/api && bun --hot src/index.ts\" \"cd ../backend && python chat_server.py\"",
-    "dev:clean": "node ../scripts/kill-ports.js",
+    "dev": "node scripts/kill-ports.js && concurrently --names \"next,api,agent\" -c \"cyan,yellow,magenta\" \"next dev\" \"cd ../backend/api && bun --hot src/index.ts\" \"cd ../backend && python chat_server.py\"",
+    "dev:clean": "node scripts/kill-ports.js",
     "dev:frontend": "next dev",
     "dev:backend": "cd ../backend/api && bun --hot src/index.ts",
     "dev:agent": "cd ../backend && python chat_server.py",
@@ -13,6 +13,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ag-ui/client": "^0.0.42",
+    "@copilotkit/react-core": "^1.50.1",
+    "@copilotkit/react-ui": "^1.50.1",
+    "@copilotkit/runtime": "^1.50.1",
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "^16.1.1",

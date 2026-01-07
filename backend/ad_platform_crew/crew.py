@@ -68,13 +68,23 @@ class AdPlatformCrew:
             agent=primary_agent,
         )
 
+        # Configure memory
+        memory_config = None
+        if settings.crew.memory.enabled:
+            memory_config = {
+                "short_term": settings.crew.memory.short_term,
+                "long_term": settings.crew.memory.long_term,
+                "entity": settings.crew.memory.entity,
+            }
+
         return Crew(
             agents=[primary_agent],
             tasks=[process_task],
             process=Process.sequential,
             verbose=settings.crew.verbose,
             chat_llm=settings.crew.chat_llm,
-            memory=settings.crew.memory,
+            memory=settings.crew.memory.enabled,
+            memory_config=memory_config,
             cache=settings.crew.cache,
         )
 
@@ -110,6 +120,15 @@ class AdPlatformCrew:
             agent=orchestrator,
         )
 
+        # Configure memory
+        memory_config = None
+        if settings.crew.memory.enabled:
+            memory_config = {
+                "short_term": settings.crew.memory.short_term,
+                "long_term": settings.crew.memory.long_term,
+                "entity": settings.crew.memory.entity,
+            }
+
         return Crew(
             agents=[orchestrator] + specialists,
             tasks=[task],
@@ -117,7 +136,8 @@ class AdPlatformCrew:
             manager_agent=orchestrator,
             verbose=settings.crew.verbose,
             chat_llm=settings.crew.chat_llm,
-            memory=settings.crew.memory,
+            memory=settings.crew.memory.enabled,
+            memory_config=memory_config,
             cache=settings.crew.cache,
         )
 

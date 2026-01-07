@@ -6,7 +6,7 @@ import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
-import { streamChat, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
+import { streamChat, approveTool, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
 import { authClient } from "@/lib/auth-client"
 import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
@@ -28,18 +28,39 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
 
-  // Tool approval state: Map<messageId, Map<toolName, approved | null>>
-  const [pendingApprovals, setPendingApprovals] = React.useState<Map<string, Map<string, boolean | null>>>(new Map())
+  // Tool approval state: Map<approvalId, approved | null>
+  const [pendingApprovals, setPendingApprovals] = React.useState<Map<string, boolean | null>>(new Map())
 
-  // Handle tool approval from user
-  const handleToolApproval = React.useCallback((messageId: string, toolName: string, approved: boolean) => {
+  // Handle tool approval from user - calls backend API and updates local state
+  const handleToolApproval = React.useCallback(async (approvalId: string, approved: boolean) => {
+    // Optimistically update UI
     setPendingApprovals(prev => {
       const newMap = new Map(prev)
-      const messageApprovals = new Map(newMap.get(messageId) || new Map())
-      messageApprovals.set(toolName, approved)
-      newMap.set(messageId, messageApprovals)
+      newMap.set(approvalId, approved)
       return newMap
     })
+
+    // Call backend API to actually approve/deny the tool
+    try {
+      const success = await approveTool(approvalId, approved)
+      if (!success) {
+        console.error(`Failed to ${approved ? 'approve' : 'deny'} tool`)
+        // Revert on failure
+        setPendingApprovals(prev => {
+          const newMap = new Map(prev)
+          newMap.set(approvalId, null)
+          return newMap
+        })
+      }
+    } catch (error) {
+      console.error('Error calling approveTool:', error)
+      // Revert on error
+      setPendingApprovals(prev => {
+        const newMap = new Map(prev)
+        newMap.set(approvalId, null)
+        return newMap
+      })
+    }
   }, [])
 
   const hasProviders = providers.some(p => p.status === "connected")
@@ -150,9 +171,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     await streamChat(
       content,
       {
-        onRouting: (service, capability) => {
-          // Add routing event to show the decision process
-          events.push({ type: "routing", service, capability })
+        onRouting: (service, capability, thinking) => {
+          // Add routing event to show the decision process (with optional thinking)
+          events.push({ type: "routing", service, capability, thinking })
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
@@ -181,7 +202,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             )
           )
         },
-        onToolCall: (tool, inputPreview, inputFull) => {
+        onToolCall: (tool, inputPreview, inputFull, approved) => {
           let params: Record<string, unknown> = {}
           try {
             const inputStr = inputFull || inputPreview
@@ -192,8 +213,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             params = { input: inputPreview }
           }
 
-          // Add to sequential events
-          events.push({ type: "tool", name: tool, params })
+          // Add to sequential events (include approved flag for dangerous tools that were approved)
+          events.push({ type: "tool", name: tool, params, approved })
           // Also track for legacy saving
           toolCalls.push({ name: tool, params })
 
@@ -230,7 +251,47 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             )
           )
         },
+        onToolApprovalRequired: (approvalId, toolName, toolInput) => {
+          // Add approval request event for UI display
+          events.push({ type: "tool_approval_required", approval_id: approvalId, tool_name: toolName, tool_input: toolInput })
+          // Mark as pending in approval state
+          setPendingApprovals(prev => {
+            const newMap = new Map(prev)
+            newMap.set(approvalId, null) // null = pending
+            return newMap
+          })
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, events: [...events] }
+                : m
+            )
+          )
+        },
+        onToolDenied: (toolName, reason) => {
+          // Add denied event for UI display
+          events.push({ type: "tool_denied", tool_name: toolName, reason })
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, events: [...events] }
+                : m
+            )
+          )
+        },
+        onContent: (chunk) => {
+          // Append streaming content chunk to the message
+          finalContent += chunk
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, content: finalContent }
+                : m
+            )
+          )
+        },
         onResult: (resultContent) => {
+          // Final result - overwrite with complete content
           finalContent = resultContent
           setMessages(prev =>
             prev.map(m =>

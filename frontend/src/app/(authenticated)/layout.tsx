@@ -9,6 +9,9 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 
+// CopilotKit styles (provider moved to chat pages only)
+import "@copilotkit/react-ui/styles.css"
+
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
@@ -96,6 +99,7 @@ export default function AuthenticatedLayout({
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/40 px-3">
           <SidebarTrigger className="md:hidden" />
+          <div className="flex-1" />
           <ThemeToggle />
         </header>
         <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">

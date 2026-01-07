@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ADAgent AI",
+  title: "ADAgentAI",
   description: "AI-powered ad platform management",
 };
 

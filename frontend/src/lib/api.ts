@@ -5,10 +5,11 @@
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5000";
 
 export interface StreamEvent {
-  type: "routing" | "agent" | "thought" | "tool" | "tool_result" | "result" | "error" | "done";
+  type: "routing" | "agent" | "thinking" | "tool" | "tool_result" | "tool_approval_required" | "tool_denied" | "result" | "content" | "error" | "done";
   content?: string;
   service?: string;
   capability?: string;
+  thinking?: string;  // Router's reasoning for routing decision
   agent?: string;
   task?: string;
   tool?: string;
@@ -18,14 +19,23 @@ export interface StreamEvent {
   full?: string;
   data_type?: string;
   is_truncated?: boolean;
+  // Approval-related fields
+  approval_id?: string;
+  tool_name?: string;
+  tool_input?: string;
+  reason?: string;
+  approved?: boolean;
 }
 
 export interface ChatStreamCallbacks {
-  onRouting?: (service: string, capability: string) => void;
+  onRouting?: (service: string, capability: string, thinking?: string) => void;
   onAgent?: (agent: string, task: string) => void;
   onThinking?: (content: string) => void;
-  onToolCall?: (tool: string, inputPreview: string, inputFull?: string) => void;
+  onToolCall?: (tool: string, inputPreview: string, inputFull?: string, approved?: boolean) => void;
   onToolResult?: (preview: string, full?: string, dataType?: string) => void;
+  onToolApprovalRequired?: (approvalId: string, toolName: string, toolInput: string) => void;
+  onToolDenied?: (toolName: string, reason: string) => void;
+  onContent?: (chunk: string) => void;  // Streaming content chunks
   onResult?: (content: string) => void;
   onError?: (error: string) => void;
   onDone?: () => void;
@@ -139,23 +149,37 @@ export async function streamChat(
 function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
   switch (event.type) {
     case "routing":
-      callbacks.onRouting?.(event.service || "", event.capability || "");
+      callbacks.onRouting?.(event.service || "", event.capability || "", event.thinking);
       break;
     case "agent":
       callbacks.onAgent?.(event.agent || "", event.task || "");
       break;
-    case "thought":
+    case "thinking":
       callbacks.onThinking?.(event.content || "");
       break;
     case "tool":
       callbacks.onToolCall?.(
         event.tool || "",
         event.input_preview || "",
-        event.input_full
+        event.input_full,
+        event.approved
       );
       break;
     case "tool_result":
       callbacks.onToolResult?.(event.preview || "", event.full, event.data_type);
+      break;
+    case "tool_approval_required":
+      callbacks.onToolApprovalRequired?.(
+        event.approval_id || "",
+        event.tool_name || "",
+        event.tool_input || ""
+      );
+      break;
+    case "tool_denied":
+      callbacks.onToolDenied?.(event.tool_name || "", event.reason || "User denied");
+      break;
+    case "content":
+      callbacks.onContent?.(event.content || "");
       break;
     case "result":
       callbacks.onResult?.(event.content || "");
@@ -164,5 +188,34 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       callbacks.onError?.(event.content || "Unknown error");
       break;
     // "done" is handled inline in streamChat to prevent duplicate calls
+  }
+}
+
+/**
+ * Approve or deny a dangerous tool execution
+ */
+export async function approveTool(approvalId: string, approved: boolean): Promise<boolean> {
+  try {
+    const response = await fetch(`${AGENT_URL}/chat/approve-tool`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        approval_id: approvalId,
+        approved,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`[approveTool] HTTP ${response.status}: ${response.statusText}`);
+      return false;
+    }
+
+    const result = await response.json();
+    return result.success === true;
+  } catch (error) {
+    console.error("[approveTool] Error:", error);
+    return false;
   }
 }

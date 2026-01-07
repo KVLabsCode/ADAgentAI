@@ -1,9 +1,11 @@
 // Sequential event types for streaming
 export type StreamEventItem =
-  | { type: "routing"; service: string; capability: string }
+  | { type: "routing"; service: string; capability: string; thinking?: string }
   | { type: "thinking"; content: string }
-  | { type: "tool"; name: string; params: Record<string, unknown> }
+  | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean }
   | { type: "tool_result"; name: string; result: unknown }
+  | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string }
+  | { type: "tool_denied"; tool_name: string; reason: string }
 
 export interface Message {
   id: string

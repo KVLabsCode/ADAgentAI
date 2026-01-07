@@ -70,7 +70,7 @@ function transformPost(post: SanityBlogPost): BlogPost {
     date: post.publishedAt || post.createdAt,
     readTime: calculateReadTime(post.content || ""),
     author: {
-      name: post.authorName || "ADAgent Team",
+      name: post.authorName || "ADAgentAI Team",
       role: post.authorRole || "",
       image: post.authorImage,
     },

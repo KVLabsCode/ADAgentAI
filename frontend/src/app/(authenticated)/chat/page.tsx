@@ -31,11 +31,10 @@ export default function ChatPage() {
         if (response.ok) {
           const data = await response.json() as { providers: ApiProvider[] }
 
-          // Map API response to frontend Provider type
           const mappedProviders: Provider[] = data.providers.map((p) => ({
             id: p.id,
             type: p.type,
-            status: "connected" as const, // API only returns connected providers
+            status: "connected" as const,
             displayName: p.name,
             identifiers: p.type === "admob"
               ? { publisherId: p.identifier }

@@ -236,7 +236,7 @@ function BillingContent() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+      <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
         <div className="space-y-0.5">
           <h1 className="text-base font-medium tracking-tight">Billing</h1>
           <p className="text-xs text-muted-foreground/80">
@@ -257,7 +257,7 @@ function BillingContent() {
 
   if (loadError) {
     return (
-      <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+      <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
         <div className="space-y-0.5">
           <h1 className="text-base font-medium tracking-tight">Billing</h1>
           <p className="text-xs text-muted-foreground/80">
@@ -288,7 +288,7 @@ function BillingContent() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       {/* Status Message */}
       {statusMessage && (
         <div className={cn(
@@ -593,7 +593,7 @@ function BillingContent() {
 
 function BillingLoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       <div className="space-y-0.5">
         <h1 className="text-base font-medium tracking-tight">Billing</h1>
         <p className="text-xs text-muted-foreground/80">

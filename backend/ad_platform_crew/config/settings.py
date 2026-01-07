@@ -55,11 +55,26 @@ class MCPConfig:
 
 
 @dataclass
+class MemoryConfig:
+    """Memory configuration for CrewAI agents."""
+
+    enabled: bool = True
+    short_term: bool = True  # Remember within single run (no embeddings needed)
+    long_term: bool = False  # Remember across runs (requires embeddings)
+    entity: bool = True  # Remember entities like accounts, apps, ad units
+
+    # Storage path for persistent memory
+    storage_path: Path = field(
+        default_factory=lambda: Path(__file__).parent.parent.parent / ".memory"
+    )
+
+
+@dataclass
 class CrewConfig:
     """Crew execution configuration."""
 
     verbose: bool = True
-    memory: bool = False  # Disabled to avoid OpenAI dependency
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
     cache: bool = True
     max_rpm: int = 10
     max_iterations: int = 15
@@ -88,7 +103,12 @@ class Settings:
             ),
             crew=CrewConfig(
                 verbose=os.getenv("CREW_VERBOSE", "true").lower() == "true",
-                memory=os.getenv("CREW_MEMORY", "false").lower() == "true",
+                memory=MemoryConfig(
+                    enabled=os.getenv("CREW_MEMORY", "true").lower() == "true",
+                    short_term=os.getenv("CREW_MEMORY_SHORT_TERM", "true").lower() == "true",
+                    long_term=os.getenv("CREW_MEMORY_LONG_TERM", "false").lower() == "true",
+                    entity=os.getenv("CREW_MEMORY_ENTITY", "true").lower() == "true",
+                ),
             ),
         )
 

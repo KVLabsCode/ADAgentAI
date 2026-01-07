@@ -92,6 +92,23 @@ class MCPClient:
         Returns:
             MCPResponse with the result or error
         """
+        # Check if tool was blocked by user (denied approval)
+        try:
+            from chat.approval.handlers import is_tool_blocked
+            blocked, reason = is_tool_blocked(tool_name)
+            if blocked:
+                print(f"[MCPClient] Tool '{tool_name}' was blocked: {reason}")
+                return MCPResponse(
+                    success=False,
+                    data=None,
+                    error=f"USER DENIED: The user explicitly chose to BLOCK execution of '{tool_name}'. "
+                          f"This is NOT a technical error or API permission issue - the human user reviewed "
+                          f"this tool request and decided NOT to allow it. Reason: {reason}. "
+                          f"Acknowledge the user's decision and do NOT retry or work around this denial."
+                )
+        except ImportError:
+            pass  # Approval module not available, proceed normally
+
         # Get a client with current user context (reads CURRENT_USER_ID env var)
         api_client = self._get_api_client()
 

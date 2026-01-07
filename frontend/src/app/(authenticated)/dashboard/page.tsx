@@ -79,7 +79,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       {/* Welcome */}
       <div className="space-y-0.5">
         <h1 className="text-base font-medium tracking-tight">

@@ -176,7 +176,7 @@ function ProvidersContent() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       {/* Status Message */}
       {statusMessage && (
         <div className={cn(
@@ -361,7 +361,7 @@ function ProvidersContent() {
         <div className="px-3 py-2 border-b border-border/30">
           <h2 className="text-xs font-medium">Supported Platforms</h2>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            ADAgent currently supports these ad platforms.
+            ADAgentAI currently supports these ad platforms.
           </p>
         </div>
         <div className="p-2">
@@ -403,7 +403,7 @@ function ProvidersContent() {
 
 function ProvidersLoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-5 p-4 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
           <div className="h-4 w-40 bg-muted rounded animate-pulse" />

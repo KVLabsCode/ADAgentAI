@@ -21,7 +21,7 @@ export default function PublicLayout({
             <div className="flex h-6 w-6 items-center justify-center rounded bg-foreground text-background text-[10px] font-semibold">
               AD
             </div>
-            <span className="text-sm font-medium tracking-tight">ADAgent</span>
+            <span className="text-sm font-medium tracking-tight">ADAgentAI</span>
           </Link>
 
           <nav className="flex items-center gap-1">
@@ -62,7 +62,7 @@ export default function PublicLayout({
       <footer className="border-t border-border/40 py-6">
         <div className="container mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} ADAgent AI</p>
+            <p>&copy; {new Date().getFullYear()} ADAgentAI</p>
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-foreground transition-colors">
                 Privacy

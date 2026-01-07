@@ -10,15 +10,15 @@ import type { Message } from "@/lib/types"
 interface ChatMessagesProps {
   messages: Message[]
   isLoading?: boolean
-  onToolApproval?: (messageId: string, toolName: string, approved: boolean) => void
-  pendingApprovals?: Map<string, Map<string, boolean | null>>
+  onToolApproval?: (approvalId: string, approved: boolean) => void
+  pendingApprovals?: Map<string, boolean | null>  // Map of approval ID -> approval state
 }
 
 export function ChatMessages({
   messages,
   isLoading,
   onToolApproval,
-  pendingApprovals = new Map()
+  pendingApprovals
 }: ChatMessagesProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null)
 
@@ -45,11 +45,8 @@ export function ChatMessages({
             ) : message.role === "assistant" ? (
               <AssistantMessage
                 message={message}
-                onToolApproval={onToolApproval
-                  ? (toolName, approved) => onToolApproval(message.id, toolName, approved)
-                  : undefined
-                }
-                pendingApprovals={pendingApprovals.get(message.id)}
+                onToolApproval={onToolApproval}
+                pendingApprovals={pendingApprovals}
               />
             ) : null}
           </div>
