@@ -18,6 +18,7 @@ interface UserContextValue {
   getAccessToken: () => Promise<string | null>
   selectedOrganization: Organization | null
   selectedOrganizationId: string | null
+  selectedOrgRole: string | null // user's role in the selected org
   organizations: Organization[]
   selectOrganization: (orgId: string | null) => void
   createOrganization: (name: string) => Promise<Organization | null>
@@ -50,9 +51,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Initialize from localStorage synchronously to avoid cascading renders
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(getInitialOrgId)
 
-  // Use Neon Auth's built-in organization hook
-  // This is part of the Organization plugin that Neon Auth includes
+  // Use Neon Auth's built-in organization hooks
+  // useListOrganizations returns basic org info
+  // useActiveOrganization returns the active org with user's membership/role
   const { data: orgList, isPending: isLoadingOrgs } = authClient.useListOrganizations()
+  const { data: activeOrgData } = authClient.useActiveOrganization()
 
   // Get user from Neon Auth session
   const neonUser = session?.user
@@ -66,13 +69,36 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     role: 'user',
   } : null
 
+  // Get user's role from active organization data
+  // activeOrgData contains: { id, name, slug, logo, createdAt, members: [...] }
+  // where members includes the current user's membership with role
+  const activeOrgRole = React.useMemo(() => {
+    if (!activeOrgData || !neonUser) return null
+    // The active org data may have members array or activeMember
+    const data = activeOrgData as Record<string, unknown>
+    // Try activeMember first (direct membership info)
+    if (data.activeMember && typeof data.activeMember === 'object') {
+      const member = data.activeMember as { role?: string }
+      return member.role || null
+    }
+    // Try members array
+    if (Array.isArray(data.members)) {
+      const membership = data.members.find((m: { userId?: string }) => m.userId === neonUser.id)
+      return (membership as { role?: string })?.role || null
+    }
+    return null
+  }, [activeOrgData, neonUser])
+
   // Map organizations from Neon Auth hook
+  // Include role for the active organization
   const organizations: Organization[] = (orgList || []).map((org) => ({
     id: org.id,
     name: org.name,
     slug: org.slug,
     logo: org.logo ?? null,
     createdAt: org.createdAt instanceof Date ? org.createdAt.toISOString() : String(org.createdAt),
+    // Add role if this is the active organization
+    role: activeOrgData && (activeOrgData as { id?: string }).id === org.id ? activeOrgRole ?? undefined : undefined,
   }))
 
   // Find selected organization from list
@@ -177,6 +203,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     getAccessToken,
     selectedOrganization,
     selectedOrganizationId: selectedOrgId,
+    selectedOrgRole: activeOrgRole,
     organizations,
     selectOrganization,
     createOrganization,

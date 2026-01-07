@@ -73,7 +73,7 @@ const adminNavItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { toggleSidebar, state } = useSidebar()
-  const { user, isAdmin, signOut, selectedOrganization, organizations, selectOrganization, createOrganization } = useUser()
+  const { user, isAdmin, signOut, selectedOrganization, selectedOrgRole, organizations, selectOrganization, createOrganization } = useUser()
   const [mounted, setMounted] = useState(false)
   const [isCreatingOrg, setIsCreatingOrg] = useState(false)
 
@@ -154,6 +154,11 @@ export function AppSidebar() {
                 </div>
                 <span className="flex-1 text-left truncate text-xs group-data-[collapsible=icon]:hidden">
                   {selectedOrganization?.name || "Personal"}
+                  {selectedOrgRole && (
+                    <span className="ml-1 text-[10px] text-muted-foreground capitalize">
+                      ({selectedOrgRole})
+                    </span>
+                  )}
                 </span>
                 <ChevronDown className="h-3 w-3 text-muted-foreground group-data-[collapsible=icon]:hidden" />
               </button>

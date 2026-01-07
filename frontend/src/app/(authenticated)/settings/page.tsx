@@ -15,7 +15,7 @@ import { OrganizationMember } from "@/lib/types"
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { displayMode, setDisplayMode } = useChatSettings()
-  const { selectedOrganization, selectedOrganizationId, user } = useUser()
+  const { selectedOrganization, selectedOrganizationId, selectedOrgRole, user } = useUser()
   const [mounted, setMounted] = React.useState(false)
 
   // Organization management state
@@ -111,7 +111,8 @@ export default function SettingsPage() {
     }
   }
 
-  const currentUserRole = members.find(m => m.userId === user?.id)?.role
+  // Use role from members list, or fall back to context (from useActiveOrganization)
+  const currentUserRole = members.find(m => m.userId === user?.id)?.role || selectedOrgRole
   const canManageMembers = currentUserRole === "owner" || currentUserRole === "admin"
 
   const getRoleIcon = (role: string) => {
