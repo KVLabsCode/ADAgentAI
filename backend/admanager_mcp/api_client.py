@@ -41,28 +41,30 @@ class AdManagerClient:
     3. Falls back to service account credentials
     """
 
-    def __init__(self, user_id: Optional[str] = None):
+    def __init__(self, user_id: Optional[str] = None, organization_id: Optional[str] = None):
         """
         Initialize Ad Manager client.
 
         Args:
             user_id: Optional user ID for user-specific tokens (fetched from DB)
+            organization_id: Optional organization ID for org-scoped provider lookup
         """
         self._user_id = user_id
+        self._organization_id = organization_id
 
     async def _get_access_token(self) -> str:
         """Get a valid OAuth 2.0 access token via the token service."""
         try:
             from shared.token_service import get_access_token, TokenError
 
-            return await get_access_token("gam", user_id=self._user_id)
+            return await get_access_token("gam", user_id=self._user_id, organization_id=self._organization_id)
         except ImportError:
             # Fallback if shared module not available
             pass
         except Exception as e:
             raise AdManagerAPIError(
                 f"Token service error: {str(e)}",
-                details={"user_id": self._user_id}
+                details={"user_id": self._user_id, "organization_id": self._organization_id}
             )
 
         # Legacy fallback: direct env var
@@ -1355,7 +1357,7 @@ class AdManagerClient:
 _client: Optional[AdManagerClient] = None
 
 
-def get_client(user_id: Optional[str] = None) -> AdManagerClient:
+def get_client(user_id: Optional[str] = None, organization_id: Optional[str] = None) -> AdManagerClient:
     """
     Get or create an Ad Manager client instance.
 
@@ -1364,20 +1366,22 @@ def get_client(user_id: Optional[str] = None) -> AdManagerClient:
                  If provided, tokens are fetched from the API (auto-refreshed).
                  If None, checks CURRENT_USER_ID env var, then falls back to
                  env vars or service account.
+        organization_id: Optional organization ID for org-scoped provider lookup.
+                 If provided, fetches tokens for the organization scope.
+                 If None, checks CURRENT_ORGANIZATION_ID env var, then falls back to personal scope.
 
     Returns:
         AdManagerClient instance
     """
     global _client
 
-    # If user_id provided, create user-specific client
-    if user_id:
-        return AdManagerClient(user_id=user_id)
+    # Check for user_id and organization_id from environment (set by chat server)
+    env_user_id = user_id or os.environ.get("CURRENT_USER_ID")
+    env_org_id = organization_id or os.environ.get("CURRENT_ORGANIZATION_ID")
 
-    # Check for user_id from environment (set by chat server)
-    env_user_id = os.environ.get("CURRENT_USER_ID")
+    # If user context available, create user-specific client
     if env_user_id:
-        return AdManagerClient(user_id=env_user_id)
+        return AdManagerClient(user_id=env_user_id, organization_id=env_org_id)
 
     # Otherwise use global client for service account / env var auth
     if _client is None:

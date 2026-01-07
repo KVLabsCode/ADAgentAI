@@ -18,6 +18,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -124,6 +126,7 @@ function formatCurrency(amount: number, currency: string): string {
 function BillingContent() {
   const searchParams = useSearchParams()
   const { resolvedTheme } = useTheme()
+  const { getAccessToken } = useUser()
   const [subscription, setSubscription] = React.useState<Subscription | null>(null)
   const [usage, setUsage] = React.useState<Usage | null>(null)
   const [invoices, setInvoices] = React.useState<Invoice[]>([])
@@ -136,10 +139,11 @@ function BillingContent() {
   // Fetch billing data
   const fetchBillingData = React.useCallback(async () => {
     try {
+      const accessToken = await getAccessToken()
       const [subRes, usageRes, invoicesRes] = await Promise.all([
-        fetch(`${API_URL}/api/billing/subscription`, { credentials: 'include' }),
-        fetch(`${API_URL}/api/billing/usage`, { credentials: 'include' }),
-        fetch(`${API_URL}/api/billing/invoices`, { credentials: 'include' }),
+        authFetch(`${API_URL}/api/billing/subscription`, accessToken),
+        authFetch(`${API_URL}/api/billing/usage`, accessToken),
+        authFetch(`${API_URL}/api/billing/invoices`, accessToken),
       ])
 
       if (subRes.ok) {
@@ -158,7 +162,7 @@ function BillingContent() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [getAccessToken])
 
   React.useEffect(() => {
     fetchBillingData()
@@ -188,11 +192,10 @@ function BillingContent() {
     if (!priceId) return
     setIsUpgrading(priceId)
     try {
+      const accessToken = await getAccessToken()
       const theme = resolvedTheme === 'dark' ? 'dark' : 'light'
-      const response = await fetch(`${API_URL}/api/billing/checkout`, {
+      const response = await authFetch(`${API_URL}/api/billing/checkout`, accessToken, {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priceId, theme }),
       })
 
@@ -214,9 +217,9 @@ function BillingContent() {
   const handleManageSubscription = async () => {
     setIsOpeningPortal(true)
     try {
-      const response = await fetch(`${API_URL}/api/billing/portal`, {
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/billing/portal`, accessToken, {
         method: 'POST',
-        credentials: 'include',
       })
 
       if (!response.ok) throw new Error('Failed to get portal URL')
@@ -230,7 +233,6 @@ function BillingContent() {
     }
   }
 
-  const currentPlanName = subscription?.plan?.name?.toLowerCase() || 'free'
   const isPro = subscription?.hasSubscription && subscription.status === 'active'
   const usagePercent = usage ? Math.min((usage.chatMessages / (usage.limit.chatMessages || 1)) * 100, 100) : 0
 

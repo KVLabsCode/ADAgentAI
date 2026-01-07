@@ -16,9 +16,11 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const providerTypeEnum = pgEnum("provider_type", ["admob", "gam"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system"]);
 export const blogPostStatusEnum = pgEnum("blog_post_status", ["draft", "published"]);
+export const waitlistStatusEnum = pgEnum("waitlist_status", ["pending", "invited", "joined"]);
 
 // ============================================================
-// Better Auth Tables (required by better-auth)
+// User Tables (legacy - Neon Auth uses neon_auth schema instead)
+// These tables are kept for data migration purposes
 // ============================================================
 
 export const users = pgTable("users", {
@@ -76,13 +78,55 @@ export const verifications = pgTable("verifications", {
 });
 
 // ============================================================
+// Organization Tables (for app-level org management)
+// ============================================================
+
+export const organizations = pgTable("organizations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique(),
+  logo: text("logo"),
+  metadata: text("metadata"), // JSON string for custom metadata
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("organizations_slug_idx").on(table.slug),
+]);
+
+export const members = pgTable("members", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"), // owner, admin, member
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("members_organization_id_idx").on(table.organizationId),
+  index("members_user_id_idx").on(table.userId),
+]);
+
+export const invitations = pgTable("invitations", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected, expired
+  inviterId: text("inviter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("invitations_organization_id_idx").on(table.organizationId),
+  index("invitations_email_idx").on(table.email),
+]);
+
+// ============================================================
 // Application Tables
 // ============================================================
 
 // Connected Ad Platform Providers (AdMob, GAM)
+// Note: userId references Neon Auth users (neon_auth schema), not public.users
 export const connectedProviders = pgTable("connected_providers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(), // References neon_auth.users_sync.id (no FK constraint)
+  organizationId: text("organization_id"), // null = personal scope (no FK to legacy orgs)
   provider: providerTypeEnum("provider").notNull(),
 
   // Provider-specific identifiers
@@ -103,19 +147,23 @@ export const connectedProviders = pgTable("connected_providers", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("connected_providers_user_id_idx").on(table.userId),
+  index("connected_providers_organization_id_idx").on(table.organizationId),
   index("connected_providers_provider_idx").on(table.provider),
 ]);
 
 // Chat Sessions
+// Note: userId references Neon Auth users (neon_auth schema), not public.users
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(), // References neon_auth.users_sync.id (no FK constraint)
+  organizationId: text("organization_id"), // null = personal scope (no FK to legacy orgs)
   title: text("title").default("New Chat").notNull(),
   isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("chat_sessions_user_id_idx").on(table.userId),
+  index("chat_sessions_organization_id_idx").on(table.organizationId),
   index("chat_sessions_created_at_idx").on(table.createdAt),
 ]);
 
@@ -162,12 +210,40 @@ export const blogPosts = pgTable("blog_posts", {
 // Relations
 // ============================================================
 
+// Legacy users table relations (Better Auth - kept for migration)
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   accounts: many(accounts),
-  connectedProviders: many(connectedProviders),
-  chatSessions: many(chatSessions),
   blogPosts: many(blogPosts),
+  members: many(members),
+}));
+
+// Legacy organizations table relations (kept for migration)
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(members),
+  invitations: many(invitations),
+}));
+
+export const membersRelations = relations(members, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [members.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [members.userId],
+    references: [users.id],
+  }),
+}));
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [invitations.organizationId],
+    references: [organizations.id],
+  }),
+  inviter: one(users, {
+    fields: [invitations.inviterId],
+    references: [users.id],
+  }),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -184,18 +260,14 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
   }),
 }));
 
-export const connectedProvidersRelations = relations(connectedProviders, ({ one }) => ({
-  user: one(users, {
-    fields: [connectedProviders.userId],
-    references: [users.id],
-  }),
+// Note: No user relation - userId references Neon Auth users (neon_auth schema)
+export const connectedProvidersRelations = relations(connectedProviders, () => ({
+  // userId is stored as plain text referencing neon_auth.users_sync
+  // organizationId is stored as plain text (Neon Auth manages orgs)
 }));
 
-export const chatSessionsRelations = relations(chatSessions, ({ one, many }) => ({
-  user: one(users, {
-    fields: [chatSessions.userId],
-    references: [users.id],
-  }),
+// Note: No user/org relations - userId and organizationId reference Neon Auth (neon_auth schema)
+export const chatSessionsRelations = relations(chatSessions, ({ many }) => ({
   messages: many(messages),
 }));
 
@@ -213,6 +285,27 @@ export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
   }),
 }));
 
+// Waitlist
+export const waitlist = pgTable("waitlist", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  status: waitlistStatusEnum("status").default("pending").notNull(),
+  referralCode: varchar("referral_code", { length: 20 }).unique(),
+  referredBy: uuid("referred_by"),
+  position: uuid("position"),
+  // Survey fields
+  role: varchar("role", { length: 100 }), // e.g., "Publisher", "Developer", "Marketer"
+  useCase: text("use_case"), // What they want to use it for
+  invitedAt: timestamp("invited_at"),
+  joinedAt: timestamp("joined_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("waitlist_email_idx").on(table.email),
+  index("waitlist_status_idx").on(table.status),
+  index("waitlist_referral_code_idx").on(table.referralCode),
+]);
+
 // ============================================================
 // Type Exports
 // ============================================================
@@ -221,6 +314,12 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
+export type Organization = typeof organizations.$inferSelect;
+export type NewOrganization = typeof organizations.$inferInsert;
+export type Member = typeof members.$inferSelect;
+export type NewMember = typeof members.$inferInsert;
+export type Invitation = typeof invitations.$inferSelect;
+export type NewInvitation = typeof invitations.$inferInsert;
 export type ConnectedProvider = typeof connectedProviders.$inferSelect;
 export type NewConnectedProvider = typeof connectedProviders.$inferInsert;
 export type ChatSession = typeof chatSessions.$inferSelect;
@@ -229,3 +328,5 @@ export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type NewBlogPost = typeof blogPosts.$inferInsert;
+export type WaitlistEntry = typeof waitlist.$inferSelect;
+export type NewWaitlistEntry = typeof waitlist.$inferInsert;

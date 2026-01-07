@@ -1,17 +1,57 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, desc, and, count } from "drizzle-orm";
+import { eq, desc, and, count, isNull } from "drizzle-orm";
 
 import { db } from "../db";
 import { chatSessions, messages, type NewChatSession, type NewMessage } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { trackChatSession } from "../lib/analytics";
+import { validateToken } from "../lib/neon-auth";
 
 const chat = new Hono();
 
-// All chat routes require authentication
-chat.use("*", requireAuth);
+// Internal endpoint for Python chat server to validate tokens
+// This must be before the requireAuth middleware
+chat.post("/internal/validate-token", async (c) => {
+  // Verify internal API key
+  const apiKey = c.req.header("X-Internal-Key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json() as { token: string };
+  const { token } = body;
+
+  if (!token) {
+    return c.json({ error: "Token required" }, 400);
+  }
+
+  const user = await validateToken(token);
+  if (!user) {
+    return c.json({ error: "Invalid token" }, 401);
+  }
+
+  return c.json({
+    valid: true,
+    user: {
+      id: user.id,
+      email: user.email,
+      organizationId: user.organizationId,
+    },
+  });
+});
+
+// All other chat routes require authentication
+chat.use("*", async (c, next) => {
+  // Skip auth for internal endpoints
+  if (c.req.path.includes("/internal/")) {
+    return next();
+  }
+  return requireAuth(c, next);
+});
 
 // ============================================================
 // Schemas
@@ -42,15 +82,28 @@ const exportFormatSchema = z.object({
 
 /**
  * GET /chat/sessions - List user's chat history
+ * When in organization context, returns org-scoped sessions
+ * When in personal context, returns personal sessions (organizationId is null)
  */
 chat.get("/sessions", async (c) => {
   const user = c.get("user");
+  const organizationId = user.organizationId;
+
+  // Build filter based on organization context
+  const whereClause = organizationId
+    ? and(
+        eq(chatSessions.userId, user.id),
+        eq(chatSessions.organizationId, organizationId),
+        eq(chatSessions.isArchived, false)
+      )
+    : and(
+        eq(chatSessions.userId, user.id),
+        isNull(chatSessions.organizationId),
+        eq(chatSessions.isArchived, false)
+      );
 
   const sessions = await db.query.chatSessions.findMany({
-    where: and(
-      eq(chatSessions.userId, user.id),
-      eq(chatSessions.isArchived, false)
-    ),
+    where: whereClause,
     orderBy: [desc(chatSessions.updatedAt)],
     with: {
       messages: {
@@ -67,12 +120,14 @@ chat.get("/sessions", async (c) => {
       lastMessage: session.messages[0]?.content.slice(0, 100),
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+      organizationId: session.organizationId,
     })),
   });
 });
 
 /**
  * POST /chat/session - Create new chat session
+ * Associates with organization if in org context
  */
 chat.post(
   "/session",
@@ -80,11 +135,13 @@ chat.post(
   async (c) => {
     const user = c.get("user");
     const { title } = c.req.valid("json");
+    const organizationId = user.organizationId;
 
     const [session] = await db
       .insert(chatSessions)
       .values({
         userId: user.id,
+        organizationId: organizationId, // null = personal scope, otherwise org-scoped
         title: title || "New Chat",
       } satisfies NewChatSession)
       .returning();

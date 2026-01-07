@@ -3,6 +3,46 @@
  */
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+/**
+ * Create fetch headers with session token and optional organization context
+ */
+export function createAuthHeaders(
+  sessionToken: string | null,
+  organizationId?: string | null
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (sessionToken) {
+    headers["Authorization"] = `Bearer ${sessionToken}`;
+  }
+  if (organizationId) {
+    headers["x-organization-id"] = organizationId;
+  }
+  return headers;
+}
+
+/**
+ * Authenticated fetch wrapper for API calls
+ * Sends session token from Neon Auth for backend validation
+ */
+export async function authFetch(
+  url: string,
+  sessionToken: string | null,
+  options: RequestInit = {},
+  organizationId?: string | null
+): Promise<Response> {
+  const headers = createAuthHeaders(sessionToken, organizationId);
+  return fetch(url.startsWith("http") ? url : `${API_URL}${url}`, {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers || {}),
+    },
+  });
+}
 
 export interface StreamEvent {
   type: "routing" | "agent" | "thinking" | "tool" | "tool_result" | "tool_approval_required" | "tool_denied" | "result" | "content" | "error" | "done";
@@ -63,22 +103,36 @@ export async function streamChat(
   signal?: AbortSignal,
   userId?: string,
   history?: ChatHistoryMessage[],
-  context?: ChatContext
+  context?: ChatContext,
+  accessToken?: string | null,
+  organizationId?: string | null
 ): Promise<void> {
   const url = `${AGENT_URL}/chat/stream`;
   let doneHandled = false; // Prevent duplicate onDone calls
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    };
+
+    // Add access token for authenticated requests
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    // Add organization context for org-scoped operations
+    if (organizationId) {
+      headers["x-organization-id"] = organizationId;
+    }
+
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-      },
-      credentials: "include", // Send cookies for auth
+      headers,
       body: JSON.stringify({
         message,
         user_id: userId,
+        organization_id: organizationId, // Pass org to agent for provider lookup
         history: history || [],
         context: context || {},
       }),

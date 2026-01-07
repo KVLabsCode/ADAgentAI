@@ -10,7 +10,7 @@ from fastapi import Request
 API_URL = os.environ.get("API_URL", "http://localhost:3001")
 
 
-async def get_user_providers(user_id: str) -> list[dict]:
+async def get_user_providers(user_id: str, organization_id: Optional[str] = None) -> list[dict]:
     """Fetch connected providers for a user from the main API."""
     if not user_id:
         return []
@@ -20,10 +20,14 @@ async def get_user_providers(user_id: str) -> list[dict]:
         if not internal_api_key:
             return []
 
+        params = {"userId": user_id}
+        if organization_id:
+            params["organizationId"] = organization_id
+
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(
                 f"{API_URL}/api/providers/internal/list",
-                params={"userId": user_id},
+                params=params,
                 headers={"x-internal-api-key": internal_api_key},
             )
             if response.status_code == 200:
@@ -34,20 +38,40 @@ async def get_user_providers(user_id: str) -> list[dict]:
 
 
 async def validate_user_session(request: Request) -> Optional[str]:
-    """Validate user session and return user_id if valid."""
+    """Validate user session via Neon Auth token and return user_id if valid.
+
+    Supports token from:
+    1. x-stack-access-token header (Neon Auth JWT)
+    2. Authorization header (Bearer token)
+    """
     try:
-        cookies = dict(request.cookies)
-        if not cookies:
+        # Get token from headers
+        token = request.headers.get("x-stack-access-token")
+        if not token:
+            # Try Authorization header
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+
+        if not token:
+            return None
+
+        # Validate token via internal API endpoint
+        internal_api_key = os.environ.get("INTERNAL_API_KEY", "")
+        if not internal_api_key:
             return None
 
         async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(
-                f"{API_URL}/api/auth/get-session",
-                cookies=cookies,
+            response = await client.post(
+                f"{API_URL}/api/chat/internal/validate-token",
+                json={"token": token},
+                headers={"X-Internal-Key": internal_api_key},
             )
             if response.status_code == 200:
-                session_data = response.json()
-                return session_data.get("user", {}).get("id")
+                data = response.json()
+                if data.get("valid"):
+                    return data.get("user", {}).get("id")
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[validate_user_session] Error: {e}")
         return None

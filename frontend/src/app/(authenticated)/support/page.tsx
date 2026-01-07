@@ -141,7 +141,7 @@ export default function SupportPage() {
           <Mail className="h-3.5 w-3.5 text-muted-foreground/70" />
           <div>
             <h2 className="text-xs font-medium">Contact Us</h2>
-            <p className="text-[10px] text-muted-foreground/60">Can't find what you're looking for? Send us a message.</p>
+            <p className="text-[10px] text-muted-foreground/60">Can&apos;t find what you&apos;re looking for? Send us a message.</p>
           </div>
         </div>
         <div className="px-3 py-3">
@@ -152,7 +152,7 @@ export default function SupportPage() {
               </div>
               <p className="text-xs font-medium mb-0.5">Message sent!</p>
               <p className="text-[10px] text-muted-foreground/60">
-                We'll get back to you within 24 hours.
+                We&apos;ll get back to you within 24 hours.
               </p>
             </div>
           ) : (

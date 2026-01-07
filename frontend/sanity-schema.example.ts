@@ -11,6 +11,12 @@
  * Schema: Post
  */
 
+// Sanity validation rule type (simplified for example schema)
+interface SanityRule {
+  required: () => SanityRule
+  max: (n: number) => SanityRule
+}
+
 export const postSchema = {
   name: 'post',
   title: 'Blog Post',
@@ -20,7 +26,7 @@ export const postSchema = {
       name: 'title',
       title: 'Title',
       type: 'string',
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: SanityRule) => Rule.required(),
     },
     {
       name: 'slug',
@@ -30,7 +36,7 @@ export const postSchema = {
         source: 'title',
         maxLength: 96,
       },
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: SanityRule) => Rule.required(),
     },
     {
       name: 'excerpt',
@@ -38,7 +44,7 @@ export const postSchema = {
       type: 'text',
       rows: 3,
       description: 'Brief description for SEO and previews (max 160 characters)',
-      validation: (Rule: any) => Rule.max(160),
+      validation: (Rule: SanityRule) => Rule.max(160),
     },
     {
       name: 'content',
@@ -59,7 +65,7 @@ export const postSchema = {
         ],
         layout: 'radio',
       },
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: SanityRule) => Rule.required(),
     },
     {
       name: 'status',
@@ -99,7 +105,7 @@ export const postSchema = {
       status: 'status',
       category: 'category',
     },
-    prepare({ title, status, category }: any) {
+    prepare({ title, status, category }: { title: string; status: string; category: string }) {
       return {
         title,
         subtitle: `${status === 'published' ? '✓' : '○'} ${category || 'Uncategorized'}`,
@@ -120,7 +126,7 @@ export const authorSchema = {
       name: 'name',
       title: 'Name',
       type: 'string',
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: SanityRule) => Rule.required(),
     },
     {
       name: 'role',

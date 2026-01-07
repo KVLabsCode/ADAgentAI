@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 import { db } from "../db";
 import { connectedProviders, type NewConnectedProvider } from "../db/schema";
@@ -13,9 +13,13 @@ const providers = new Hono();
 
 // Most routes require authentication
 providers.use("*", async (c, next) => {
-  // Skip auth for internal endpoints (uses API key instead)
   const path = c.req.path;
+  // Skip auth for internal endpoints (uses API key instead)
   if (path.includes("/internal/")) {
+    return next();
+  }
+  // Skip auth for OAuth callbacks (Google redirects here without auth token)
+  if (path.includes("/callback/")) {
     return next();
   }
   return requireAuth(c, next);
@@ -54,12 +58,20 @@ const OAUTH_CONFIG = {
 
 /**
  * GET /providers - List user's connected providers
+ * When in organization context, returns org-scoped providers
+ * When in personal context, returns personal providers (organizationId is null)
  */
 providers.get("/", async (c) => {
   const user = c.get("user");
+  const organizationId = user.organizationId;
+
+  // Build filter: if org selected, filter by org; otherwise personal (null organizationId)
+  const whereClause = organizationId
+    ? and(eq(connectedProviders.userId, user.id), eq(connectedProviders.organizationId, organizationId))
+    : and(eq(connectedProviders.userId, user.id), isNull(connectedProviders.organizationId));
 
   const userProviders = await db.query.connectedProviders.findMany({
-    where: eq(connectedProviders.userId, user.id),
+    where: whereClause,
     columns: {
       id: true,
       provider: true,
@@ -69,6 +81,7 @@ providers.get("/", async (c) => {
       isEnabled: true,
       lastSyncAt: true,
       createdAt: true,
+      organizationId: true,
     },
   });
 
@@ -81,6 +94,7 @@ providers.get("/", async (c) => {
       isEnabled: p.isEnabled,
       lastSyncAt: p.lastSyncAt,
       connectedAt: p.createdAt,
+      organizationId: p.organizationId,
     })),
   });
 });
@@ -93,16 +107,23 @@ providers.post(
   "/connect/:type",
   zValidator("param", z.object({ type: providerTypeSchema })),
   async (c) => {
+    const user = c.get("user");
     const { type } = c.req.valid("param");
     const config = OAUTH_CONFIG[type];
 
-    // Generate state for CSRF protection
-    const state = crypto.randomUUID();
+    // Encode user ID and org ID in state for the callback
+    // Format: randomUUID:userId:organizationId (orgId can be empty)
+    const stateData = {
+      nonce: crypto.randomUUID(),
+      userId: user.id,
+      organizationId: user.organizationId || "",
+    };
+    const state = Buffer.from(JSON.stringify(stateData)).toString("base64url");
 
     // Build OAuth URL
     const params = new URLSearchParams({
       client_id: Bun.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: `${Bun.env.BETTER_AUTH_URL}/api/providers/callback/${type}`,
+      redirect_uri: `${Bun.env.BACKEND_URL}/api/providers/callback/${type}`,
       response_type: "code",
       scope: config.scope,
       access_type: "offline",
@@ -112,7 +133,6 @@ providers.post(
 
     const authUrl = `${config.authUrl}?${params.toString()}`;
 
-    // In production, store state in session/cache for verification
     return c.json({
       authUrl,
       state,
@@ -124,14 +144,15 @@ providers.post(
 /**
  * GET /providers/callback/:type - OAuth callback handler
  * Exchanges code for tokens and stores the connection
+ * Note: This route skips auth middleware - user info comes from state parameter
  */
 providers.get(
   "/callback/:type",
   zValidator("param", z.object({ type: providerTypeSchema })),
   async (c) => {
-    const user = c.get("user");
     const { type } = c.req.valid("param");
     const code = c.req.query("code");
+    const stateParam = c.req.query("state");
     const error = c.req.query("error");
 
     if (error) {
@@ -146,6 +167,29 @@ providers.get(
       );
     }
 
+    // Extract user info from state parameter
+    if (!stateParam) {
+      return c.redirect(
+        `${Bun.env.FRONTEND_URL}/providers?error=invalid_state`
+      );
+    }
+
+    let userId: string;
+    let organizationId: string | null;
+    try {
+      const stateData = JSON.parse(Buffer.from(stateParam, "base64url").toString()) as {
+        nonce: string;
+        userId: string;
+        organizationId: string;
+      };
+      userId = stateData.userId;
+      organizationId = stateData.organizationId || null;
+    } catch {
+      return c.redirect(
+        `${Bun.env.FRONTEND_URL}/providers?error=invalid_state`
+      );
+    }
+
     const config = OAUTH_CONFIG[type];
 
     try {
@@ -157,7 +201,7 @@ providers.get(
           code,
           client_id: Bun.env.GOOGLE_CLIENT_ID!,
           client_secret: Bun.env.GOOGLE_CLIENT_SECRET!,
-          redirect_uri: `${Bun.env.BETTER_AUTH_URL}/api/providers/callback/${type}`,
+          redirect_uri: `${Bun.env.BACKEND_URL}/api/providers/callback/${type}`,
           grant_type: "authorization_code",
         }),
       });
@@ -182,7 +226,7 @@ providers.get(
       // Check if provider already connected
       const existing = await db.query.connectedProviders.findFirst({
         where: and(
-          eq(connectedProviders.userId, user.id),
+          eq(connectedProviders.userId, userId),
           eq(connectedProviders.provider, type)
         ),
       });
@@ -205,9 +249,10 @@ providers.get(
           })
           .where(eq(connectedProviders.id, existing.id));
       } else {
-        // Create new connection
+        // Create new connection with organization context
         await db.insert(connectedProviders).values({
-          userId: user.id,
+          userId: userId,
+          organizationId: organizationId, // null = personal scope, otherwise org-scoped
           provider: type,
           accessToken: encryptedAccessToken!,
           refreshToken: encryptedRefreshToken,
@@ -219,7 +264,7 @@ providers.get(
       }
 
       // Track successful connection
-      trackProviderConnected(user.id, type, true);
+      trackProviderConnected(userId, type, true);
 
       return c.redirect(
         `${Bun.env.FRONTEND_URL}/providers?success=${type}`
@@ -228,7 +273,7 @@ providers.get(
       console.error("OAuth callback error:", error);
 
       // Track failed connection
-      trackProviderConnected(user.id, type, false);
+      trackProviderConnected(userId, type, false);
 
       return c.redirect(
         `${Bun.env.FRONTEND_URL}/providers?error=oauth_failed`
@@ -478,6 +523,7 @@ providers.get(
 /**
  * GET /providers/internal/list - Internal endpoint for fetching user's providers
  * Protected by internal API key. Used by chat server.
+ * Supports organization filtering via organizationId query param
  */
 providers.get("/internal/list", async (c) => {
   // Verify internal API key
@@ -489,21 +535,34 @@ providers.get("/internal/list", async (c) => {
   }
 
   const userId = c.req.query("userId");
+  const organizationId = c.req.query("organizationId"); // Optional organization filter
+
   if (!userId) {
     return c.json({ error: "userId is required" }, 400);
   }
 
+  // Build filter based on organization context
+  const whereClause = organizationId
+    ? and(
+        eq(connectedProviders.userId, userId),
+        eq(connectedProviders.organizationId, organizationId),
+        eq(connectedProviders.isEnabled, true)
+      )
+    : and(
+        eq(connectedProviders.userId, userId),
+        isNull(connectedProviders.organizationId),
+        eq(connectedProviders.isEnabled, true)
+      );
+
   const userProviders = await db.query.connectedProviders.findMany({
-    where: and(
-      eq(connectedProviders.userId, userId),
-      eq(connectedProviders.isEnabled, true)
-    ),
+    where: whereClause,
     columns: {
       id: true,
       provider: true,
       publisherId: true,
       networkCode: true,
       accountName: true,
+      organizationId: true,
     },
   });
 
@@ -513,13 +572,14 @@ providers.get("/internal/list", async (c) => {
       type: p.provider,
       name: p.accountName || getProviderDisplayName(p.provider),
       identifier: p.provider === "admob" ? p.publisherId : p.networkCode,
+      organizationId: p.organizationId,
     })),
   });
 });
 
 /**
  * POST /providers/internal/token - Internal endpoint for services (no user auth)
- * Protected by internal API key
+ * Protected by internal API key. Supports organization filtering.
  */
 providers.post("/internal/token", async (c) => {
   console.log("[InternalToken] Request received");
@@ -537,22 +597,33 @@ providers.post("/internal/token", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const body = await c.req.json() as { userId: string; provider: "admob" | "gam" };
-  const { userId, provider: providerType } = body;
+  const body = await c.req.json() as { userId: string; provider: "admob" | "gam"; organizationId?: string };
+  const { userId, provider: providerType, organizationId } = body;
 
-  console.log(`[InternalToken] Looking up ${providerType} for user ${userId}`);
+  console.log(`[InternalToken] Looking up ${providerType} for user ${userId}, org ${organizationId || 'personal'}`);
 
   if (!userId || !providerType) {
     return c.json({ error: "userId and provider are required" }, 400);
   }
 
+  // Build filter based on organization context
+  const whereClause = organizationId
+    ? and(
+        eq(connectedProviders.userId, userId),
+        eq(connectedProviders.organizationId, organizationId),
+        eq(connectedProviders.provider, providerType),
+        eq(connectedProviders.isEnabled, true)
+      )
+    : and(
+        eq(connectedProviders.userId, userId),
+        isNull(connectedProviders.organizationId),
+        eq(connectedProviders.provider, providerType),
+        eq(connectedProviders.isEnabled, true)
+      );
+
   // Find the provider connection
   const provider = await db.query.connectedProviders.findFirst({
-    where: and(
-      eq(connectedProviders.userId, userId),
-      eq(connectedProviders.provider, providerType),
-      eq(connectedProviders.isEnabled, true)
-    ),
+    where: whereClause,
   });
 
   if (!provider) {

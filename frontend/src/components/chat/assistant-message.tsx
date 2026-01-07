@@ -13,7 +13,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Tooltip,
   TooltipContent,
@@ -76,10 +75,6 @@ function CodeBlock({
   maxHeight?: string
   resizable?: boolean
 }) {
-  const formattedContent = typeof content === "string"
-    ? content
-    : JSON.stringify(content, null, 2)
-
   return (
     <div className="rounded-lg overflow-hidden border border-zinc-700/50">
       <div className="bg-zinc-800/80 px-3 py-1.5 border-b border-zinc-700/50">
@@ -216,7 +211,7 @@ interface ToolApprovalBlockProps {
   isPending: boolean
 }
 
-function ToolApprovalBlock({ approvalId, toolName, toolInput, onApproval, isPending }: ToolApprovalBlockProps) {
+function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, onApproval, isPending }: ToolApprovalBlockProps) {
   const [isOpen, setIsOpen] = React.useState(true) // Auto-expand for approval
   const shortName = getShortToolName(toolName)
 
@@ -328,6 +323,7 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
     if (!isPending && isOpen) {
       setIsOpen(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only auto-collapse on isPending change
   }, [isPending])
 
   // Icon color based on state
@@ -442,7 +438,7 @@ function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[],
 }
 
 // Message Actions
-function MessageActions({ content, messageId }: { content: string; messageId: string }) {
+function MessageActions({ content, messageId: _messageId }: { content: string; messageId: string }) {
   const [copied, setCopied] = React.useState(false)
   const [liked, setLiked] = React.useState(false)
   const [disliked, setDisliked] = React.useState(false)

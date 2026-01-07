@@ -3,9 +3,6 @@
  *
  * Uses JWE (JSON Web Encryption) via the jose library for encrypting
  * sensitive tokens before storing in the database.
- *
- * Based on Better Auth documentation:
- * https://www.better-auth.com/docs/concepts/users-accounts
  */
 
 import { CompactEncrypt, compactDecrypt } from "jose";
@@ -16,12 +13,12 @@ const ENC = "A256GCM"; // AES-256-GCM content encryption
 
 /**
  * Get the encryption key from environment.
- * Uses BETTER_AUTH_SECRET which should be at least 32 bytes.
+ * Uses TOKEN_ENCRYPTION_SECRET which should be at least 32 bytes.
  */
 function getEncryptionKey(): Uint8Array {
-  const secret = Bun.env.BETTER_AUTH_SECRET;
+  const secret = Bun.env.TOKEN_ENCRYPTION_SECRET;
   if (!secret) {
-    throw new Error("BETTER_AUTH_SECRET is required for token encryption");
+    throw new Error("TOKEN_ENCRYPTION_SECRET is required for token encryption");
   }
 
   // Ensure key is exactly 32 bytes for A256GCM
@@ -29,7 +26,7 @@ function getEncryptionKey(): Uint8Array {
   const keyBytes = encoder.encode(secret);
 
   if (keyBytes.length < 32) {
-    throw new Error("BETTER_AUTH_SECRET must be at least 32 characters for encryption");
+    throw new Error("TOKEN_ENCRYPTION_SECRET must be at least 32 characters for encryption");
   }
 
   // Use first 32 bytes

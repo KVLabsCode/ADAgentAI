@@ -18,7 +18,7 @@ export default function TermsPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-medium">1. Acceptance of Terms</h2>
           <p className="text-muted-foreground">
-            By accessing and using Ad Agent AI ("Service"), you agree to be bound by these Terms of Service.
+            By accessing and using Ad Agent AI (&quot;Service&quot;), you agree to be bound by these Terms of Service.
             If you do not agree to these terms, please do not use our Service.
           </p>
         </section>
@@ -52,7 +52,7 @@ export default function TermsPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-medium">5. Limitation of Liability</h2>
           <p className="text-muted-foreground">
-            The Service is provided "as is" without warranties of any kind. We are not liable for any
+            The Service is provided &quot;as is&quot; without warranties of any kind. We are not liable for any
             indirect, incidental, or consequential damages arising from your use of the Service.
           </p>
         </section>

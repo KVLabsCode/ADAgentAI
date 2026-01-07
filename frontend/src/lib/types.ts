@@ -73,6 +73,41 @@ export interface OAuthAccount {
   }
 }
 
+// Organization (Better Auth)
+export interface Organization {
+  id: string
+  name: string
+  slug: string | null
+  logo: string | null
+  createdAt: string
+  role?: string // user's role in this org: owner, admin, member
+}
+
+// Organization member
+export interface OrganizationMember {
+  id: string
+  userId: string
+  organizationId: string
+  role: string
+  createdAt: string
+  user?: {
+    id: string
+    name: string | null
+    email: string
+    image: string | null
+  }
+}
+
+// Organization invitation
+export interface OrganizationInvitation {
+  id: string
+  email: string
+  role: string
+  status: string
+  expiresAt: string
+  createdAt: string
+}
+
 // User with role-based access
 export interface User {
   id: string

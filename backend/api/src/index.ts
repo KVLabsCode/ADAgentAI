@@ -4,7 +4,6 @@ import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { timing } from "hono/timing";
 
-import { auth } from "./lib/auth";
 import { initSentry } from "./lib/sentry";
 import { initAnalytics, flushAnalytics } from "./lib/analytics";
 import { errorHandler } from "./middleware/error-handler";
@@ -14,6 +13,7 @@ import providerRoutes from "./routes/providers";
 import billingRoutes from "./routes/billing";
 import webhookRoutes from "./routes/webhooks";
 import { publicBlog, adminBlog } from "./routes/blog";
+import waitlistRoutes from "./routes/waitlist";
 
 // Initialize observability (as early as possible)
 initSentry();
@@ -73,7 +73,7 @@ app.use(
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "x-stack-access-token", "x-organization-id"],
     exposeHeaders: ["X-Request-Id"],
     maxAge: 86400, // 24 hours
   })
@@ -94,11 +94,6 @@ app.get("/", (c) => {
 // Health check endpoints
 app.route("/health", healthRoutes);
 
-// Better Auth handler
-app.on(["POST", "GET"], "/api/auth/*", (c) => {
-  return auth.handler(c.req.raw);
-});
-
 // API version prefix
 const api = new Hono();
 
@@ -117,6 +112,7 @@ api.route("/providers", providerRoutes);
 api.route("/billing", billingRoutes);
 api.route("/blog", publicBlog);
 api.route("/admin/blog", adminBlog);
+api.route("/waitlist", waitlistRoutes);
 
 // Webhook routes (outside /api for cleaner URLs)
 app.route("/webhooks", webhookRoutes);

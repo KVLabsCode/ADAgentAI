@@ -3,6 +3,8 @@
 import * as React from "react"
 import { Loader2 } from "lucide-react"
 import { ChatContainer } from "@/components/chat/chat-container"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import type { Provider } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -18,15 +20,15 @@ interface ApiProvider {
 }
 
 export default function ChatPage() {
+  const { getAccessToken, isLoading: isUserLoading } = useUser()
   const [providers, setProviders] = React.useState<Provider[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
 
   React.useEffect(() => {
     async function fetchProviders() {
       try {
-        const response = await fetch(`${API_URL}/api/providers`, {
-          credentials: 'include',
-        })
+        const accessToken = await getAccessToken()
+        const response = await authFetch(`${API_URL}/api/providers`, accessToken)
 
         if (response.ok) {
           const data = await response.json() as { providers: ApiProvider[] }
@@ -50,8 +52,10 @@ export default function ChatPage() {
       }
     }
 
-    fetchProviders()
-  }, [])
+    if (!isUserLoading) {
+      fetchProviders()
+    }
+  }, [getAccessToken, isUserLoading])
 
   if (isLoading) {
     return (

@@ -7,7 +7,7 @@ import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
 import { streamChat, approveTool, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
-import { authClient } from "@/lib/auth-client"
+import { useUser } from "@/hooks/use-user"
 import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
 
@@ -21,7 +21,7 @@ interface ChatContainerProps {
 
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const router = useRouter()
-  const { data: session } = authClient.useSession()
+  const { user, getAccessToken } = useUser()
   const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext } = useChatSettings()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
@@ -30,6 +30,20 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
 
   // Tool approval state: Map<approvalId, approved | null>
   const [pendingApprovals, setPendingApprovals] = React.useState<Map<string, boolean | null>>(new Map())
+
+  // Reset state when navigating to a new/different chat session
+  // Uses initialSessionId as the trigger - when it changes, we reset all state
+  React.useEffect(() => {
+    // Abort any pending request when session changes
+    abortControllerRef.current?.abort()
+
+    // Reset all state to match new session
+    setMessages(initialMessages)
+    setCurrentSessionId(initialSessionId || null)
+    setIsLoading(false)
+    setPendingApprovals(new Map())
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reset on sessionId change
+  }, [initialSessionId])
 
   // Handle tool approval from user - calls backend API and updates local state
   const handleToolApproval = React.useCallback(async (approvalId: string, approved: boolean) => {
@@ -65,7 +79,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
 
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
-  const userId = session?.user?.id
+  const userId = user?.id
 
   // Build context for API calls
   const chatContext: ChatContext = React.useMemo(() => ({
@@ -78,10 +92,14 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {
     try {
+      const accessToken = await getAccessToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (accessToken) {
+        headers['x-stack-access-token'] = accessToken
+      }
       const response = await fetch(`${API_URL}/api/chat/session`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers,
         body: JSON.stringify({ title: title || 'New Chat' }),
       })
       if (response.ok) {
@@ -97,10 +115,14 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   // Save a message to the database
   const saveMessage = async (sessionId: string, role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>) => {
     try {
+      const accessToken = await getAccessToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (accessToken) {
+        headers['x-stack-access-token'] = accessToken
+      }
       await fetch(`${API_URL}/api/chat/session/${sessionId}/save-message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers,
         body: JSON.stringify({ content, role, metadata }),
       })
     } catch (error) {
@@ -110,6 +132,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isLoading || !hasProviders) return
+
+    // Get access token for authenticated API calls
+    const accessToken = await getAccessToken()
 
     // Cancel any pending request
     abortControllerRef.current?.abort()
@@ -182,7 +207,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             )
           )
         },
-        onAgent: (agent, task) => {
+        onAgent: (agent, _task) => {
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
@@ -330,9 +355,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         },
       },
       abortControllerRef.current.signal,
-      userId, // Pass user ID for OAuth token fetching
+      userId, // Pass user ID
       history, // Pass conversation history for context
-      chatContext // Pass context settings (enabled providers, response style)
+      chatContext, // Pass context settings (enabled providers, response style)
+      accessToken // Pass access token for authenticated requests
     )
 
     setIsLoading(false)
@@ -341,6 +367,12 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   const handlePromptClick = (prompt: string) => {
     handleSendMessage(prompt)
   }
+
+  // Handle new chat - navigates to /chat and resets state
+  const handleNewChat = React.useCallback(() => {
+    abortControllerRef.current?.abort()
+    router.push('/chat')
+  }, [router])
 
   // Cleanup on unmount
   React.useEffect(() => {
@@ -353,7 +385,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     <div className="flex flex-col h-full overflow-hidden">
       {/* Fixed Header - always visible at top */}
       <div className="shrink-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40">
-        <ChatHeader hasProviders={hasProviders} />
+        <ChatHeader hasProviders={hasProviders} onNewChat={hasMessages ? handleNewChat : undefined} />
       </div>
 
       {!hasMessages ? (

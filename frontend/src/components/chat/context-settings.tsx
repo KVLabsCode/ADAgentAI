@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
   Plug,
-  ChevronDown,
   ChevronRight,
   Settings2,
   Loader2,
@@ -35,6 +34,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useChatSettings } from "@/lib/chat-settings"
 import { useSidebar } from "@/components/ui/sidebar"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import type { Provider, ProviderApp } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
@@ -77,7 +78,7 @@ function TreeCheckbox({
 }
 
 // Tree connector line component
-function TreeLine({ isLast, hasChildren, isExpanded }: { isLast: boolean; hasChildren?: boolean; isExpanded?: boolean }) {
+function TreeLine({ isLast, hasChildren: _hasChildren, isExpanded: _isExpanded }: { isLast: boolean; hasChildren?: boolean; isExpanded?: boolean }) {
   return (
     <div className="relative w-5 h-full flex items-center justify-center">
       {/* Vertical line */}
@@ -94,6 +95,7 @@ function TreeLine({ isLast, hasChildren, isExpanded }: { isLast: boolean; hasChi
 }
 
 export function ContextSettings({ providers }: ContextSettingsProps) {
+  const { getAccessToken } = useUser()
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(["admob", "gam"]))
@@ -136,7 +138,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const providersWithMatchingApps = Object.entries(providerApps)
-        .filter(([_, apps]) => apps.some(app => app.name.toLowerCase().includes(query)))
+        .filter(([, apps]) => apps.some(app => app.name.toLowerCase().includes(query)))
         .map(([providerId]) => providerId)
 
       if (providersWithMatchingApps.length > 0) {
@@ -176,9 +178,8 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
       if (providerApps[providerId] || loadingApps.has(providerId)) return
       setLoadingApps((prev) => new Set(prev).add(providerId))
       try {
-        const response = await fetch(`${API_URL}/api/providers/${providerId}/apps`, {
-          credentials: "include",
-        })
+        const accessToken = await getAccessToken()
+        const response = await authFetch(`${API_URL}/api/providers/${providerId}/apps`, accessToken)
         if (response.ok) {
           const data = await response.json()
           setProviderApps((prev) => ({ ...prev, [providerId]: data.apps || [] }))
@@ -197,7 +198,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         })
       }
     },
-    [providerApps, loadingApps, enabledAppIds, setEnabledAppIds]
+    [providerApps, loadingApps, enabledAppIds, setEnabledAppIds, getAccessToken]
   )
 
   const toggleSection = (section: string) => {

@@ -4,6 +4,8 @@ import * as React from "react"
 import { use } from "react"
 import { Loader2 } from "lucide-react"
 import { ChatContainer } from "@/components/chat/chat-container"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import type { Provider, Message, StreamEventItem } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -39,6 +41,7 @@ export default function ChatSessionPage({
   params: Promise<{ id: string }>
 }) {
   const { id: sessionId } = use(params)
+  const { getAccessToken, isLoading: isUserLoading } = useUser()
   const [providers, setProviders] = React.useState<Provider[]>([])
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -46,10 +49,11 @@ export default function ChatSessionPage({
   React.useEffect(() => {
     async function fetchData() {
       try {
+        const accessToken = await getAccessToken()
         // Fetch providers and session messages in parallel
         const [providersRes, sessionRes] = await Promise.all([
-          fetch(`${API_URL}/api/providers`, { credentials: 'include' }),
-          fetch(`${API_URL}/api/chat/session/${sessionId}`, { credentials: 'include' }),
+          authFetch(`${API_URL}/api/providers`, accessToken),
+          authFetch(`${API_URL}/api/chat/session/${sessionId}`, accessToken),
         ])
 
         if (providersRes.ok) {
@@ -92,8 +96,10 @@ export default function ChatSessionPage({
       }
     }
 
-    fetchData()
-  }, [sessionId])
+    if (!isUserLoading) {
+      fetchData()
+    }
+  }, [sessionId, getAccessToken, isUserLoading])
 
   if (isLoading) {
     return (

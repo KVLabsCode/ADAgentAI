@@ -116,7 +116,7 @@ export default function PlatformsPage() {
         {/* CTA */}
         <div className="max-w-2xl mx-auto text-center mt-12 space-y-4">
           <p className="text-muted-foreground">
-            Need a platform that's not listed? Let us know!
+            Need a platform that&apos;s not listed? Let us know!
           </p>
           <div className="flex gap-4 justify-center">
             <Button asChild>

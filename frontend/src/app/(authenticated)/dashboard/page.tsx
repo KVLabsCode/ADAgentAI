@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { MessageSquarePlus, Plug, ArrowRight, History, Loader2 } from "lucide-react"
-import { authClient } from "@/lib/auth-client"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
@@ -34,7 +35,7 @@ function formatRelativeDate(dateString: string): string {
 }
 
 export default function DashboardPage() {
-  const { data: session } = authClient.useSession()
+  const { user, getAccessToken, isLoading: isUserLoading } = useUser()
   const [providers, setProviders] = React.useState<ApiProvider[]>([])
   const [recentChats, setRecentChats] = React.useState<ApiSession[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -42,9 +43,10 @@ export default function DashboardPage() {
   React.useEffect(() => {
     async function fetchData() {
       try {
+        const accessToken = await getAccessToken()
         const [providersRes, sessionsRes] = await Promise.all([
-          fetch(`${API_URL}/api/providers`, { credentials: 'include' }),
-          fetch(`${API_URL}/api/chat/sessions`, { credentials: 'include' }),
+          authFetch(`${API_URL}/api/providers`, accessToken),
+          authFetch(`${API_URL}/api/chat/sessions`, accessToken),
         ])
 
         if (providersRes.ok) {
@@ -63,10 +65,12 @@ export default function DashboardPage() {
       }
     }
 
-    fetchData()
-  }, [])
+    if (!isUserLoading) {
+      fetchData()
+    }
+  }, [getAccessToken, isUserLoading])
 
-  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User'
+  const userName = user?.name || user?.email?.split('@')[0] || 'User'
   const connectedProviders = providers.length
   const chatCount = recentChats.length
 

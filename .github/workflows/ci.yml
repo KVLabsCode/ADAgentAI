@@ -39,11 +39,12 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-          BETTER_AUTH_URL: http://localhost:3001
+          NEON_AUTH_URL: ${{ secrets.NEON_AUTH_URL }}
+          TOKEN_ENCRYPTION_SECRET: ${{ secrets.TOKEN_ENCRYPTION_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           FRONTEND_URL: http://localhost:3000
+          BACKEND_URL: http://localhost:3001
           PORT: 3001
 
       - name: Upload test results

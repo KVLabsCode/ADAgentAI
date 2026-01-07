@@ -1,22 +1,11 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
-import { ArrowRight, Sparkles, Shield, Zap, Check } from "lucide-react"
+import { ArrowRight, Sparkles, Shield, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { WaitlistDialog } from "@/components/waitlist-dialog"
 
 export default function LandingPage() {
-  const [email, setEmail] = React.useState("")
-  const [submitted, setSubmitted] = React.useState(false)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (email) {
-      setSubmitted(true)
-    }
-  }
-
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -38,27 +27,8 @@ export default function LandingPage() {
               Ask questions in plain English. Get instant insights.
             </p>
 
-            {/* Waitlist Form */}
-            {submitted ? (
-              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                <Check className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm">You're on the list. We'll be in touch soon.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm mx-auto">
-                <Input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-9 text-sm"
-                  required
-                />
-                <Button type="submit" size="sm" className="h-9 text-xs shrink-0">
-                  Join Waitlist
-                </Button>
-              </form>
-            )}
+            {/* Waitlist CTA */}
+            <WaitlistDialog />
 
             <p className="text-[11px] text-muted-foreground">
               Free during early access. No credit card required.
@@ -80,7 +50,7 @@ export default function LandingPage() {
                   <h3 className="text-sm font-medium">Natural Language</h3>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Ask questions like "What was my revenue yesterday?" and get instant answers.
+                  Ask questions like &quot;What was my revenue yesterday?&quot; and get instant answers.
                 </p>
               </div>
 

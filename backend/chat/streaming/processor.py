@@ -47,6 +47,7 @@ _crew_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="crew-")
 async def stream_chat_response(
     user_query: str,
     user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
     conversation_history: Optional[list] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream a chat response using CrewAI with real-time interleaved events.
@@ -96,7 +97,7 @@ async def stream_chat_response(
         yield format_sse(AgentEvent(agent=agent_name).model_dump(mode='json'))
 
         # Build crew with conversation history
-        crew = get_crew_for_query(user_query, service, capability, user_id, conversation_history)
+        crew = get_crew_for_query(user_query, service, capability, user_id, organization_id, conversation_history)
 
         # Run CrewAI in background thread (hooks may block, this prevents deadlock)
         result_queue = thread_queue.Queue()

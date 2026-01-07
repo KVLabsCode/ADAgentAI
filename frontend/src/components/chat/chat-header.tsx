@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Lock, Globe, Plus, Shield, Link2, Eye } from "lucide-react"
+import { Lock, Globe, Plus, Shield, Link2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,7 +18,6 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({
-  hasProviders,
   isPrivate = true,
   onPrivacyChange,
   onNewChat

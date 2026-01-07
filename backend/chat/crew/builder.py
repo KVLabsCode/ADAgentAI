@@ -14,6 +14,7 @@ def get_crew_for_query(
     service: str,
     capability: str,
     user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
     conversation_history: Optional[list] = None,
 ) -> Crew:
     """Create a crew with streaming enabled for the specified service/capability.
@@ -23,14 +24,19 @@ def get_crew_for_query(
         service: Target service (admob, admanager, general)
         capability: Target capability (inventory, reporting, etc.)
         user_id: User ID for OAuth tokens
+        organization_id: Organization ID for org-scoped operations
         conversation_history: Previous conversation for context
 
     Returns:
         Configured Crew ready for streaming execution
     """
-    # Pass user_id to factory for OAuth tokens
+    # Pass user_id and organization_id to factory for OAuth tokens
     if user_id:
         os.environ["CURRENT_USER_ID"] = user_id
+    if organization_id:
+        os.environ["CURRENT_ORGANIZATION_ID"] = organization_id
+    else:
+        os.environ.pop("CURRENT_ORGANIZATION_ID", None)  # Clear if not set (personal scope)
 
     # Build conversation context string for task description
     conversation_context = _build_conversation_context(conversation_history)

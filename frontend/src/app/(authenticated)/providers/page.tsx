@@ -24,6 +24,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AccountSelectionModal } from "@/components/providers/account-selection-modal"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type { Provider, OAuthAccount } from "@/lib/types"
 
@@ -31,20 +33,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 function ProvidersContent() {
   const searchParams = useSearchParams()
+  const { getAccessToken } = useUser()
   const [providers, setProviders] = React.useState<Provider[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [connectingType, setConnectingType] = React.useState<string | null>(null)
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [accountSelectionOpen, setAccountSelectionOpen] = React.useState(false)
   const [pendingAccounts, setPendingAccounts] = React.useState<OAuthAccount[]>([])
-  const [pendingProviderType, setPendingProviderType] = React.useState<"admob" | "gam">("gam")
+  const [pendingProviderType] = React.useState<"admob" | "gam">("gam")
 
   // Fetch providers on mount
   const fetchProviders = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/providers`, {
-        credentials: 'include',
-      })
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/providers`, accessToken)
 
       if (response.ok) {
         const data = await response.json()
@@ -64,7 +66,7 @@ function ProvidersContent() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [getAccessToken])
 
   React.useEffect(() => {
     fetchProviders()
@@ -107,10 +109,10 @@ function ProvidersContent() {
   const handleConnect = async (type: "admob" | "gam") => {
     setConnectingType(type)
     try {
+      const accessToken = await getAccessToken()
       // Call API to get OAuth URL
-      const response = await fetch(`${API_URL}/api/providers/connect/${type}`, {
+      const response = await authFetch(`${API_URL}/api/providers/connect/${type}`, accessToken, {
         method: 'POST',
-        credentials: 'include',
       })
 
       if (!response.ok) {
@@ -152,9 +154,9 @@ function ProvidersContent() {
 
   const handleDisconnect = async (providerId: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/providers/${providerId}`, {
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/providers/${providerId}`, accessToken, {
         method: 'DELETE',
-        credentials: 'include',
       })
 
       if (response.ok) {

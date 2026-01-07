@@ -30,6 +30,7 @@ class TokenError(Exception):
 async def get_access_token(
     provider: str,
     user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
 ) -> str:
     """
     Get a valid OAuth access token for a provider.
@@ -42,6 +43,7 @@ async def get_access_token(
     Args:
         provider: "admob" or "gam"
         user_id: Optional user ID to fetch user-specific tokens
+        organization_id: Optional organization ID for org-scoped provider lookup
 
     Returns:
         Valid access token string
@@ -49,9 +51,7 @@ async def get_access_token(
     Raises:
         TokenError: If no valid token can be obtained
     """
-    print(f"[TokenService] get_access_token called for {provider}, user_id={user_id}")
-
-    cache_key = f"{provider}:{user_id or 'default'}"
+    cache_key = f"{provider}:{user_id or 'default'}:{organization_id or 'personal'}"
 
     # Check cache first
     if cache_key in _token_cache:
@@ -66,18 +66,13 @@ async def get_access_token(
                 # Make comparison timezone-aware
                 now = datetime.now(timezone.utc)
                 if expires_at > now + _cache_buffer:
-                    print(f"[TokenService] Using cached token, expires: {expires_at}")
                     return cached["access_token"]
-                else:
-                    print(f"[TokenService] Cache expired, fetching fresh token")
-            except ValueError as e:
-                print(f"[TokenService] Invalid expires_at format: {e}")
-        else:
-            print(f"[TokenService] No expires_at in cache, fetching fresh token")
+            except ValueError:
+                pass
 
     # Method 1: Fetch from API (user-specific tokens with auto-refresh)
     if user_id:
-        token_data = await _fetch_token_from_api(provider, user_id)
+        token_data = await _fetch_token_from_api(provider, user_id, organization_id)
         if token_data:
             _token_cache[cache_key] = token_data
             return token_data["access_token"]
@@ -101,47 +96,35 @@ async def get_access_token(
 async def _fetch_token_from_api(
     provider: str,
     user_id: str,
+    organization_id: Optional[str] = None,
 ) -> Optional[dict]:
     """Fetch token from the API's internal endpoint."""
     api_url = os.environ.get("API_URL", "http://localhost:3001")
     internal_key = os.environ.get("INTERNAL_API_KEY")
 
-    print(f"[TokenService] Fetching token for {provider}, user: {user_id}")
-    print(f"[TokenService] API_URL: {api_url}")
-    print(f"[TokenService] INTERNAL_API_KEY set: {bool(internal_key)}")
-
     if not internal_key:
-        print("[TokenService] ERROR: INTERNAL_API_KEY not set!")
         return None
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
+            payload = {"userId": user_id, "provider": provider}
+            if organization_id:
+                payload["organizationId"] = organization_id
             response = await client.post(
                 f"{api_url}/api/providers/internal/token",
                 headers={"X-Internal-Key": internal_key},
-                json={"userId": user_id, "provider": provider},
+                json=payload,
             )
-
-            print(f"[TokenService] Response status: {response.status_code}")
 
             if response.status_code == 200:
                 data = response.json()
-                token = data.get("accessToken", "")
-                # Only show first 20 chars for security
-                print(f"[TokenService] Got token: {token[:20]}... (len={len(token)})")
                 return {
                     "access_token": data["accessToken"],
                     "expires_at": data.get("expiresAt"),
                 }
-            elif response.status_code == 404:
-                # Provider not connected for this user
-                print(f"[TokenService] Provider not found for user")
-                return None
             else:
-                print(f"[TokenService] Token API error: {response.status_code} - {response.text}")
                 return None
-    except Exception as e:
-        print(f"[TokenService] Failed to fetch token from API: {e}")
+    except Exception:
         return None
 
 
@@ -189,10 +172,8 @@ async def _get_service_account_token(provider: str) -> Optional[str]:
 
         return credentials.token
     except ImportError:
-        print("google-auth not installed. Run: pip install google-auth")
         return None
-    except Exception as e:
-        print(f"Service account auth failed: {e}")
+    except Exception:
         return None
 
 

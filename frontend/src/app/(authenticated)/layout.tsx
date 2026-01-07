@@ -97,7 +97,7 @@ export default function AuthenticatedLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/40 px-3">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/40 px-4 sm:px-6">
           <SidebarTrigger className="md:hidden" />
           <div className="flex-1" />
           <ThemeToggle />

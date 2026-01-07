@@ -115,6 +115,7 @@ class ChatRequest(BaseModel):
     """Request body for chat endpoint."""
     message: str
     user_id: Optional[str] = None
+    organization_id: Optional[str] = None  # Better Auth org ID for org-scoped operations
     history: Optional[list] = None
     context: Optional[dict] = None
 
@@ -141,10 +142,14 @@ async def chat_stream(request: Request, body: ChatRequest):
             content={"error": "Unauthorized - please log in"}
         )
 
+    # Extract organization ID from request body or header
+    organization_id = body.organization_id or request.headers.get("x-organization-id")
+
     return StreamingResponse(
         stream_chat_response(
             user_query=body.message,
             user_id=user_id,
+            organization_id=organization_id,
             conversation_history=body.history,
         ),
         media_type="text/event-stream",
@@ -207,7 +212,7 @@ if __name__ == "__main__":
     print(f"\n  Ad Platform Chat API (modular) -> http://localhost:{port}\n")
 
     uvicorn.run(
-        "chat_server_modular:app",
+        "chat_server:app",
         host="0.0.0.0",
         port=port,
         reload=False,

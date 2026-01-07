@@ -8,10 +8,30 @@ import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
-import { authClient } from "@/lib/auth-client"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+
+// CopilotKit message types
+interface CopilotToolCall {
+  name?: string
+  toolName?: string
+  args?: Record<string, unknown>
+  arguments?: Record<string, unknown>
+  result?: unknown
+}
+
+interface CopilotMessage {
+  id: string
+  role: string
+  content?: string
+  agentName?: string
+  toolCalls?: CopilotToolCall[]
+  type?: string
+  constructor?: { name?: string }
+}
 
 interface CopilotKitChatContainerProps {
   initialMessages?: Message[]
@@ -20,16 +40,16 @@ interface CopilotKitChatContainerProps {
 }
 
 // Map CopilotKit message to our custom Message format
-function mapCopilotMessage(msg: any): Message {
+function mapCopilotMessage(msg: CopilotMessage): Message {
   const events: StreamEventItem[] = []
 
   // Add tool call events if available from the message
   if (msg.toolCalls?.length) {
-    msg.toolCalls.forEach((tc: any) => {
+    msg.toolCalls.forEach((tc) => {
       events.push({
         type: "tool" as const,
         name: tc.name || tc.toolName || "unknown",
-        params: tc.args || tc.arguments || {}
+        params: (tc.args || tc.arguments || {}) as Record<string, unknown>
       })
       if (tc.result !== undefined) {
         events.push({
@@ -49,11 +69,11 @@ function mapCopilotMessage(msg: any): Message {
     createdAt: new Date().toISOString(),
     events: events.length > 0 ? events : undefined,
     hasToolCalls: (msg.toolCalls?.length || 0) > 0,
-    toolCalls: msg.toolCalls?.map((tc: any) => ({
+    toolCalls: msg.toolCalls?.map((tc) => ({
       name: tc.name || tc.toolName || "unknown",
-      params: tc.args || tc.arguments || {}
+      params: (tc.args || tc.arguments || {}) as Record<string, unknown>
     })),
-    toolResults: msg.toolCalls?.filter((tc: any) => tc.result !== undefined).map((tc: any) => ({
+    toolResults: msg.toolCalls?.filter((tc) => tc.result !== undefined).map((tc) => ({
       name: tc.name || tc.toolName || "unknown",
       result: tc.result
     })),
@@ -66,7 +86,7 @@ export function CopilotKitChatContainer({
   sessionId: initialSessionId
 }: CopilotKitChatContainerProps) {
   const router = useRouter()
-  const { data: session } = authClient.useSession()
+  const { getAccessToken } = useUser()
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
 
   // Tool approval state: Map<approvalId, approved | null>
@@ -84,7 +104,11 @@ export function CopilotKitChatContainer({
 
   // Get messages from the messages context (more reliable than visibleMessages)
   const messagesContext = useCopilotMessagesContext()
-  const contextMessages = messagesContext?.messages || []
+  // Memoize contextMessages to avoid dependency changes on every render
+  const contextMessages = React.useMemo(
+    () => (messagesContext?.messages || []) as CopilotMessage[],
+    [messagesContext?.messages]
+  )
 
   // Debug: log messages from both sources
   React.useEffect(() => {
@@ -106,22 +130,23 @@ export function CopilotKitChatContainer({
   }, [])
 
   const hasProviders = providers.some(p => p.status === "connected")
-  const userId = session?.user?.id
 
   // Map CopilotKit messages to our custom format
   const messages: Message[] = React.useMemo(() => {
     // Use contextMessages (from useCopilotMessagesContext) as primary source
     // Fall back to visibleMessages if contextMessages is empty
-    const rawMsgs = contextMessages.length > 0 ? contextMessages : (Array.isArray(visibleMessages) ? visibleMessages : [])
+    const rawMsgs: CopilotMessage[] = contextMessages.length > 0
+      ? contextMessages
+      : (Array.isArray(visibleMessages) ? visibleMessages as CopilotMessage[] : [])
 
     console.log('[CopilotKit] Mapping messages:', {
       source: contextMessages.length > 0 ? 'contextMessages' : 'visibleMessages',
       rawCount: rawMsgs.length,
-      rawMessages: rawMsgs.map((m: any) => ({ id: m.id, role: m.role, content: m.content?.slice?.(0, 50) || '[no content]', type: m.type || m.constructor?.name }))
+      rawMessages: rawMsgs.map((m) => ({ id: m.id, role: m.role, content: m.content?.slice?.(0, 50) || '[no content]', type: m.type || m.constructor?.name }))
     })
 
     // Combine initial messages with CopilotKit messages
-    const copilotMessages = rawMsgs.map((msg: any) => mapCopilotMessage(msg))
+    const copilotMessages = rawMsgs.map((msg) => mapCopilotMessage(msg))
 
     // If we have initial messages and no copilot messages, show initial
     if (initialMessages.length > 0 && copilotMessages.length === 0) {
@@ -136,10 +161,9 @@ export function CopilotKitChatContainer({
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {
     try {
-      const response = await fetch(`${API_URL}/api/chat/session`, {
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/chat/session`, accessToken, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ title: title || 'New Chat' }),
       })
       if (response.ok) {

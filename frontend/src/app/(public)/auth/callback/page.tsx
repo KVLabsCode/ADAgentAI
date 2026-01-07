@@ -4,75 +4,50 @@ import * as React from "react"
 import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
-import { authClient } from "@/lib/auth-client"
+import { useUser } from "@/hooks/use-user"
 
 function CallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isAuthenticated, isLoading } = useUser()
   const [status, setStatus] = React.useState<"loading" | "success" | "error">("loading")
   const [message, setMessage] = React.useState("Completing sign in...")
 
   React.useEffect(() => {
-    async function handleCallback() {
-      try {
-        // Check for error in URL params
-        const error = searchParams.get("error")
-        if (error) {
-          setStatus("error")
-          setMessage(getErrorMessage(error))
-          setTimeout(() => {
-            router.push(`/login?error=${error}`)
-          }, 2000)
-          return
-        }
-
-        // Check if user is authenticated
-        const { data: session } = await authClient.getSession()
-
-        if (session?.user) {
-          setStatus("success")
-          setMessage("Sign in successful! Redirecting...")
-
-          // Get redirect destination from localStorage or use default
-          const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
-          localStorage.removeItem("auth_redirect")
-
-          setTimeout(() => {
-            router.push(redirectTo)
-          }, 500)
-        } else {
-          // No session yet, wait a moment and check again
-          // This handles cases where the cookie hasn't been set yet
-          await new Promise(resolve => setTimeout(resolve, 1000))
-
-          const { data: retrySession } = await authClient.getSession()
-          if (retrySession?.user) {
-            setStatus("success")
-            setMessage("Sign in successful! Redirecting...")
-            const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
-            localStorage.removeItem("auth_redirect")
-            router.push(redirectTo)
-          } else {
-            // Still no session, redirect to login
-            setStatus("error")
-            setMessage("Authentication incomplete. Please try again.")
-            setTimeout(() => {
-              router.push("/login?error=incomplete")
-            }, 2000)
-          }
-        }
-      } catch (err) {
-        console.error("Auth callback error:", err)
-        setStatus("error")
-        setMessage("An error occurred. Please try again.")
-        setTimeout(() => {
-          router.push("/login?error=callback_error")
-        }, 2000)
-      }
+    // Check for error in URL params
+    const error = searchParams.get("error")
+    if (error) {
+      setStatus("error")
+      setMessage(getErrorMessage(error))
+      setTimeout(() => {
+        router.push(`/login?error=${error}`)
+      }, 2000)
+      return
     }
 
-    handleCallback()
-  }, [router, searchParams])
+    // Wait for auth state to be resolved
+    if (isLoading) return
+
+    if (isAuthenticated) {
+      setStatus("success")
+      setMessage("Sign in successful! Redirecting...")
+
+      // Get redirect destination from localStorage or use default
+      const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
+      localStorage.removeItem("auth_redirect")
+
+      setTimeout(() => {
+        router.push(redirectTo)
+      }, 500)
+    } else {
+      // Not authenticated, redirect to sign in
+      setStatus("error")
+      setMessage("Please sign in to continue.")
+      setTimeout(() => {
+        router.push("/auth/sign-in")
+      }, 1500)
+    }
+  }, [router, searchParams, isAuthenticated, isLoading])
 
   return (
     <>

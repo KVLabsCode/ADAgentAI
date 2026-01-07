@@ -16,6 +16,11 @@ import {
   ChevronUp,
   PanelLeftClose,
   FileText,
+  Users,
+  User,
+  Plus,
+  Check,
+  ChevronDown,
 } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
 
@@ -37,6 +42,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -66,19 +73,34 @@ const adminNavItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { toggleSidebar, state } = useSidebar()
-  const { user, isAdmin, signOut } = useUser()
+  const { user, isAdmin, signOut, selectedOrganization, organizations, selectOrganization, createOrganization } = useUser()
   const [mounted, setMounted] = useState(false)
+  const [isCreatingOrg, setIsCreatingOrg] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const handleCreateOrganization = async () => {
+    const name = prompt("Enter organization name:")
+    if (!name) return
+    setIsCreatingOrg(true)
+    try {
+      const newOrg = await createOrganization(name)
+      if (newOrg) {
+        selectOrganization(newOrg.id)
+      }
+    } finally {
+      setIsCreatingOrg(false)
+    }
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/40">
       <SidebarHeader className="h-12 flex flex-row items-center justify-between border-b border-border/40 px-2">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 group-data-[collapsible=icon]:hidden"
+          className="flex items-center gap-2 pl-2 group-data-[collapsible=icon]:hidden"
         >
           <div className="flex h-6 w-6 items-center justify-center rounded bg-foreground text-background text-[10px] font-semibold shrink-0">
             AD
@@ -87,23 +109,99 @@ export function AppSidebar() {
             ADAgentAI
           </span>
         </Link>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:mx-auto"
-            >
-              <PanelLeftClose className={`h-3.5 w-3.5 transition-transform ${state === "collapsed" ? "rotate-180" : ""}`} />
-              <span className="sr-only">Toggle sidebar</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="text-xs">
-            {state === "collapsed" ? "Expand" : "Collapse"} sidebar
-          </TooltipContent>
-        </Tooltip>
+        {/* Desktop: show tooltip, Mobile: no tooltip to prevent it staying open */}
+        <div className="hidden md:block">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSidebar}
+                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:mx-auto"
+              >
+                <PanelLeftClose className={`h-3.5 w-3.5 transition-transform ${state === "collapsed" ? "rotate-180" : ""}`} />
+                <span className="sr-only">Toggle sidebar</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              {state === "collapsed" ? "Expand" : "Collapse"} sidebar
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground md:hidden"
+        >
+          <PanelLeftClose className={`h-3.5 w-3.5 transition-transform ${state === "collapsed" ? "rotate-180" : ""}`} />
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
       </SidebarHeader>
+
+      {/* Organization Switcher */}
+      {mounted && (
+        <div className="px-2 py-2 border-b border-border/40">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent/50 transition-colors group-data-[collapsible=icon]:justify-center">
+                <div className="h-5 w-5 rounded flex items-center justify-center shrink-0 bg-muted">
+                  {selectedOrganization ? (
+                    <Users className="h-3 w-3 text-muted-foreground" />
+                  ) : (
+                    <User className="h-3 w-3 text-muted-foreground" />
+                  )}
+                </div>
+                <span className="flex-1 text-left truncate text-xs group-data-[collapsible=icon]:hidden">
+                  {selectedOrganization?.name || "Personal"}
+                </span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal">
+                Switch workspace
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => selectOrganization(null)}
+                className="text-xs cursor-pointer"
+              >
+                <User className="h-3.5 w-3.5 mr-2" />
+                Personal
+                {!selectedOrganization && <Check className="h-3 w-3 ml-auto" />}
+              </DropdownMenuItem>
+              {organizations.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal">
+                    Organizations
+                  </DropdownMenuLabel>
+                  {organizations.map((org) => (
+                    <DropdownMenuItem
+                      key={org.id}
+                      onClick={() => selectOrganization(org.id)}
+                      className="text-xs cursor-pointer"
+                    >
+                      <Users className="h-3.5 w-3.5 mr-2" />
+                      <span className="truncate">{org.name}</span>
+                      {selectedOrganization?.id === org.id && <Check className="h-3 w-3 ml-auto" />}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleCreateOrganization}
+                disabled={isCreatingOrg}
+                className="text-xs cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5 mr-2" />
+                {isCreatingOrg ? "Creating..." : "Create organization"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
       <SidebarContent className="px-2 py-2">
         <SidebarGroup className="p-0">

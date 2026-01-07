@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +64,7 @@ function formatRelativeDate(dateStr: string): string {
 }
 
 export default function ChatHistoryPage() {
+  const { getAccessToken } = useUser()
   const [chats, setChats] = React.useState<ChatHistoryItem[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -75,9 +78,8 @@ export default function ChatHistoryPage() {
   // Fetch chat sessions from API
   const fetchChats = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/chat/sessions`, {
-        credentials: 'include',
-      })
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/chat/sessions`, accessToken)
 
       if (response.ok) {
         const data = await response.json()
@@ -93,7 +95,7 @@ export default function ChatHistoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [getAccessToken])
 
   React.useEffect(() => {
     fetchChats()
@@ -158,9 +160,9 @@ export default function ChatHistoryPage() {
 
   const handleDelete = async (chatId: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/chat/session/${chatId}`, {
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/chat/session/${chatId}`, accessToken, {
         method: 'DELETE',
-        credentials: 'include',
       })
 
       if (response.ok) {
@@ -176,11 +178,11 @@ export default function ChatHistoryPage() {
   const handleBulkDelete = async () => {
     setIsDeleting(true)
     try {
+      const accessToken = await getAccessToken()
       // Delete all selected chats
       const deletePromises = Array.from(selectedIds).map(id =>
-        fetch(`${API_URL}/api/chat/session/${id}`, {
+        authFetch(`${API_URL}/api/chat/session/${id}`, accessToken, {
           method: 'DELETE',
-          credentials: 'include',
         })
       )
 
@@ -199,9 +201,10 @@ export default function ChatHistoryPage() {
 
   const handleExport = async (chatId: string, format: "md" | "json") => {
     try {
-      const response = await fetch(
+      const accessToken = await getAccessToken()
+      const response = await authFetch(
         `${API_URL}/api/chat/session/${chatId}/export?format=${format === 'md' ? 'markdown' : 'json'}`,
-        { credentials: 'include' }
+        accessToken
       )
 
       if (response.ok) {
@@ -221,7 +224,6 @@ export default function ChatHistoryPage() {
   }
 
   const isAllSelected = filteredChats.length > 0 && selectedIds.size === filteredChats.length
-  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < filteredChats.length
 
   if (isLoading) {
     return (
