@@ -288,6 +288,20 @@ export default function SettingsPage() {
   const currentUserRole = memberRole || selectedOrgRole?.toLowerCase() || null
   const canManageMembers = currentUserRole === "owner" || currentUserRole === "admin"
 
+  // Debug logging for role detection
+  React.useEffect(() => {
+    if (selectedOrganization) {
+      console.log('[Settings] Debug org role:', {
+        userId: user?.id,
+        selectedOrgRole,
+        memberRole,
+        currentUserRole,
+        canManageMembers,
+        members: members.map(m => ({ id: m.id, userId: m.userId, role: m.role })),
+      })
+    }
+  }, [selectedOrganization, user?.id, selectedOrgRole, memberRole, currentUserRole, canManageMembers, members])
+
   const getRoleIcon = (role: string) => {
     switch (role.toLowerCase()) {
       case "owner": return <Crown className="h-3 w-3 text-amber-500" />

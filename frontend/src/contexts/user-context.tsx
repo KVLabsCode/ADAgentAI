@@ -115,6 +115,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return null
   }, [activeOrgData, neonUser])
 
+  // Debug logging for active org data
+  React.useEffect(() => {
+    if (activeOrgData) {
+      console.log('[UserContext] Active org data:', JSON.stringify(activeOrgData, null, 2))
+    }
+  }, [activeOrgData])
+
   // Map organizations from Neon Auth hook
   // Include role for the active organization
   const organizations: Organization[] = (orgList || []).map((org) => ({
