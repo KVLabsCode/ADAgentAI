@@ -144,7 +144,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(ORG_STORAGE_KEY)
 
     // Clear all auth-related cookies (Neon Auth / Better Auth uses these)
-    const cookiesToClear = [
+    // Must handle both localhost (no Secure flag) and production (Secure flag)
+    const cookieNames = [
       'better-auth.session_token',
       'better-auth.session',
       '__Secure-better-auth.session_token',
@@ -152,9 +153,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       'neon-auth.session_token',
       'neon-auth.session',
     ]
-    cookiesToClear.forEach(name => {
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`
+
+    const isProduction = window.location.protocol === 'https:'
+    const domain = window.location.hostname
+
+    cookieNames.forEach(name => {
+      // Clear with various combinations to ensure removal
+      const expiry = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
+
+      // Basic clear
+      document.cookie = `${name}=; ${expiry}; path=/`
+
+      // With domain
+      document.cookie = `${name}=; ${expiry}; path=/; domain=${domain}`
+
+      // With Secure flag for production
+      if (isProduction) {
+        document.cookie = `${name}=; ${expiry}; path=/; Secure`
+        document.cookie = `${name}=; ${expiry}; path=/; domain=${domain}; Secure`
+        document.cookie = `${name}=; ${expiry}; path=/; domain=.${domain}; Secure`
+      }
     })
 
     try {
