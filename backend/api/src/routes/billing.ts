@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { Polar } from "@polar-sh/sdk";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, sql, inArray } from "drizzle-orm";
 
 import { requireAuth } from "../middleware/auth";
 import { trackSubscription } from "../lib/analytics";
@@ -111,7 +111,7 @@ billing.get("/usage", async (c) => {
         .from(messages)
         .where(
           and(
-            sql`${messages.sessionId} = ANY(${sessionIds})`,
+            inArray(messages.sessionId, sessionIds),
             eq(messages.role, "user"),
             gte(messages.createdAt, startOfMonth)
           )
