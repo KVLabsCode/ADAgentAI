@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
+import { TosModal } from "@/components/tos-modal"
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
@@ -64,7 +65,7 @@ export default function AuthenticatedLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { isLoading, isAuthenticated } = useUser()
+  const { isLoading, isAuthenticated, hasWaitlistAccess, isCheckingWaitlist, hasAcceptedTos, isCheckingTos } = useUser()
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -72,8 +73,15 @@ export default function AuthenticatedLayout({
     }
   }, [isLoading, isAuthenticated, router])
 
-  // Show loading state while checking auth
-  if (isLoading) {
+  // Redirect to access denied if user doesn't have waitlist access
+  React.useEffect(() => {
+    if (!isLoading && isAuthenticated && !isCheckingWaitlist && hasWaitlistAccess === false) {
+      router.push('/access-denied')
+    }
+  }, [isLoading, isAuthenticated, isCheckingWaitlist, hasWaitlistAccess, router])
+
+  // Show loading state while checking auth, waitlist, or ToS
+  if (isLoading || isCheckingWaitlist || isCheckingTos) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -90,6 +98,18 @@ export default function AuthenticatedLayout({
     )
   }
 
+  // Don't render if waitlist access is denied
+  if (hasWaitlistAccess === false) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Show ToS modal if user hasn't accepted (but is authenticated and has waitlist access)
+  const showTosModal = hasAcceptedTos === false
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -103,6 +123,8 @@ export default function AuthenticatedLayout({
           {children}
         </div>
       </SidebarInset>
+      {/* Terms of Service Modal */}
+      <TosModal open={showTosModal} />
     </SidebarProvider>
   )
 }

@@ -338,6 +338,22 @@ export const crewTasks = pgTable("crew_tasks", {
   index("crew_tasks_agent_key_idx").on(table.agentKey),
 ]);
 
+// User Preferences (ToS acceptance, settings, etc.)
+// Note: userId references Neon Auth users (neon_auth schema), not public.users
+export const userPreferences = pgTable("user_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().unique(), // References neon_auth.users_sync.id (no FK constraint)
+  tosAcceptedAt: timestamp("tos_accepted_at"), // null = not accepted yet
+  tosVersion: varchar("tos_version", { length: 20 }), // e.g., "1.0", "2024-01-01"
+  privacyAcceptedAt: timestamp("privacy_accepted_at"),
+  privacyVersion: varchar("privacy_version", { length: 20 }),
+  marketingOptIn: boolean("marketing_opt_in").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("user_preferences_user_id_idx").on(table.userId),
+]);
+
 // Waitlist
 export const waitlist = pgTable("waitlist", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -385,6 +401,8 @@ export type BlogPost = typeof blogPosts.$inferSelect;
 export type NewBlogPost = typeof blogPosts.$inferInsert;
 export type WaitlistEntry = typeof waitlist.$inferSelect;
 export type NewWaitlistEntry = typeof waitlist.$inferInsert;
+export type UserPreference = typeof userPreferences.$inferSelect;
+export type NewUserPreference = typeof userPreferences.$inferInsert;
 export type CrewAgent = typeof crewAgents.$inferSelect;
 export type NewCrewAgent = typeof crewAgents.$inferInsert;
 export type CrewTask = typeof crewTasks.$inferSelect;

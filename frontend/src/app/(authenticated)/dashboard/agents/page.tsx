@@ -11,9 +11,7 @@ import {
   Target,
   BookOpen,
   Save,
-  X,
   Plus,
-  Trash2,
   ListTodo,
   Link2,
   GitBranch,
@@ -35,16 +33,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   Select,
   SelectContent,
@@ -331,6 +319,15 @@ export default function CrewAIConfigPage() {
     }
     setDeleteTarget(null)
   }
+
+  // Suppress unused warnings - these handlers will be wired to UI buttons
+  void saving
+  void handleCreateAgent
+  void handleSaveAgent
+  void handleDeleteAgent
+  void handleCreateTask
+  void handleSaveTask
+  void handleDeleteTask
 
   // Group agents
   const orchestrators = agents.filter((a) => a.is_orchestrator)

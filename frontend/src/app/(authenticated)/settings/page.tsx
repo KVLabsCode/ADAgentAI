@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GmailEmailInput, GMAIL_DOMAINS, getFullEmail } from "@/components/ui/gmail-email-input"
 import { useChatSettings } from "@/lib/chat-settings"
 import { useUser } from "@/hooks/use-user"
+import { authFetch } from "@/lib/api"
 import { authClient } from "@/lib/neon-auth/client"
 import { OrganizationMember } from "@/lib/types"
 import {
@@ -37,7 +38,7 @@ interface PendingInvitation {
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { displayMode, setDisplayMode } = useChatSettings()
-  const { selectedOrganization, selectedOrganizationId, selectedOrgRole, user } = useUser()
+  const { selectedOrganization, selectedOrganizationId, selectedOrgRole, user, getAccessToken, signOut } = useUser()
   const [mounted, setMounted] = React.useState(false)
 
   // Organization management state
@@ -66,6 +67,11 @@ export default function SettingsPage() {
 
   // Role change state
   const [changingRoleMemberId, setChangingRoleMemberId] = React.useState<string | null>(null)
+
+  // Delete account state
+  const [deleteAccountConfirmEmail, setDeleteAccountConfirmEmail] = React.useState("")
+  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false)
+  const [deleteAccountError, setDeleteAccountError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     setMounted(true)
@@ -278,6 +284,39 @@ export default function SettingsPage() {
       console.error("Failed to change member role:", error)
     } finally {
       setChangingRoleMemberId(null)
+    }
+  }
+
+  // Delete account handler
+  const handleDeleteAccount = async () => {
+    if (!user?.email) return
+    if (deleteAccountConfirmEmail.toLowerCase() !== user.email.toLowerCase()) {
+      setDeleteAccountError("Email doesn't match your account email")
+      return
+    }
+
+    setIsDeletingAccount(true)
+    setDeleteAccountError(null)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${apiUrl}/api/account`, accessToken, {
+        method: 'DELETE',
+        body: JSON.stringify({ confirmEmail: deleteAccountConfirmEmail }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to delete account')
+      }
+
+      // Sign out after successful deletion
+      await signOut()
+    } catch (error) {
+      console.error("Failed to delete account:", error)
+      setDeleteAccountError(error instanceof Error ? error.message : "Failed to delete account")
+      setIsDeletingAccount(false)
     }
   }
 
@@ -789,16 +828,79 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="px-3 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between py-2 px-2 rounded bg-destructive/5 border border-destructive/20">
             <div>
               <p className="text-xs font-medium text-destructive">Delete Account</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                This will permanently delete your account and all associated data.
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Permanently delete your account and all associated data including chat history, connected providers, and settings.
               </p>
             </div>
-            <Button variant="destructive" size="sm" className="h-7 text-[11px]">
-              Delete
-            </Button>
+            <AlertDialog onOpenChange={(open) => {
+              if (!open) {
+                setDeleteAccountConfirmEmail("")
+                setDeleteAccountError(null)
+              }
+            }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="h-7 text-[11px] shrink-0">
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    Delete Account
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3">
+                      <p>
+                        Are you sure you want to delete your account? This action <strong>cannot be undone</strong>. The following data will be permanently deleted:
+                      </p>
+                      <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-4">
+                        <li>All chat conversations and history</li>
+                        <li>Connected AdMob and Ad Manager accounts</li>
+                        <li>Your preferences and settings</li>
+                      </ul>
+                      <div className="space-y-2 pt-2">
+                        <p className="text-xs font-medium text-foreground">
+                          Type your email <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">{user?.email}</span> to confirm:
+                        </p>
+                        <Input
+                          type="email"
+                          value={deleteAccountConfirmEmail}
+                          onChange={(e) => setDeleteAccountConfirmEmail(e.target.value)}
+                          placeholder="your@email.com"
+                          className="h-9 text-sm"
+                          autoComplete="off"
+                        />
+                        {deleteAccountError && (
+                          <p className="text-[11px] text-destructive">{deleteAccountError}</p>
+                        )}
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    disabled={isDeletingAccount || deleteAccountConfirmEmail.toLowerCase() !== user?.email?.toLowerCase()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {isDeletingAccount ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete Account"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

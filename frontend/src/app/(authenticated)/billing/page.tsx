@@ -68,7 +68,7 @@ interface Invoice {
 
 const tiers: PricingTier[] = [
   {
-    name: "Free",
+    name: "Trial",
     price: "$0",
     description: "For individuals getting started",
     features: [
@@ -321,7 +321,7 @@ function BillingContent() {
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-medium">Current Plan</h2>
             <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
-              {isPro ? subscription?.plan?.name || 'Pro' : 'Free'}
+              {isPro ? subscription?.plan?.name || 'Pro' : 'Trial'}
             </Badge>
           </div>
           <div className="flex items-center gap-1.5">
@@ -393,7 +393,7 @@ function BillingContent() {
         <h2 className="text-xs font-medium mb-2">Available Plans</h2>
         <div className="grid gap-2 sm:grid-cols-3">
           {tiers.map((tier) => {
-            const isCurrent = (tier.name === 'Free' && !isPro) || (tier.name === 'Pro' && isPro)
+            const isCurrent = (tier.name === 'Trial' && !isPro) || (tier.name === 'Pro' && isPro)
             const canUpgrade = tier.name === 'Pro' && !isPro && tier.priceId
             const isUpgradingThis = isUpgrading === tier.priceId
 

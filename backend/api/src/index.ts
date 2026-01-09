@@ -15,6 +15,7 @@ import webhookRoutes from "./routes/webhooks";
 import { publicBlog, adminBlog } from "./routes/blog";
 import waitlistRoutes from "./routes/waitlist";
 import agentRoutes from "./routes/agents";
+import accountRoutes from "./routes/account";
 
 // Initialize observability (as early as possible)
 initSentry();
@@ -115,6 +116,7 @@ api.route("/blog", publicBlog);
 api.route("/admin/blog", adminBlog);
 api.route("/waitlist", waitlistRoutes);
 api.route("/admin/agents", agentRoutes);
+api.route("/account", accountRoutes);
 
 // Webhook routes (outside /api for cleaner URLs)
 app.route("/webhooks", webhookRoutes);
