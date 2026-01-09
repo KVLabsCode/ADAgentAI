@@ -283,11 +283,13 @@ export default function SettingsPage() {
   }
 
   // Use role from members list, or fall back to context (from useActiveOrganization)
-  const currentUserRole = members.find(m => m.userId === user?.id)?.role || selectedOrgRole
+  // Normalize to lowercase for consistent comparison
+  const memberRole = members.find(m => m.userId === user?.id)?.role?.toLowerCase()
+  const currentUserRole = memberRole || selectedOrgRole?.toLowerCase() || null
   const canManageMembers = currentUserRole === "owner" || currentUserRole === "admin"
 
   const getRoleIcon = (role: string) => {
-    switch (role) {
+    switch (role.toLowerCase()) {
       case "owner": return <Crown className="h-3 w-3 text-amber-500" />
       case "admin": return <ShieldCheck className="h-3 w-3 text-blue-500" />
       default: return <Users className="h-3 w-3 text-muted-foreground" />
@@ -525,8 +527,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Organization Settings */}
-              {currentUserRole === "owner" && (
+              {/* Organization Settings - Owner only */}
+              {(currentUserRole === "owner") && (
                 <div className="border-t border-border/20 pt-3 space-y-3">
                   <div className="flex items-center gap-2">
                     <Building2 className="h-3.5 w-3.5 text-muted-foreground/70" />

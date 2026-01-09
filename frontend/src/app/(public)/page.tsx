@@ -30,12 +30,22 @@ export default function LandingPage() {
               Ask questions in plain English. Get instant insights.
             </p>
 
-            {/* Waitlist CTA */}
-            <WaitlistDialog />
-
-            <p className="text-[11px] text-muted-foreground">
-              Free during early access. No credit card required.
-            </p>
+            {/* CTA - Show waitlist for non-authenticated, dashboard link for authenticated */}
+            {isAuthenticated ? (
+              <Button asChild size="sm" className="h-9">
+                <Link href="/dashboard">
+                  Go to Dashboard
+                  <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <WaitlistDialog />
+                <p className="text-[11px] text-muted-foreground">
+                  Free during early access. No credit card required.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </section>

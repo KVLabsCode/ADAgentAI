@@ -78,18 +78,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // where members includes the current user's membership with role
   const activeOrgRole = React.useMemo(() => {
     if (!activeOrgData || !neonUser) return null
+
     // The active org data may have members array or activeMember
     const data = activeOrgData as Record<string, unknown>
-    // Try activeMember first (direct membership info)
+
+    // Try activeMember first (direct membership info from Neon Auth)
     if (data.activeMember && typeof data.activeMember === 'object') {
       const member = data.activeMember as { role?: string }
-      return member.role || null
+      if (member.role) {
+        return member.role.toLowerCase() // Normalize to lowercase
+      }
     }
+
     // Try members array
     if (Array.isArray(data.members)) {
       const membership = data.members.find((m: { userId?: string }) => m.userId === neonUser.id)
-      return (membership as { role?: string })?.role || null
+      const role = (membership as { role?: string })?.role
+      if (role) {
+        return role.toLowerCase() // Normalize to lowercase
+      }
     }
+
+    // Try role field directly on data (some Neon Auth versions return it here)
+    if (typeof data.role === 'string') {
+      return data.role.toLowerCase()
+    }
+
+    // Try membership field (alternative Neon Auth structure)
+    if (data.membership && typeof data.membership === 'object') {
+      const membership = data.membership as { role?: string }
+      if (membership.role) {
+        return membership.role.toLowerCase()
+      }
+    }
+
     return null
   }, [activeOrgData, neonUser])
 
@@ -112,15 +134,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await authClient.signOut()
+      // Clear local storage first
       localStorage.removeItem(ORG_STORAGE_KEY)
-      await new Promise(resolve => setTimeout(resolve, 100))
-      router.push('/')
+
+      // Sign out from Neon Auth
+      await authClient.signOut()
+
+      // Use hard redirect to ensure all state is cleared (no caching)
+      // This is more reliable than router.push for sign out
+      window.location.href = '/'
     } catch (error) {
       console.error('Sign out error:', error)
-      router.push('/login')
+      // Even on error, clear local state and redirect
+      localStorage.removeItem(ORG_STORAGE_KEY)
+      window.location.href = '/login'
     }
-  }, [router])
+  }, [])
 
   // Get session token for backend API calls
   // Neon Auth provides the token in the session object
