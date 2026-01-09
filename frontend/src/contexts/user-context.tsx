@@ -146,12 +146,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     // Clear all auth-related cookies (Neon Auth / Better Auth uses these)
     // Must handle both localhost (no Secure flag) and production (Secure flag)
     const cookieNames = [
+      // Neon Auth cookies (production uses __Secure- prefix)
+      '__Secure-neon-auth.session_token',
+      '__Secure-neon-auth.session_challange',
+      'neon-auth.session_token',
+      'neon-auth.session_challange',
+      // Better Auth cookies (fallback)
       'better-auth.session_token',
       'better-auth.session',
       '__Secure-better-auth.session_token',
       '__Host-better-auth.session_token',
-      'neon-auth.session_token',
-      'neon-auth.session',
     ]
 
     const isProduction = window.location.protocol === 'https:'
