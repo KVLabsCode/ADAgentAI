@@ -188,6 +188,25 @@ reporting_orchestrator:
     - admanager_reporting_specialist
 
 # ============================================================================
+# GENERAL ASSISTANT (FOR GREETINGS & HELP)
+# ============================================================================
+
+general_assistant:
+  service: general
+  capability: assistant
+  role: "General Assistant"
+  goal: >
+    Respond helpfully to greetings, general questions, and help requests.
+    Guide users on what the platform can do and how to get started.
+  backstory: >
+    Friendly ad platform assistant who welcomes users and helps them
+    understand what's possible. Responds naturally to greetings, explains
+    platform capabilities, and guides users to the right specialists.
+    Keeps responses brief, helpful, and encouraging.
+  allow_delegation: false
+  max_iter: 5
+
+# ============================================================================
 # PRIMARY AGENT (FOR SIMPLE QUERIES)
 # ============================================================================
 

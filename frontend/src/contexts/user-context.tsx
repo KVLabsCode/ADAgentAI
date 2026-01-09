@@ -27,8 +27,8 @@ interface UserContextValue {
 
 const UserContext = createContext<UserContextValue | null>(null)
 
-// Type for Neon Auth organization response
-interface NeonAuthOrg {
+// Type for Neon Auth organization response (used in type assertions below)
+interface _NeonAuthOrg {
   id: string
   name: string
   slug: string
@@ -54,19 +54,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Use Neon Auth's built-in organization hooks
   // useListOrganizations returns basic org info
   // useActiveOrganization returns the active org with user's membership/role
-  const { data: orgList, isPending: isLoadingOrgs } = authClient.useListOrganizations()
+  const { data: orgList, isPending: isLoadingOrgs, refetch: refetchOrgs } = authClient.useListOrganizations()
   const { data: activeOrgData } = authClient.useActiveOrganization()
 
   // Get user from Neon Auth session
   const neonUser = session?.user
 
   // Map to our User type
+  // neonUser.role comes from Neon Auth - can be set in Neon Console
+  const neonUserAny = neonUser as Record<string, unknown> | undefined
+  const userRole = neonUserAny?.role === 'admin' ? 'admin' : 'user'
+
   const user: User | null = neonUser ? {
     id: neonUser.id,
     email: neonUser.email || '',
     name: neonUser.name || neonUser.email?.split('@')[0] || 'User',
     avatar: neonUser.image || '',
-    role: 'user',
+    role: userRole,
   } : null
 
   // Get user's role from active organization data
@@ -176,8 +180,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         name,
         slug: name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
       })
+      if (response.error) {
+        console.error('Failed to create organization:', response.error)
+        return null
+      }
       if (response.data) {
         const org = response.data
+        // Refetch organizations list to include the new org
+        await refetchOrgs()
         return {
           id: org.id,
           name: org.name,
@@ -191,11 +201,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to create organization:', error)
       return null
     }
-  }, [neonUser])
+  }, [neonUser, refetchOrgs])
+
+  // Platform admin check - uses role from Neon Auth (set in Neon Console)
+  const isAdmin = user?.role === 'admin'
 
   const value: UserContextValue = {
     user,
-    isAdmin: false,
+    isAdmin,
     isLoading: isPending,
     isAuthenticated: !!neonUser,
     signOut,

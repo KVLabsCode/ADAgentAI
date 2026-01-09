@@ -180,7 +180,11 @@ app.get("/admin/list", async (c) => {
       .limit(limit)
       .offset(offset);
 
-    const [{ value: total }] = await db.select({ value: count() }).from(waitlist);
+    // Count with the same filter to get accurate totals
+    const [{ value: total }] = await db
+      .select({ value: count() })
+      .from(waitlist)
+      .where(whereClause);
 
     return c.json({
       entries,
@@ -237,6 +241,43 @@ app.post("/admin/invite", zValidator("json", inviteSchema), async (c) => {
   } catch (error) {
     console.error("[Waitlist] Error inviting:", error);
     return c.json({ error: "Failed to invite user" }, 500);
+  }
+});
+
+// Reject a user (remove from waitlist)
+const rejectSchema = z.object({
+  email: z.string().email(),
+});
+
+app.post("/admin/reject", zValidator("json", rejectSchema), async (c) => {
+  // TODO: Add admin auth check
+  const { email } = c.req.valid("json");
+
+  try {
+    const [entry] = await db
+      .select()
+      .from(waitlist)
+      .where(eq(waitlist.email, email.toLowerCase()))
+      .limit(1);
+
+    if (!entry) {
+      return c.json({ error: "Email not found on waitlist" }, 404);
+    }
+
+    if (entry.status === "rejected") {
+      return c.json({ error: "User already rejected" }, 400);
+    }
+
+    // Update status to rejected instead of deleting
+    await db
+      .update(waitlist)
+      .set({ status: "rejected" })
+      .where(eq(waitlist.id, entry.id));
+
+    return c.json({ success: true, message: "User rejected" });
+  } catch (error) {
+    console.error("[Waitlist] Error rejecting:", error);
+    return c.json({ error: "Failed to reject user" }, 500);
   }
 });
 

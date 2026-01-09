@@ -4,10 +4,11 @@ import { z } from "zod";
 import { eq, and, isNull } from "drizzle-orm";
 
 import { db } from "../db";
-import { connectedProviders, type NewConnectedProvider } from "../db/schema";
+import { connectedProviders, userProviderPreferences, type NewConnectedProvider } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { trackProviderConnected } from "../lib/analytics";
 import { safeEncrypt, safeDecrypt } from "../lib/crypto";
+import { sql } from "drizzle-orm";
 
 const providers = new Hono();
 
@@ -53,12 +54,39 @@ const OAUTH_CONFIG = {
 } as const;
 
 // ============================================================
+// Helpers
+// ============================================================
+
+/**
+ * Check if user is an admin/owner of the current organization
+ * Returns true if personal context (no org) or if user is admin/owner
+ */
+async function isOrgAdmin(userId: string, organizationId: string | null): Promise<boolean> {
+  // Personal context - user owns their own providers
+  if (!organizationId) return true;
+
+  // Check org membership role via Neon Auth
+  const result = await db.execute(sql`
+    SELECT role FROM neon_auth.member
+    WHERE "userId" = ${userId}
+    AND "organizationId" = ${organizationId}
+    LIMIT 1
+  `);
+
+  const rows = result.rows as Array<{ role: string }>;
+  if (!rows || rows.length === 0) return false;
+
+  const role = rows[0].role;
+  return role === "owner" || role === "admin";
+}
+
+// ============================================================
 // Routes
 // ============================================================
 
 /**
  * GET /providers - List user's connected providers
- * When in organization context, returns org-scoped providers
+ * When in organization context, returns org-scoped providers with user's enabled preference
  * When in personal context, returns personal providers (organizationId is null)
  */
 providers.get("/", async (c) => {
@@ -70,7 +98,7 @@ providers.get("/", async (c) => {
     ? and(eq(connectedProviders.userId, user.id), eq(connectedProviders.organizationId, organizationId))
     : and(eq(connectedProviders.userId, user.id), isNull(connectedProviders.organizationId));
 
-  const userProviders = await db.query.connectedProviders.findMany({
+  const orgProviders = await db.query.connectedProviders.findMany({
     where: whereClause,
     columns: {
       id: true,
@@ -85,23 +113,42 @@ providers.get("/", async (c) => {
     },
   });
 
+  // Get user's preferences for these providers
+  const providerIds = orgProviders.map(p => p.id);
+  const userPrefs = providerIds.length > 0
+    ? await db.query.userProviderPreferences.findMany({
+        where: and(
+          eq(userProviderPreferences.userId, user.id),
+          sql`${userProviderPreferences.providerId} = ANY(ARRAY[${sql.join(providerIds.map(id => sql`${id}::uuid`), sql`, `)}])`
+        ),
+      })
+    : [];
+
+  // Create a map of provider preferences
+  const prefMap = new Map(userPrefs.map(p => [p.providerId, p.isEnabled]));
+
+  // Check if user can manage providers (admin/owner)
+  const canManage = await isOrgAdmin(user.id, organizationId);
+
   return c.json({
-    providers: userProviders.map((p) => ({
+    providers: orgProviders.map((p) => ({
       id: p.id,
       type: p.provider,
       name: p.accountName || getProviderDisplayName(p.provider),
       identifier: p.provider === "admob" ? p.publisherId : p.networkCode,
-      isEnabled: p.isEnabled,
+      isEnabled: prefMap.get(p.id) ?? true, // Default to enabled if no preference
       lastSyncAt: p.lastSyncAt,
       connectedAt: p.createdAt,
       organizationId: p.organizationId,
     })),
+    canManage, // Frontend uses this to show/hide connect/disconnect buttons
   });
 });
 
 /**
  * POST /providers/connect/:type - Initiate OAuth for provider
  * Returns the OAuth URL to redirect the user to
+ * Requires org admin role when in organization context
  */
 providers.post(
   "/connect/:type",
@@ -109,6 +156,13 @@ providers.post(
   async (c) => {
     const user = c.get("user");
     const { type } = c.req.valid("param");
+
+    // Check if user can manage providers (admin only for org context)
+    const canManage = await isOrgAdmin(user.id, user.organizationId);
+    if (!canManage) {
+      return c.json({ error: "Only organization admins can connect providers" }, 403);
+    }
+
     const config = OAUTH_CONFIG[type];
 
     // Encode user ID and org ID in state for the callback
@@ -387,10 +441,17 @@ providers.get("/:id/apps", async (c) => {
 
 /**
  * DELETE /providers/:id - Disconnect provider
+ * Requires org admin role when in organization context
  */
 providers.delete("/:id", async (c) => {
   const user = c.get("user");
   const providerId = c.req.param("id");
+
+  // Check if user can manage providers (admin only for org context)
+  const canManage = await isOrgAdmin(user.id, user.organizationId);
+  if (!canManage) {
+    return c.json({ error: "Only organization admins can disconnect providers" }, 403);
+  }
 
   const [deleted] = await db
     .delete(connectedProviders)
@@ -410,7 +471,8 @@ providers.delete("/:id", async (c) => {
 });
 
 /**
- * PATCH /providers/:id/toggle - Enable/disable provider for chat
+ * PATCH /providers/:id/toggle - Enable/disable provider for user's queries
+ * This is a per-user preference, any org member can toggle for themselves
  */
 providers.patch(
   "/:id/toggle",
@@ -420,24 +482,48 @@ providers.patch(
     const providerId = c.req.param("id");
     const { isEnabled } = c.req.valid("json");
 
-    const [updated] = await db
-      .update(connectedProviders)
-      .set({ isEnabled, updatedAt: new Date() })
-      .where(
-        and(
-          eq(connectedProviders.id, providerId),
-          eq(connectedProviders.userId, user.id)
-        )
-      )
-      .returning();
+    // Verify provider exists and user has access
+    const provider = await db.query.connectedProviders.findFirst({
+      where: eq(connectedProviders.id, providerId),
+    });
 
-    if (!updated) {
+    if (!provider) {
       return c.json({ error: "Provider not found" }, 404);
     }
 
+    // Check user has access (same org or personal provider)
+    const userOrgId = user.organizationId;
+    const providerOrgId = provider.organizationId;
+    if (providerOrgId !== userOrgId) {
+      return c.json({ error: "Provider not found" }, 404);
+    }
+
+    // Upsert user preference
+    const existingPref = await db.query.userProviderPreferences.findFirst({
+      where: and(
+        eq(userProviderPreferences.userId, user.id),
+        eq(userProviderPreferences.providerId, providerId)
+      ),
+    });
+
+    if (existingPref) {
+      // Update existing preference
+      await db
+        .update(userProviderPreferences)
+        .set({ isEnabled, updatedAt: new Date() })
+        .where(eq(userProviderPreferences.id, existingPref.id));
+    } else {
+      // Create new preference
+      await db.insert(userProviderPreferences).values({
+        userId: user.id,
+        providerId,
+        isEnabled,
+      });
+    }
+
     return c.json({
-      id: updated.id,
-      isEnabled: updated.isEnabled,
+      id: providerId,
+      isEnabled,
     });
   }
 );
@@ -524,6 +610,7 @@ providers.get(
  * GET /providers/internal/list - Internal endpoint for fetching user's providers
  * Protected by internal API key. Used by chat server.
  * Supports organization filtering via organizationId query param
+ * Respects user's enabled preferences
  */
 providers.get("/internal/list", async (c) => {
   // Verify internal API key
@@ -541,20 +628,18 @@ providers.get("/internal/list", async (c) => {
     return c.json({ error: "userId is required" }, 400);
   }
 
-  // Build filter based on organization context
+  // Build filter based on organization context (no longer filter by isEnabled at org level)
   const whereClause = organizationId
     ? and(
         eq(connectedProviders.userId, userId),
-        eq(connectedProviders.organizationId, organizationId),
-        eq(connectedProviders.isEnabled, true)
+        eq(connectedProviders.organizationId, organizationId)
       )
     : and(
         eq(connectedProviders.userId, userId),
-        isNull(connectedProviders.organizationId),
-        eq(connectedProviders.isEnabled, true)
+        isNull(connectedProviders.organizationId)
       );
 
-  const userProviders = await db.query.connectedProviders.findMany({
+  const orgProviders = await db.query.connectedProviders.findMany({
     where: whereClause,
     columns: {
       id: true,
@@ -566,8 +651,25 @@ providers.get("/internal/list", async (c) => {
     },
   });
 
+  // Get user's preferences for these providers
+  const providerIds = orgProviders.map(p => p.id);
+  const userPrefs = providerIds.length > 0
+    ? await db.query.userProviderPreferences.findMany({
+        where: and(
+          eq(userProviderPreferences.userId, userId),
+          sql`${userProviderPreferences.providerId} = ANY(ARRAY[${sql.join(providerIds.map(id => sql`${id}::uuid`), sql`, `)}])`
+        ),
+      })
+    : [];
+
+  // Create a map of provider preferences
+  const prefMap = new Map(userPrefs.map(p => [p.providerId, p.isEnabled]));
+
+  // Filter to only enabled providers (default true if no preference)
+  const enabledProviders = orgProviders.filter(p => prefMap.get(p.id) !== false);
+
   return c.json({
-    providers: userProviders.map((p) => ({
+    providers: enabledProviders.map((p) => ({
       id: p.id,
       type: p.provider,
       name: p.accountName || getProviderDisplayName(p.provider),
@@ -580,6 +682,7 @@ providers.get("/internal/list", async (c) => {
 /**
  * POST /providers/internal/token - Internal endpoint for services (no user auth)
  * Protected by internal API key. Supports organization filtering.
+ * Respects user's enabled preferences
  */
 providers.post("/internal/token", async (c) => {
   console.log("[InternalToken] Request received");
@@ -606,19 +709,17 @@ providers.post("/internal/token", async (c) => {
     return c.json({ error: "userId and provider are required" }, 400);
   }
 
-  // Build filter based on organization context
+  // Build filter based on organization context (no longer filter by isEnabled at org level)
   const whereClause = organizationId
     ? and(
         eq(connectedProviders.userId, userId),
         eq(connectedProviders.organizationId, organizationId),
-        eq(connectedProviders.provider, providerType),
-        eq(connectedProviders.isEnabled, true)
+        eq(connectedProviders.provider, providerType)
       )
     : and(
         eq(connectedProviders.userId, userId),
         isNull(connectedProviders.organizationId),
-        eq(connectedProviders.provider, providerType),
-        eq(connectedProviders.isEnabled, true)
+        eq(connectedProviders.provider, providerType)
       );
 
   // Find the provider connection
@@ -629,6 +730,20 @@ providers.post("/internal/token", async (c) => {
   if (!provider) {
     console.log("[InternalToken] Provider not found");
     return c.json({ error: "Provider not connected" }, 404);
+  }
+
+  // Check user's preference for this provider
+  const userPref = await db.query.userProviderPreferences.findFirst({
+    where: and(
+      eq(userProviderPreferences.userId, userId),
+      eq(userProviderPreferences.providerId, provider.id)
+    ),
+  });
+
+  // If user has explicitly disabled this provider, don't return token
+  if (userPref && !userPref.isEnabled) {
+    console.log("[InternalToken] Provider disabled by user preference");
+    return c.json({ error: "Provider disabled by user" }, 403);
   }
 
   console.log(`[InternalToken] Found provider, token encrypted: ${provider.accessToken?.startsWith('eyJ') ? 'JWE' : 'unknown'}`);

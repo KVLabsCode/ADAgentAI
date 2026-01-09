@@ -8,6 +8,7 @@ interface NeonAuthUser {
   primaryEmail: string | null;
   displayName: string | null;
   profileImageUrl: string | null;
+  role: string | null; // 'admin' or 'user' - set in Neon Console
   organizationId: string | null; // Currently selected organization (null = personal)
   // Aliases for backward compatibility with billing routes
   email: string | null;
@@ -56,6 +57,7 @@ export async function requireAuth(c: Context, next: Next) {
     // Aliases for backward compatibility
     email: result.user.primaryEmail,
     name: result.user.displayName,
+    role: result.user.role,
   });
   await next();
 }
@@ -77,6 +79,7 @@ export async function optionalAuth(c: Context, next: Next) {
         // Aliases for backward compatibility
         email: result.user.primaryEmail,
         name: result.user.displayName,
+        role: result.user.role,
       });
     }
   }
@@ -85,9 +88,9 @@ export async function optionalAuth(c: Context, next: Next) {
 }
 
 /**
- * Middleware to require admin role
+ * Middleware to require platform admin role
  * Must be used after requireAuth
- * TODO: Implement with Neon Auth teams/permissions
+ * Checks user.role from Neon Auth (set in Neon Console)
  */
 export async function requireAdmin(c: Context, next: Next) {
   const user = c.get("user");
@@ -96,12 +99,8 @@ export async function requireAdmin(c: Context, next: Next) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 
-  // TODO: Check admin permission via Neon Auth teams
-  // For now, check against a list of admin emails
-  const adminEmails = (Bun.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
-  const userEmail = user.primaryEmail?.toLowerCase();
-
-  if (!userEmail || !adminEmails.includes(userEmail)) {
+  // Check role from Neon Auth (set in Neon Console)
+  if (user.role !== "admin") {
     throw new HTTPException(403, { message: "Forbidden: Admin access required" });
   }
 

@@ -1,9 +1,28 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-// Only initialize Resend if API key is provided (used for waitlist emails, not auth)
-const resend = Bun.env.RESEND_API_KEY ? new Resend(Bun.env.RESEND_API_KEY) : null;
+// Gmail SMTP configuration (same credentials as Neon Auth)
+const SMTP_HOST = Bun.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = parseInt(Bun.env.SMTP_PORT || "465");
+const SMTP_USER = Bun.env.SMTP_USER;
+const SMTP_PASS = Bun.env.SMTP_PASS;
+const SMTP_FROM_EMAIL = Bun.env.SMTP_FROM_EMAIL || SMTP_USER;
+const SMTP_FROM_NAME = Bun.env.SMTP_FROM_NAME || "ADAgentAI";
 
-const FROM_EMAIL = Bun.env.FROM_EMAIL || "ADAgent <noreply@adagentai.com>";
+// Check if SMTP is configured
+const isSmtpConfigured = !!(SMTP_USER && SMTP_PASS);
+
+// Create transporter only if configured
+const transporter = isSmtpConfigured
+  ? nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // true for 465, false for other ports
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    })
+  : null;
 
 export interface SendEmailOptions {
   to: string;
@@ -13,26 +32,22 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
-  if (!resend) {
-    console.warn("[Email] RESEND_API_KEY not set, skipping email send");
+  if (!transporter || !isSmtpConfigured) {
+    console.warn("[Email] SMTP not configured (set SMTP_USER and SMTP_PASS), skipping email send");
     return { success: false, error: "Email not configured" };
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+    const info = await transporter.sendMail({
+      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
       to,
       subject,
       html,
       text,
     });
 
-    if (error) {
-      console.error("[Email] Failed to send:", error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, data };
+    console.log("[Email] Sent successfully:", info.messageId);
+    return { success: true, data: { messageId: info.messageId } };
   } catch (err) {
     console.error("[Email] Error:", err);
     return { success: false, error: String(err) };
@@ -44,7 +59,7 @@ export function waitlistConfirmationEmail(name?: string) {
   const greeting = name ? `Hi ${name}` : "Hi there";
 
   return {
-    subject: "You're on the ADAgent waitlist!",
+    subject: "You're on the ADAgentAI waitlist!",
     html: `
 <!DOCTYPE html>
 <html>
@@ -54,18 +69,18 @@ export function waitlistConfirmationEmail(name?: string) {
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="text-align: center; margin-bottom: 30px;">
-    <h1 style="color: #000; font-size: 24px; margin: 0;">ADAgent</h1>
+    <h1 style="color: #000; font-size: 24px; margin: 0;">ADAgentAI</h1>
     <p style="color: #666; margin: 5px 0 0;">AI-Powered Ad Management</p>
   </div>
 
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 30px; color: white; text-align: center; margin-bottom: 30px;">
+  <div style="background: #000; border-radius: 12px; padding: 30px; color: white; text-align: center; margin-bottom: 30px;">
     <h2 style="margin: 0 0 10px; font-size: 28px;">You're on the list!</h2>
     <p style="margin: 0; opacity: 0.9;">We'll notify you when it's your turn.</p>
   </div>
 
   <p>${greeting},</p>
 
-  <p>Thanks for joining the ADAgent waitlist! We're building an AI assistant that makes managing AdMob and Google Ad Manager as easy as having a conversation.</p>
+  <p>Thanks for joining the ADAgentAI waitlist! We're building an AI assistant that makes managing AdMob and Google Ad Manager as easy as having a conversation.</p>
 
   <p><strong>What's coming:</strong></p>
   <ul style="padding-left: 20px;">
@@ -79,7 +94,7 @@ export function waitlistConfirmationEmail(name?: string) {
 
   <p style="color: #666; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
     Questions? Reply to this email - we read everything.<br><br>
-    — The ADAgent Team
+    — The ADAgentAI Team
   </p>
 </body>
 </html>
@@ -87,7 +102,7 @@ export function waitlistConfirmationEmail(name?: string) {
     text: `
 ${greeting},
 
-Thanks for joining the ADAgent waitlist!
+Thanks for joining the ADAgentAI waitlist!
 
 We're building an AI assistant that makes managing AdMob and Google Ad Manager as easy as having a conversation.
 
@@ -101,7 +116,7 @@ We're rolling out access in waves. When it's your turn, you'll get an email with
 
 Questions? Reply to this email - we read everything.
 
-— The ADAgent Team
+— The ADAgentAI Team
     `.trim(),
   };
 }
@@ -111,7 +126,7 @@ export function waitlistInviteEmail(name?: string) {
   const appUrl = Bun.env.FRONTEND_URL || "https://adagentai.com";
 
   return {
-    subject: "You're in! Your ADAgent access is ready",
+    subject: "You're in! Your ADAgentAI access is ready",
     html: `
 <!DOCTYPE html>
 <html>
@@ -121,21 +136,21 @@ export function waitlistInviteEmail(name?: string) {
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="text-align: center; margin-bottom: 30px;">
-    <h1 style="color: #000; font-size: 24px; margin: 0;">ADAgent</h1>
+    <h1 style="color: #000; font-size: 24px; margin: 0;">ADAgentAI</h1>
     <p style="color: #666; margin: 5px 0 0;">AI-Powered Ad Management</p>
   </div>
 
-  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 30px; color: white; text-align: center; margin-bottom: 30px;">
+  <div style="background: #000; border-radius: 12px; padding: 30px; color: white; text-align: center; margin-bottom: 30px;">
     <h2 style="margin: 0 0 10px; font-size: 28px;">You're in!</h2>
-    <p style="margin: 0; opacity: 0.9;">Your access to ADAgent is ready.</p>
+    <p style="margin: 0; opacity: 0.9;">Your access to ADAgentAI is ready.</p>
   </div>
 
   <p>${greeting},</p>
 
-  <p>Great news! Your spot on the ADAgent waitlist has come up. You can now sign up and start using ADAgent to manage your AdMob and Google Ad Manager accounts.</p>
+  <p>Great news! Your spot on the ADAgentAI waitlist has come up. You can now sign up and start using ADAgentAI to manage your AdMob and Google Ad Manager accounts.</p>
 
   <div style="text-align: center; margin: 30px 0;">
-    <a href="${appUrl}/login" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Get Started</a>
+    <a href="${appUrl}/login" style="background: #000; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Get Started</a>
   </div>
 
   <p><strong>Quick start:</strong></p>
@@ -147,7 +162,7 @@ export function waitlistInviteEmail(name?: string) {
 
   <p style="color: #666; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
     Need help? Reply to this email and we'll get you sorted.<br><br>
-    — The ADAgent Team
+    — The ADAgentAI Team
   </p>
 </body>
 </html>
@@ -155,9 +170,9 @@ export function waitlistInviteEmail(name?: string) {
     text: `
 ${greeting},
 
-Great news! Your spot on the ADAgent waitlist has come up.
+Great news! Your spot on the ADAgentAI waitlist has come up.
 
-You can now sign up and start using ADAgent to manage your AdMob and Google Ad Manager accounts.
+You can now sign up and start using ADAgentAI to manage your AdMob and Google Ad Manager accounts.
 
 Get started: ${appUrl}/login
 
@@ -168,7 +183,7 @@ Quick start:
 
 Need help? Reply to this email and we'll get you sorted.
 
-— The ADAgent Team
+— The ADAgentAI Team
     `.trim(),
   };
 }

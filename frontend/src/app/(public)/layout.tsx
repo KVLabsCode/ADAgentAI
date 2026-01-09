@@ -2,8 +2,17 @@
 
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun, LayoutDashboard, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useUser } from "@/hooks/use-user"
 
 export default function PublicLayout({
   children,
@@ -11,6 +20,7 @@ export default function PublicLayout({
   children: React.ReactNode
 }) {
   const { theme, setTheme } = useTheme()
+  const { user, isAuthenticated, isLoading, signOut } = useUser()
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -48,9 +58,44 @@ export default function PublicLayout({
               <Moon className="absolute h-3.5 w-3.5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Toggle theme</span>
             </Button>
-            <Button asChild size="sm" className="h-7 text-xs ml-1">
-              <Link href="/login">Sign in</Link>
-            </Button>
+            {isLoading ? (
+              <div className="h-7 w-7 rounded-full bg-muted animate-pulse ml-1" />
+            ) : isAuthenticated && user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-7 w-7 rounded-full p-0 ml-1">
+                    <Avatar className="h-7 w-7">
+                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarFallback className="text-[10px]">
+                        {user.name?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="cursor-pointer">
+                      <LayoutDashboard className="h-3.5 w-3.5 mr-2" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive focus:text-destructive">
+                    <LogOut className="h-3.5 w-3.5 mr-2" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button asChild size="sm" className="h-7 text-xs ml-1">
+                <Link href="/login">Sign in</Link>
+              </Button>
+            )}
           </nav>
         </div>
       </header>

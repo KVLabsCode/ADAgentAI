@@ -79,6 +79,7 @@ export function RichTextEditor({
   placeholder = "Write your content here...",
 }: RichTextEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false, // Prevent SSR hydration mismatch
     extensions: [
       StarterKit.configure({
         heading: {

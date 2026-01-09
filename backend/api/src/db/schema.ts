@@ -16,7 +16,7 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const providerTypeEnum = pgEnum("provider_type", ["admob", "gam"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system"]);
 export const blogPostStatusEnum = pgEnum("blog_post_status", ["draft", "published"]);
-export const waitlistStatusEnum = pgEnum("waitlist_status", ["pending", "invited", "joined"]);
+export const waitlistStatusEnum = pgEnum("waitlist_status", ["pending", "invited", "joined", "rejected"]);
 
 // ============================================================
 // User Tables (legacy - Neon Auth uses neon_auth schema instead)
@@ -149,6 +149,20 @@ export const connectedProviders = pgTable("connected_providers", {
   index("connected_providers_user_id_idx").on(table.userId),
   index("connected_providers_organization_id_idx").on(table.organizationId),
   index("connected_providers_provider_idx").on(table.provider),
+]);
+
+// User Provider Preferences (per-user enable/disable for org providers)
+// Allows users to toggle which providers they want to use for their queries
+export const userProviderPreferences = pgTable("user_provider_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(), // References neon_auth.users_sync.id
+  providerId: uuid("provider_id").notNull().references(() => connectedProviders.id, { onDelete: "cascade" }),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("user_provider_prefs_user_id_idx").on(table.userId),
+  index("user_provider_prefs_provider_id_idx").on(table.providerId),
 ]);
 
 // Chat Sessions
@@ -285,6 +299,45 @@ export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
   }),
 }));
 
+// ============================================================
+// CrewAI Configuration Tables
+// ============================================================
+
+// CrewAI Agents
+export const crewAgents = pgTable("crew_agents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  role: varchar("role", { length: 200 }).notNull(),
+  goal: text("goal").notNull(),
+  backstory: text("backstory").notNull(),
+  service: varchar("service", { length: 50 }), // admob, admanager, general, null for orchestrators
+  capability: varchar("capability", { length: 50 }), // inventory, reporting, mediation, etc.
+  allowDelegation: boolean("allow_delegation").default(false).notNull(),
+  maxIter: varchar("max_iter", { length: 10 }).default("15"),
+  isOrchestrator: boolean("is_orchestrator").default(false).notNull(),
+  coordinates: jsonb("coordinates").$type<string[]>(), // Array of agent keys this orchestrator manages
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("crew_agents_key_idx").on(table.key),
+  index("crew_agents_service_idx").on(table.service),
+]);
+
+// CrewAI Tasks
+export const crewTasks = pgTable("crew_tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  description: text("description").notNull(),
+  expectedOutput: text("expected_output").notNull(),
+  agentKey: varchar("agent_key", { length: 100 }).notNull(), // References crew_agents.key
+  context: jsonb("context").$type<string[]>(), // Array of task keys this task depends on
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("crew_tasks_key_idx").on(table.key),
+  index("crew_tasks_agent_key_idx").on(table.agentKey),
+]);
+
 // Waitlist
 export const waitlist = pgTable("waitlist", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -322,6 +375,8 @@ export type Invitation = typeof invitations.$inferSelect;
 export type NewInvitation = typeof invitations.$inferInsert;
 export type ConnectedProvider = typeof connectedProviders.$inferSelect;
 export type NewConnectedProvider = typeof connectedProviders.$inferInsert;
+export type UserProviderPreference = typeof userProviderPreferences.$inferSelect;
+export type NewUserProviderPreference = typeof userProviderPreferences.$inferInsert;
 export type ChatSession = typeof chatSessions.$inferSelect;
 export type NewChatSession = typeof chatSessions.$inferInsert;
 export type Message = typeof messages.$inferSelect;
@@ -330,3 +385,7 @@ export type BlogPost = typeof blogPosts.$inferSelect;
 export type NewBlogPost = typeof blogPosts.$inferInsert;
 export type WaitlistEntry = typeof waitlist.$inferSelect;
 export type NewWaitlistEntry = typeof waitlist.$inferInsert;
+export type CrewAgent = typeof crewAgents.$inferSelect;
+export type NewCrewAgent = typeof crewAgents.$inferInsert;
+export type CrewTask = typeof crewTasks.$inferSelect;
+export type NewCrewTask = typeof crewTasks.$inferInsert;
