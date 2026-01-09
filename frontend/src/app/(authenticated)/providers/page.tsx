@@ -146,12 +146,13 @@ function ProvidersContent() {
 
   const handleAccountSelected = (account: OAuthAccount) => {
     // Add the selected account as a connected provider
-    const newProvider: Provider = {
+    const newProvider: ProviderWithEnabled = {
       id: account.id,
       type: account.type,
       status: "connected",
       displayName: account.displayName,
       identifiers: account.identifiers,
+      isEnabled: true,
     }
     setProviders((prev) => [...prev, newProvider])
     setAccountSelectionOpen(false)
