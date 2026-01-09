@@ -108,7 +108,6 @@ export default function SettingsPage() {
 
   // Fetch organization members when org is selected
   React.useEffect(() => {
-    console.log("[Settings] selectedOrganizationId changed:", selectedOrganizationId)
     if (selectedOrganizationId) {
       fetchMembers()
     } else {
@@ -287,20 +286,6 @@ export default function SettingsPage() {
   const memberRole = members.find(m => m.userId === user?.id)?.role?.toLowerCase()
   const currentUserRole = memberRole || selectedOrgRole?.toLowerCase() || null
   const canManageMembers = currentUserRole === "owner" || currentUserRole === "admin"
-
-  // Debug logging for role detection
-  React.useEffect(() => {
-    if (selectedOrganization) {
-      console.log('[Settings] Debug org role:', {
-        userId: user?.id,
-        selectedOrgRole,
-        memberRole,
-        currentUserRole,
-        canManageMembers,
-        members: members.map(m => ({ id: m.id, userId: m.userId, role: m.role })),
-      })
-    }
-  }, [selectedOrganization, user?.id, selectedOrgRole, memberRole, currentUserRole, canManageMembers, members])
 
   const getRoleIcon = (role: string) => {
     switch (role.toLowerCase()) {

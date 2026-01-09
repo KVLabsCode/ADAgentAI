@@ -115,12 +115,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return null
   }, [activeOrgData, neonUser])
 
-  // Debug logging for active org data
+  // Refetch organizations when user becomes authenticated
+  // This ensures orgs load immediately after sign in without page refresh
   React.useEffect(() => {
-    if (activeOrgData) {
-      console.log('[UserContext] Active org data:', JSON.stringify(activeOrgData, null, 2))
+    if (neonUser && !isLoadingOrgs) {
+      refetchOrgs()
     }
-  }, [activeOrgData])
+  }, [neonUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Map organizations from Neon Auth hook
   // Include role for the active organization
