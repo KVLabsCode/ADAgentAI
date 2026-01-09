@@ -133,21 +133,41 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     : null
 
   const signOut = useCallback(async () => {
+    // Clear local storage
+    localStorage.removeItem(ORG_STORAGE_KEY)
+
+    // Clear all auth-related cookies (Neon Auth / Better Auth uses these)
+    const cookiesToClear = [
+      'better-auth.session_token',
+      'better-auth.session',
+      '__Secure-better-auth.session_token',
+      '__Host-better-auth.session_token',
+      'neon-auth.session_token',
+      'neon-auth.session',
+    ]
+    cookiesToClear.forEach(name => {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`
+    })
+
     try {
-      // Clear local storage first
-      localStorage.removeItem(ORG_STORAGE_KEY)
-
-      // Sign out from Neon Auth
-      await authClient.signOut()
-
-      // Use hard redirect to ensure all state is cleared (no caching)
-      // This is more reliable than router.push for sign out
-      window.location.href = '/'
+      // Sign out from Neon Auth with callback on success
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            // Hard redirect after successful sign out
+            window.location.href = '/'
+          },
+          onError: () => {
+            // Still redirect on error - user wants to sign out
+            window.location.href = '/'
+          }
+        }
+      })
     } catch (error) {
       console.error('Sign out error:', error)
-      // Even on error, clear local state and redirect
-      localStorage.removeItem(ORG_STORAGE_KEY)
-      window.location.href = '/login'
+      // Force redirect even on exception
+      window.location.href = '/'
     }
   }, [])
 
