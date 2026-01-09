@@ -439,13 +439,13 @@ export default function CrewAIConfigPage() {
     )
   }
 
-  const renderCollapsibleSection = (
+  function renderCollapsibleSection<T extends Agent | Task>(
     id: string,
     title: string,
-    items: Agent[] | Task[],
-    renderItem: (item: Agent | Task) => React.ReactNode,
+    items: T[],
+    renderItem: (item: T) => React.ReactNode,
     defaultOpen = true
-  ) => {
+  ) {
     if (items.length === 0) return null
     return (
       <Collapsible open={isSectionOpen(id, defaultOpen)} onOpenChange={() => toggleSection(id)}>
@@ -461,7 +461,7 @@ export default function CrewAIConfigPage() {
           </Badge>
         </CollapsibleTrigger>
         <CollapsibleContent className="pl-4 border-l border-border/50 ml-1.5 mt-0.5">
-          {items.map((item) => renderItem(item as Agent & Task))}
+          {items.map((item) => renderItem(item))}
         </CollapsibleContent>
       </Collapsible>
     )
