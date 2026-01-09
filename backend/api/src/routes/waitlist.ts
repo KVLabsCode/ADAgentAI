@@ -40,6 +40,44 @@ app.post("/join", zValidator("json", joinSchema), async (c) => {
       .limit(1);
 
     if (existing.length > 0) {
+      // Allow rejected users to rejoin by resetting their status
+      if (existing[0].status === "rejected") {
+        // Reset the entry to pending
+        const [updatedEntry] = await db
+          .update(waitlist)
+          .set({
+            status: "pending",
+            name: name || existing[0].name,
+            role: role || existing[0].role,
+            useCase: useCase || existing[0].useCase,
+          })
+          .where(eq(waitlist.id, existing[0].id))
+          .returning();
+
+        // Get position
+        const [{ value: position }] = await db
+          .select({ value: count() })
+          .from(waitlist)
+          .where(eq(waitlist.status, "pending"));
+
+        // Send confirmation email
+        const emailTemplate = waitlistConfirmationEmail(name || updatedEntry.name || undefined);
+        await sendEmail({
+          to: email,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
+        });
+
+        return c.json({
+          success: true,
+          message: "Welcome back! You're on the waitlist again.",
+          position: Number(position),
+          referralCode: updatedEntry.referralCode,
+        });
+      }
+
+      // Already on waitlist with pending/invited/joined status
       return c.json(
         {
           success: false,
