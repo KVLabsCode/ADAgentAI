@@ -65,5 +65,6 @@ export default function ChatPage() {
     )
   }
 
-  return <ChatContainer providers={providers} />
+  // Key forces remount when navigating from /chat/[id] to /chat
+  return <ChatContainer key="new-chat" providers={providers} />
 }

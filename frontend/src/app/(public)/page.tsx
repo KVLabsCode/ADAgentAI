@@ -4,8 +4,11 @@ import Link from "next/link"
 import { ArrowRight, Sparkles, Shield, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { WaitlistDialog } from "@/components/waitlist-dialog"
+import { useUser } from "@/hooks/use-user"
 
 export default function LandingPage() {
+  const { isAuthenticated } = useUser()
+
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -108,15 +111,31 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="py-16 border-t border-border/40">
         <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            Already have an invite?
-          </p>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-            <Link href="/login">
-              Sign in with Google
-              <ArrowRight className="ml-2 h-3 w-3" />
-            </Link>
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Ready to get started?
+              </p>
+              <Button asChild size="sm" className="h-8 text-xs">
+                <Link href="/dashboard">
+                  Go to Dashboard
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Already have an invite?
+              </p>
+              <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+                <Link href="/login">
+                  Sign in with Google
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            </>
+          )}
         </div>
       </section>
     </div>

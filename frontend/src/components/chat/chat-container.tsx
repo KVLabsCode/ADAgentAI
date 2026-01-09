@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
@@ -20,7 +20,7 @@ interface ChatContainerProps {
 }
 
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
-  const router = useRouter()
+  const pathname = usePathname()
   const { user, getAccessToken } = useUser()
   const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext } = useChatSettings()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
@@ -44,6 +44,26 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     setPendingApprovals(new Map())
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reset on sessionId change
   }, [initialSessionId])
+
+  // Track previous pathname to detect navigation from /chat/[id] to /chat
+  const prevPathnameRef = React.useRef(pathname)
+
+  // Reset state when navigating back to /chat (new chat) from a session
+  // This handles the case where URL was updated via history.replaceState during streaming
+  React.useEffect(() => {
+    const prevPathname = prevPathnameRef.current
+    prevPathnameRef.current = pathname
+
+    // Only reset when navigating FROM /chat/[id] TO /chat (not during initial load or history.replaceState)
+    if (pathname === '/chat' && prevPathname?.startsWith('/chat/') && prevPathname !== '/chat') {
+      // We navigated back to /chat from a session - reset state
+      abortControllerRef.current?.abort()
+      setMessages([])
+      setCurrentSessionId(null)
+      setIsLoading(false)
+      setPendingApprovals(new Map())
+    }
+  }, [pathname])
 
   // Handle tool approval from user - calls backend API and updates local state
   const handleToolApproval = React.useCallback(async (approvalId: string, approved: boolean) => {
@@ -147,9 +167,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
       const title = content.slice(0, 50) + (content.length > 50 ? '...' : '')
       sessionId = await createSession(title)
       if (sessionId) {
-        setCurrentSessionId(sessionId)
-        // Update URL using history API to avoid component remount
+        // Update URL first using history API to avoid component remount during streaming
+        // This must happen BEFORE setCurrentSessionId to prevent the pathname effect from triggering a reset
         window.history.replaceState(null, '', `/chat/${sessionId}`)
+        setCurrentSessionId(sessionId)
       }
     }
 
@@ -368,12 +389,6 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     handleSendMessage(prompt)
   }
 
-  // Handle new chat - navigates to /chat and resets state
-  const handleNewChat = React.useCallback(() => {
-    abortControllerRef.current?.abort()
-    router.push('/chat')
-  }, [router])
-
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
@@ -385,7 +400,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     <div className="flex flex-col h-full overflow-hidden">
       {/* Fixed Header - always visible at top */}
       <div className="shrink-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40">
-        <ChatHeader hasProviders={hasProviders} onNewChat={hasMessages ? handleNewChat : undefined} />
+        <ChatHeader hasProviders={hasProviders} />
       </div>
 
       {!hasMessages ? (

@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Check, Loader2, Copy, CheckCheck, ArrowRight } from "lucide-react"
+import { Check, Loader2, Copy, CheckCheck, ArrowRight, Briefcase, MessageSquareText } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import {
@@ -23,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { GmailEmailInput, GMAIL_DOMAINS, getFullEmail } from "@/components/ui/gmail-email-input"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
@@ -33,7 +33,8 @@ interface WaitlistDialogProps {
 
 export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
   const [open, setOpen] = React.useState(false)
-  const [email, setEmail] = React.useState("")
+  const [emailUsername, setEmailUsername] = React.useState("")
+  const [emailDomain, setEmailDomain] = React.useState(GMAIL_DOMAINS[0].id)
   const [role, setRole] = React.useState("")
   const [useCase, setUseCase] = React.useState("")
   const [submitted, setSubmitted] = React.useState(false)
@@ -45,8 +46,9 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !role || !useCase) return
+    if (!emailUsername || !role || !useCase) return
 
+    const email = getFullEmail(emailUsername, emailDomain)
     setLoading(true)
     setError("")
 
@@ -89,7 +91,8 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
   }
 
   const resetForm = () => {
-    setEmail("")
+    setEmailUsername("")
+    setEmailDomain(GMAIL_DOMAINS[0].id)
     setRole("")
     setUseCase("")
     setSubmitted(false)
@@ -178,68 +181,84 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+            <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+              {/* Email Input */}
               <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email <span className="text-red-500">*</span>
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Gmail Address <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                <GmailEmailInput
+                  value={emailUsername}
+                  onChange={setEmailUsername}
+                  domain={emailDomain}
+                  onDomainChange={setEmailDomain}
                   disabled={loading}
+                  placeholder="your.email"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">
-                  What best describes you? <span className="text-red-500">*</span>
-                </Label>
-                <Select value={role} onValueChange={setRole} disabled={loading} required>
-                  <SelectTrigger id="role">
-                    <SelectValue placeholder="Select your role..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="publisher">App Publisher</SelectItem>
-                    <SelectItem value="developer">Developer</SelectItem>
-                    <SelectItem value="marketer">Marketer / Ad Ops</SelectItem>
-                    <SelectItem value="agency">Agency</SelectItem>
-                    <SelectItem value="indie">Indie Developer</SelectItem>
-                    <SelectItem value="enterprise">Enterprise / Large Publisher</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="useCase">
-                  What would you use ADAgent for? <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="useCase"
-                  placeholder="e.g., I want to quickly check my daily revenue across multiple apps without logging into each dashboard..."
-                  value={useCase}
-                  onChange={(e) => setUseCase(e.target.value)}
-                  className="min-h-[100px] resize-none"
-                  required
-                  disabled={loading}
-                  maxLength={500}
-                />
-                <p className="text-[11px] text-muted-foreground text-right">
-                  {useCase.length}/500
+                <p className="text-[11px] text-muted-foreground">
+                  We use Google Sign-In for authentication
                 </p>
               </div>
 
+              {/* Survey Section */}
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-4">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary">
+                    <Briefcase className="h-3 w-3" />
+                  </span>
+                  Quick Survey
+                </div>
+
+                {/* Role Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="role" className="text-sm">
+                    What best describes you? <span className="text-destructive">*</span>
+                  </Label>
+                  <Select value={role} onValueChange={setRole} disabled={loading} required>
+                    <SelectTrigger id="role" className="bg-background">
+                      <SelectValue placeholder="Select your role..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="publisher">App Publisher</SelectItem>
+                      <SelectItem value="developer">Developer</SelectItem>
+                      <SelectItem value="marketer">Marketer / Ad Ops</SelectItem>
+                      <SelectItem value="agency">Agency</SelectItem>
+                      <SelectItem value="indie">Indie Developer</SelectItem>
+                      <SelectItem value="enterprise">Enterprise / Large Publisher</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Use Case */}
+                <div className="space-y-2">
+                  <Label htmlFor="useCase" className="text-sm flex items-center gap-1.5">
+                    <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground" />
+                    What would you use ADAgent for? <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    id="useCase"
+                    placeholder="e.g., I want to quickly check my daily revenue across multiple apps without logging into each dashboard..."
+                    value={useCase}
+                    onChange={(e) => setUseCase(e.target.value)}
+                    className="min-h-[80px] resize-none bg-background"
+                    required
+                    disabled={loading}
+                    maxLength={500}
+                  />
+                  <p className="text-[10px] text-muted-foreground text-right">
+                    {useCase.length}/500
+                  </p>
+                </div>
+              </div>
+
               {error && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="text-sm text-red-500">{error}</p>
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm text-destructive">{error}</p>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -252,7 +271,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={loading || !email || !role || !useCase}
+                  disabled={loading || !emailUsername || !role || !useCase}
                 >
                   {loading ? (
                     <>

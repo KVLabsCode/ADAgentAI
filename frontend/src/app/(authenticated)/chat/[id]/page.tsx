@@ -111,6 +111,7 @@ export default function ChatSessionPage({
 
   return (
     <ChatContainer
+      key={sessionId}
       providers={providers}
       initialMessages={messages}
       sessionId={sessionId}

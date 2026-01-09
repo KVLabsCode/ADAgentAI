@@ -22,6 +22,7 @@ import {
   Eye,
   Pencil,
   Trash2,
+  Star,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -130,6 +131,17 @@ export default function BlogAdminPage() {
       cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
     },
     {
+      accessorKey: "featured",
+      header: "Featured",
+      cell: ({ row }) => (
+        row.getValue("featured") ? (
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+        ) : (
+          <span className="text-[10px] text-muted-foreground">—</span>
+        )
+      ),
+    },
+    {
       accessorKey: "category",
       header: "Category",
       cell: ({ row }) => (
@@ -223,7 +235,7 @@ export default function BlogAdminPage() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

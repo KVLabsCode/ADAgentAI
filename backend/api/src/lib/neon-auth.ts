@@ -15,6 +15,7 @@ interface NeonAuthUser {
   primaryEmail: string | null;
   displayName: string | null;
   profileImageUrl: string | null;
+  role: string | null; // 'admin' or 'user' - set in Neon Console
 }
 
 type ValidateTokenResult = {
@@ -72,6 +73,7 @@ async function validateJWT(token: string): Promise<ValidateTokenResult> {
         primaryEmail: (payload.email as string) || null,
         displayName: (payload.name as string) || null,
         profileImageUrl: null, // JWT doesn't include image
+        role: (payload.role as string) || null,
       },
     };
   } catch (error) {
@@ -93,7 +95,8 @@ async function validateSessionToken(sessionToken: string): Promise<ValidateToken
         u.id,
         u.email,
         u.name,
-        u.image
+        u.image,
+        u.role
       FROM neon_auth.session s
       JOIN neon_auth."user" u ON s."userId" = u.id
       WHERE s.token = ${sessionToken}
@@ -109,6 +112,7 @@ async function validateSessionToken(sessionToken: string): Promise<ValidateToken
       email: string | null;
       name: string | null;
       image: string | null;
+      role: string | null;
     }>;
 
     if (!rows || rows.length === 0) {
@@ -116,7 +120,7 @@ async function validateSessionToken(sessionToken: string): Promise<ValidateToken
     }
 
     const row = rows[0];
-    console.log("[NeonAuth] Session validated, user:", row.id, row.email);
+    console.log("[NeonAuth] Session validated, user:", row.id, row.email, "role:", row.role);
 
     return {
       success: true,
@@ -125,6 +129,7 @@ async function validateSessionToken(sessionToken: string): Promise<ValidateToken
         primaryEmail: row.email,
         displayName: row.name,
         profileImageUrl: row.image,
+        role: row.role,
       },
     };
   } catch (error) {

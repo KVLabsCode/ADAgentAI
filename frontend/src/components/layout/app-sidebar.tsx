@@ -21,6 +21,9 @@ import {
   Plus,
   Check,
   ChevronDown,
+  Globe,
+  Bot,
+  Shield,
 } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
 
@@ -67,7 +70,9 @@ const bottomNavItems = [
 ]
 
 const adminNavItems = [
-  { title: "Blog Admin", url: "/dashboard/blog", icon: FileText },
+  { title: "Waitlist", url: "/dashboard/waitlist", icon: Users },
+  { title: "Blog", url: "/dashboard/blog", icon: FileText },
+  { title: "Agent Prompts", url: "/dashboard/agents", icon: Bot },
 ]
 
 export function AppSidebar() {
@@ -82,6 +87,10 @@ export function AppSidebar() {
   }, [])
 
   const handleCreateOrganization = async () => {
+    if (organizations.length >= 1) {
+      alert("Multiple organizations coming soon! For now, you can have one organization.")
+      return
+    }
     const name = prompt("Enter organization name:")
     if (!name) return
     setIsCreatingOrg(true)
@@ -89,6 +98,15 @@ export function AppSidebar() {
       const newOrg = await createOrganization(name)
       if (newOrg) {
         selectOrganization(newOrg.id)
+      }
+    } catch (error) {
+      // Handle Neon Auth organization limit error
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes("maximum number of organizations")) {
+        alert("Multiple organizations coming soon! For now, you can have one organization.")
+      } else {
+        console.error("Failed to create organization:", error)
+        alert("Failed to create organization. Please try again.")
       }
     } finally {
       setIsCreatingOrg(false)
@@ -235,6 +253,12 @@ export function AppSidebar() {
           <>
             <div className="my-2 h-px bg-border/40" />
             <SidebarGroup className="p-0">
+              <div className="flex items-center gap-1.5 px-2 mb-1.5 group-data-[collapsible=icon]:justify-center">
+                <Shield className="h-3 w-3 text-amber-500" />
+                <span className="text-[10px] font-medium text-amber-500 uppercase tracking-wider group-data-[collapsible=icon]:hidden">
+                  Admin
+                </span>
+              </div>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0.5">
                   {adminNavItems.map((item) => (
@@ -313,6 +337,13 @@ export function AppSidebar() {
                   align="start"
                   sideOffset={4}
                 >
+                  <DropdownMenuItem asChild className="cursor-pointer text-xs">
+                    <Link href="/?view=public">
+                      <Globe className="mr-2 h-3.5 w-3.5" />
+                      Visit Website
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={signOut}
                     className="cursor-pointer text-xs text-destructive focus:text-destructive"

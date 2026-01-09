@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Lock, Globe, Plus, Shield, Link2 } from "lucide-react"
+import { Lock, Globe, Shield, Link2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import {
   Popover,
   PopoverContent,
@@ -14,13 +13,11 @@ interface ChatHeaderProps {
   hasProviders: boolean
   isPrivate?: boolean
   onPrivacyChange?: (isPrivate: boolean) => void
-  onNewChat?: () => void
 }
 
 export function ChatHeader({
   isPrivate = true,
   onPrivacyChange,
-  onNewChat
 }: ChatHeaderProps) {
   const [privacy, setPrivacy] = React.useState(isPrivate)
   const [open, setOpen] = React.useState(false)
@@ -32,23 +29,8 @@ export function ChatHeader({
   }
 
   return (
-    <div className="flex items-center justify-between px-4 sm:px-6 py-2">
-      {/* Left side - New chat button */}
-      <div className="flex items-center">
-        {onNewChat && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onNewChat}
-            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-zinc-800/50"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Chat
-          </Button>
-        )}
-      </div>
-
-      {/* Right side - Privacy selector */}
+    <div className="flex items-center justify-end px-4 sm:px-6 py-2">
+      {/* Privacy selector */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button

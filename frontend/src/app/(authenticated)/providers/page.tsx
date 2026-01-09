@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation"
 import { Plug, Plus, Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,16 +32,23 @@ import type { Provider, OAuthAccount } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
+// Extended provider type with enabled state
+interface ProviderWithEnabled extends Provider {
+  isEnabled: boolean
+}
+
 function ProvidersContent() {
   const searchParams = useSearchParams()
   const { getAccessToken } = useUser()
-  const [providers, setProviders] = React.useState<Provider[]>([])
+  const [providers, setProviders] = React.useState<ProviderWithEnabled[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [connectingType, setConnectingType] = React.useState<string | null>(null)
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [accountSelectionOpen, setAccountSelectionOpen] = React.useState(false)
   const [pendingAccounts, setPendingAccounts] = React.useState<OAuthAccount[]>([])
   const [pendingProviderType] = React.useState<"admob" | "gam">("gam")
+  const [canManage, setCanManage] = React.useState(false) // Can user connect/disconnect?
+  const [togglingProvider, setTogglingProvider] = React.useState<string | null>(null)
 
   // Fetch providers on mount
   const fetchProviders = React.useCallback(async () => {
@@ -59,7 +67,10 @@ function ProvidersContent() {
           identifiers: p.type === 'admob'
             ? { publisherId: p.identifier }
             : { networkCode: p.identifier, accountName: p.name },
+          isEnabled: p.isEnabled !== false, // Default to true
         })))
+        // Set canManage from API response
+        setCanManage(data.canManage === true)
       }
     } catch (error) {
       console.error('Failed to fetch providers:', error)
@@ -166,14 +177,44 @@ function ProvidersContent() {
           text: 'Provider disconnected successfully.'
         })
       } else {
-        throw new Error('Failed to disconnect')
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to disconnect')
       }
     } catch (error) {
       console.error('Disconnect error:', error)
       setStatusMessage({
         type: 'error',
-        text: 'Failed to disconnect provider. Please try again.'
+        text: error instanceof Error ? error.message : 'Failed to disconnect provider. Please try again.'
       })
+    }
+  }
+
+  // Toggle provider enabled/disabled for user's queries
+  const handleToggleEnabled = async (providerId: string, enabled: boolean) => {
+    setTogglingProvider(providerId)
+    try {
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${API_URL}/api/providers/${providerId}/toggle`, accessToken, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isEnabled: enabled }),
+      })
+
+      if (response.ok) {
+        setProviders(prev => prev.map(p =>
+          p.id === providerId ? { ...p, isEnabled: enabled } : p
+        ))
+      } else {
+        throw new Error('Failed to toggle')
+      }
+    } catch (error) {
+      console.error('Toggle error:', error)
+      setStatusMessage({
+        type: 'error',
+        text: 'Failed to update provider. Please try again.'
+      })
+    } finally {
+      setTogglingProvider(null)
     }
   }
 
@@ -204,48 +245,50 @@ function ProvidersContent() {
           </p>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-7 text-xs px-2.5">
-              <Plus className="mr-1 h-3 w-3" />
-              Connect
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem
-              onClick={() => handleConnect("admob")}
-              disabled={!!connectingType}
-              className="text-xs"
-            >
-              <div className="flex items-center gap-2">
-                {connectingType === 'admob' ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                ) : (
-                  <div className="h-5 w-5 rounded bg-green-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
-                    A
-                  </div>
-                )}
-                <span>{connectingType === 'admob' ? 'Connecting...' : 'AdMob'}</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleConnect("gam")}
-              disabled={!!connectingType}
-              className="text-xs"
-            >
-              <div className="flex items-center gap-2">
-                {connectingType === 'gam' ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                ) : (
-                  <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
-                    G
-                  </div>
-                )}
-                <span>{connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}</span>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {canManage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="h-7 text-xs px-2.5">
+                <Plus className="mr-1 h-3 w-3" />
+                Connect
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onClick={() => handleConnect("admob")}
+                disabled={!!connectingType}
+                className="text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  {connectingType === 'admob' ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <div className="h-5 w-5 rounded bg-green-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                      A
+                    </div>
+                  )}
+                  <span>{connectingType === 'admob' ? 'Connecting...' : 'AdMob'}</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleConnect("gam")}
+                disabled={!!connectingType}
+                className="text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  {connectingType === 'gam' ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                      G
+                    </div>
+                  )}
+                  <span>{connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {isLoading ? (
@@ -270,24 +313,28 @@ function ProvidersContent() {
             </div>
             <h3 className="text-sm font-medium mb-1">No providers connected</h3>
             <p className="text-[11px] text-muted-foreground/70 text-center max-w-xs mb-3">
-              Connect your AdMob or Google Ad Manager account to start.
+              {canManage
+                ? "Connect your AdMob or Google Ad Manager account to start."
+                : "No ad platforms have been connected yet. Contact your organization admin to connect providers."}
             </p>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="h-7 text-xs">
-                  <Plus className="mr-1 h-3 w-3" />
-                  Connect provider
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleConnect("admob")} className="text-xs" disabled={!!connectingType}>
-                  {connectingType === 'admob' ? 'Connecting...' : 'AdMob'}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs" disabled={!!connectingType}>
-                  {connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {canManage && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="h-7 text-xs">
+                    <Plus className="mr-1 h-3 w-3" />
+                    Connect provider
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleConnect("admob")} className="text-xs" disabled={!!connectingType}>
+                    {connectingType === 'admob' ? 'Connecting...' : 'AdMob'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs" disabled={!!connectingType}>
+                    {connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       ) : (
@@ -328,30 +375,48 @@ function ProvidersContent() {
                   </div>
                 </div>
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/50 hover:text-destructive">
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-base">Disconnect {provider.displayName}?</AlertDialogTitle>
-                      <AlertDialogDescription className="text-xs">
-                        This will remove access to this ad platform. You can reconnect at any time.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDisconnect(provider.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs h-8"
-                      >
-                        Disconnect
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <div className="flex items-center gap-3">
+                  {/* Enable/Disable toggle - available to all users */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {provider.isEnabled ? "Enabled" : "Disabled"}
+                    </span>
+                    <Switch
+                      checked={provider.isEnabled}
+                      onCheckedChange={(checked) => handleToggleEnabled(provider.id, checked)}
+                      disabled={togglingProvider === provider.id}
+                      className="scale-75"
+                    />
+                  </div>
+
+                  {/* Disconnect button - only for admins */}
+                  {canManage && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/50 hover:text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-base">Disconnect {provider.displayName}?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs">
+                            This will remove access to this ad platform for the entire organization. You can reconnect at any time.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDisconnect(provider.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs h-8"
+                          >
+                            Disconnect
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
               </div>
             </div>
           ))}
