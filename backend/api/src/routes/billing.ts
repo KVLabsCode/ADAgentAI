@@ -1,8 +1,11 @@
 import { Hono } from "hono";
 import { Polar } from "@polar-sh/sdk";
+import { eq, and, gte, sql } from "drizzle-orm";
 
 import { requireAuth } from "../middleware/auth";
 import { trackSubscription } from "../lib/analytics";
+import { db } from "../db";
+import { chatSessions, messages } from "../db/schema";
 
 const billing = new Hono();
 
@@ -36,7 +39,7 @@ billing.get("/subscription", async (c) => {
     if (!customer) {
       return c.json({
         hasSubscription: false,
-        status: "free",
+        status: "trial",
         plan: null,
       });
     }
@@ -53,7 +56,7 @@ billing.get("/subscription", async (c) => {
     if (!subscription) {
       return c.json({
         hasSubscription: false,
-        status: "free",
+        status: "trial",
         plan: null,
         customerId: customer.id,
       });
@@ -87,37 +90,69 @@ billing.get("/usage", async (c) => {
   const user = c.get("user");
 
   try {
-    // Find customer
+    // Get start of current month for billing period
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Count user messages this billing period
+    // First get all session IDs for this user
+    const userSessions = await db
+      .select({ id: chatSessions.id })
+      .from(chatSessions)
+      .where(eq(chatSessions.userId, user.id));
+
+    let messageCount = 0;
+    if (userSessions.length > 0) {
+      const sessionIds = userSessions.map((s) => s.id);
+      // Count user role messages in these sessions created this month
+      const result = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(messages)
+        .where(
+          and(
+            sql`${messages.sessionId} = ANY(${sessionIds})`,
+            eq(messages.role, "user"),
+            gte(messages.createdAt, startOfMonth)
+          )
+        );
+      messageCount = result[0]?.count || 0;
+    }
+
+    // Check if user is admin (unlimited usage)
+    const isAdmin = user.role === "admin";
+
+    // Find Polar customer to check subscription
     const customers = await polar.customers.list({
       email: user.email,
       limit: 1,
     });
 
     const customer = customers.result.items[0];
+    let hasActiveSubscription = false;
 
-    if (!customer) {
-      return c.json({
-        chatMessages: 0,
-        providerQueries: 0,
-        limit: {
-          chatMessages: 50, // Free tier limit
-          providerQueries: 10,
-        },
+    if (customer) {
+      const subscriptions = await polar.subscriptions.list({
+        customerId: customer.id,
+        active: true,
+        limit: 1,
       });
+      hasActiveSubscription = subscriptions.result.items.length > 0;
     }
 
-    // In production, track usage via meters
-    // For now, return placeholder data
+    // Determine limits: admin = unlimited, paid = unlimited, trial = 25
+    const chatLimit = isAdmin || hasActiveSubscription ? -1 : 25;
+    const providerLimit = isAdmin || hasActiveSubscription ? -1 : 10;
+
     return c.json({
-      chatMessages: 0,
-      providerQueries: 0,
+      chatMessages: messageCount,
+      providerQueries: 0, // TODO: Track provider queries separately
       limit: {
-        chatMessages: -1, // Unlimited for paid
-        providerQueries: -1,
+        chatMessages: chatLimit,
+        providerQueries: providerLimit,
       },
-      resetDate: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
-      ).toISOString(),
+      isAdmin,
+      resetDate: endOfMonth.toISOString(),
     });
   } catch (error) {
     console.error("Error fetching usage:", error);

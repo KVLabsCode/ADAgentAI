@@ -144,6 +144,50 @@ app.post("/join", zValidator("json", joinSchema), async (c) => {
   }
 });
 
+// Check if user has access (invited or joined)
+// Also marks user as "joined" if they were "invited" (first access)
+app.get("/access/:email", async (c) => {
+  const email = c.req.param("email");
+
+  try {
+    const [entry] = await db
+      .select()
+      .from(waitlist)
+      .where(eq(waitlist.email, email.toLowerCase()))
+      .limit(1);
+
+    // Not on waitlist = no access
+    if (!entry) {
+      return c.json({ hasAccess: false, reason: "not_on_waitlist" });
+    }
+
+    // Check status
+    if (entry.status === "invited") {
+      // First time access - mark as joined
+      await db
+        .update(waitlist)
+        .set({ status: "joined", joinedAt: new Date() })
+        .where(eq(waitlist.id, entry.id));
+
+      return c.json({ hasAccess: true, status: "joined" });
+    }
+
+    if (entry.status === "joined") {
+      return c.json({ hasAccess: true, status: "joined" });
+    }
+
+    // pending or rejected = no access
+    return c.json({
+      hasAccess: false,
+      reason: entry.status === "pending" ? "pending_approval" : "rejected",
+      status: entry.status
+    });
+  } catch (error) {
+    console.error("[Waitlist] Error checking access:", error);
+    return c.json({ error: "Failed to check access" }, 500);
+  }
+});
+
 // Check waitlist status by email
 app.get("/status/:email", async (c) => {
   const email = c.req.param("email");

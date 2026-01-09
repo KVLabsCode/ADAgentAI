@@ -23,6 +23,14 @@ interface UserContextValue {
   selectOrganization: (orgId: string | null) => void
   createOrganization: (name: string) => Promise<Organization | null>
   isLoadingOrgs: boolean
+  // Waitlist access
+  hasWaitlistAccess: boolean | null // null = not checked yet
+  waitlistAccessReason: string | null // "not_on_waitlist", "pending_approval", "rejected"
+  isCheckingWaitlist: boolean
+  // Terms of Service
+  hasAcceptedTos: boolean | null // null = not checked yet
+  isCheckingTos: boolean
+  acceptTos: (marketingOptIn?: boolean) => Promise<boolean>
 }
 
 const UserContext = createContext<UserContextValue | null>(null)
@@ -46,10 +54,19 @@ function getInitialOrgId(): string | null {
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
+  const _router = useRouter()
   const { data: session, isPending, refetch } = authClient.useSession()
   // Initialize from localStorage synchronously to avoid cascading renders
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(getInitialOrgId)
+
+  // Waitlist access state
+  const [hasWaitlistAccess, setHasWaitlistAccess] = useState<boolean | null>(null)
+  const [waitlistAccessReason, setWaitlistAccessReason] = useState<string | null>(null)
+  const [isCheckingWaitlist, setIsCheckingWaitlist] = useState(false)
+
+  // Terms of Service state
+  const [hasAcceptedTos, setHasAcceptedTos] = useState<boolean | null>(null)
+  const [isCheckingTos, setIsCheckingTos] = useState(false)
 
   // Use Neon Auth's built-in organization hooks
   // useListOrganizations returns basic org info
@@ -122,6 +139,83 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       refetchOrgs()
     }
   }, [neonUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check waitlist access when user authenticates
+  React.useEffect(() => {
+    async function checkWaitlistAccess() {
+      if (!neonUser?.email) {
+        setHasWaitlistAccess(null)
+        setWaitlistAccessReason(null)
+        return
+      }
+
+      setIsCheckingWaitlist(true)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const response = await fetch(`${apiUrl}/waitlist/access/${encodeURIComponent(neonUser.email)}`)
+        const data = await response.json()
+
+        if (data.hasAccess) {
+          setHasWaitlistAccess(true)
+          setWaitlistAccessReason(null)
+        } else {
+          setHasWaitlistAccess(false)
+          setWaitlistAccessReason(data.reason || 'unknown')
+        }
+      } catch (error) {
+        console.error('Failed to check waitlist access:', error)
+        // On error, allow access to prevent lockout
+        setHasWaitlistAccess(true)
+        setWaitlistAccessReason(null)
+      } finally {
+        setIsCheckingWaitlist(false)
+      }
+    }
+
+    checkWaitlistAccess()
+  }, [neonUser?.email])
+
+  // Check ToS acceptance when user authenticates and has waitlist access
+  React.useEffect(() => {
+    async function checkTosStatus() {
+      if (!neonUser?.id || !hasWaitlistAccess) {
+        // Don't check ToS if not authenticated or no waitlist access
+        return
+      }
+
+      setIsCheckingTos(true)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+        // Get session token for auth
+        const sessionAny = session as Record<string, unknown> | undefined
+        let token: string | null = null
+        if (sessionAny?.session && typeof sessionAny.session === 'object') {
+          const nestedSession = sessionAny.session as Record<string, unknown>
+          if (nestedSession.token && typeof nestedSession.token === 'string') {
+            token = nestedSession.token
+          }
+        } else if (sessionAny?.token && typeof sessionAny.token === 'string') {
+          token = sessionAny.token
+        }
+
+        const response = await fetch(`${apiUrl}/api/account/tos-status`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        })
+        const data = await response.json()
+
+        setHasAcceptedTos(data.accepted === true)
+      } catch (error) {
+        console.error('Failed to check ToS status:', error)
+        // On error, assume accepted to prevent blocking (they can be asked later)
+        setHasAcceptedTos(true)
+      } finally {
+        setIsCheckingTos(false)
+      }
+    }
+
+    checkTosStatus()
+  }, [neonUser?.id, hasWaitlistAccess, session])
 
   // Map organizations from Neon Auth hook
   // Include role for the active organization
@@ -282,6 +376,43 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [neonUser, refetchOrgs])
 
+  // Accept Terms of Service
+  const acceptTos = useCallback(async (marketingOptIn: boolean = false): Promise<boolean> => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+      // Get session token for auth
+      const sessionAny = session as Record<string, unknown> | undefined
+      let token: string | null = null
+      if (sessionAny?.session && typeof sessionAny.session === 'object') {
+        const nestedSession = sessionAny.session as Record<string, unknown>
+        if (nestedSession.token && typeof nestedSession.token === 'string') {
+          token = nestedSession.token
+        }
+      } else if (sessionAny?.token && typeof sessionAny.token === 'string') {
+        token = sessionAny.token
+      }
+
+      const response = await fetch(`${apiUrl}/api/account/accept-tos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ marketingOptIn }),
+      })
+
+      if (response.ok) {
+        setHasAcceptedTos(true)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Failed to accept ToS:', error)
+      return false
+    }
+  }, [session])
+
   // Platform admin check - uses role from Neon Auth (set in Neon Console)
   const isAdmin = user?.role === 'admin'
 
@@ -300,6 +431,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     selectOrganization,
     createOrganization,
     isLoadingOrgs,
+    hasWaitlistAccess,
+    waitlistAccessReason,
+    isCheckingWaitlist,
+    hasAcceptedTos,
+    isCheckingTos,
+    acceptTos,
   }
 
   return (
