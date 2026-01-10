@@ -21,7 +21,7 @@ export function UserMessage({ content }: UserMessageProps) {
         className={cn(
           "max-w-[80%]",
           "bg-sky-900/80 border border-sky-700/50",
-          "rounded-lg",
+          "rounded-2xl",
           // Match card height for short messages, allow expansion for longer
           isShort ? "h-10 px-3 flex items-center" : "px-3 py-2.5"
         )}

@@ -82,8 +82,8 @@ export function ChatInput({
           disabled={disabled || isLoading}
           rows={1}
           className={cn(
-            "min-h-[44px] max-h-[200px] resize-none pr-12 py-2.5 text-sm",
-            "rounded-lg border-border/40",
+            "min-h-[52px] max-h-[200px] resize-none pr-12 py-3.5 text-sm",
+            "rounded-2xl border-border/40",
             "focus-visible:ring-1 focus-visible:ring-ring/50",
             "placeholder:text-muted-foreground/60",
             disabled && "opacity-50 cursor-not-allowed"
@@ -94,7 +94,7 @@ export function ChatInput({
           size="icon"
           disabled={disabled || isLoading || !value.trim()}
           className={cn(
-            "absolute right-1.5 bottom-1.5 h-7 w-7 rounded-md",
+            "absolute right-1.5 bottom-3 h-7 w-7 rounded-full",
             "transition-opacity duration-150",
             value.trim() && !disabled && !isLoading
               ? "opacity-100"

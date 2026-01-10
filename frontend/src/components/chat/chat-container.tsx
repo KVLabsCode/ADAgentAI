@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
-import { ChatHeader } from "./chat-header"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
@@ -397,12 +396,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
   }, [])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Fixed Header - always visible at top */}
-      <div className="shrink-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40">
-        <ChatHeader hasProviders={hasProviders} />
-      </div>
-
+    <div className="flex flex-col h-full">
       {!hasMessages ? (
         /* Empty state - centered content with input */
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
@@ -436,9 +430,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
           </div>
         </div>
       ) : (
-        /* With messages - scrollable content + sticky input */
+        /* With messages - content scrolls behind sticky input */
         <>
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 pb-20">
             <ChatMessages
               messages={messages}
               isLoading={isLoading}
@@ -447,9 +441,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             />
           </div>
 
-          {/* Sticky Input at bottom */}
-          <div className="shrink-0 bg-background/95 backdrop-blur-sm border-t border-border/30 px-6 py-3">
-            <div className="max-w-6xl mx-auto w-full">
+          {/* Sticky Input at bottom - content scrolls behind it */}
+          <div className="sticky bottom-0 z-50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-t border-border/30 px-8 sm:px-12 py-3">
+            <div className="max-w-4xl mx-auto w-full">
               <ChatInput
                 onSend={handleSendMessage}
                 disabled={!hasProviders}

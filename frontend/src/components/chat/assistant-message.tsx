@@ -76,7 +76,7 @@ function CodeBlock({
   resizable?: boolean
 }) {
   return (
-    <div className="rounded-lg overflow-hidden border border-zinc-700/50">
+    <div className="rounded-xl overflow-hidden border border-zinc-700/50">
       <div className="bg-zinc-800/80 px-3 py-1.5 border-b border-zinc-700/50">
         <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
           {title}
@@ -123,7 +123,7 @@ function RoutingBlock({ service, capability, thinking }: { service: string; capa
 
   if (!thinking) {
     return (
-      <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50")}>
+      <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5 rounded-2xl bg-zinc-800/50 border border-zinc-700/50")}>
         <IconBox color="violet">
           <Route className="h-3.5 w-3.5 text-violet-400" />
         </IconBox>
@@ -139,7 +139,7 @@ function RoutingBlock({ service, capability, thinking }: { service: string; capa
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
@@ -178,7 +178,7 @@ function ThinkingBlock({ content }: { content: string }) {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5">
@@ -224,7 +224,7 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, onApp
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
@@ -283,7 +283,7 @@ function ToolDeniedBlock({ toolName, reason }: { toolName: string; reason: strin
   const shortName = getShortToolName(toolName)
 
   return (
-    <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2 rounded-lg bg-zinc-800/50 border border-zinc-700/50")}>
+    <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2 rounded-2xl bg-zinc-800/50 border border-zinc-700/50")}>
       <div className="flex items-center gap-2.5 min-w-0">
         <IconBox color="red">
           <X className="h-3.5 w-3.5 text-red-400" />
@@ -332,7 +332,7 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
         <CollapsibleTrigger asChild>
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
@@ -412,7 +412,7 @@ function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[],
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 overflow-hidden">
+      <div className="rounded-2xl bg-zinc-800/50 border border-zinc-700/50 overflow-hidden">
         <CollapsibleTrigger asChild>
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 h-full">
@@ -458,7 +458,7 @@ function MessageActions({ content, messageId: _messageId }: { content: string; m
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
           <TooltipTrigger asChild>
-            <button onClick={handleCopy} className={cn("p-1.5 rounded-md transition-colors", copied ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
+            <button onClick={handleCopy} className={cn("p-1.5 rounded-lg transition-colors", copied ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
               {copied ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
           </TooltipTrigger>
@@ -466,7 +466,7 @@ function MessageActions({ content, messageId: _messageId }: { content: string; m
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button onClick={() => { setLiked(!liked); if (!liked && disliked) setDisliked(false) }} className={cn("p-1.5 rounded-md transition-colors", liked ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
+            <button onClick={() => { setLiked(!liked); if (!liked && disliked) setDisliked(false) }} className={cn("p-1.5 rounded-lg transition-colors", liked ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
               <ThumbsUp className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
@@ -474,7 +474,7 @@ function MessageActions({ content, messageId: _messageId }: { content: string; m
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button onClick={() => { setDisliked(!disliked); if (!disliked && liked) setLiked(false) }} className={cn("p-1.5 rounded-md transition-colors", disliked ? "text-red-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
+            <button onClick={() => { setDisliked(!disliked); if (!disliked && liked) setLiked(false) }} className={cn("p-1.5 rounded-lg transition-colors", disliked ? "text-red-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")}>
               <ThumbsDown className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
@@ -617,42 +617,42 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
         {/* Final Content - Markdown rendered */}
         {message.content && (
           <div className="space-y-2">
-            <div className="rounded-lg overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+            <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
               <div className="px-4 py-3">
-                  <div className={cn(
-                    "prose prose-sm prose-invert max-w-none",
-                    "text-[13px] leading-relaxed text-zinc-200",
-                    // Headings - clear hierarchy
-                    "prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
-                    "prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",
-                    "prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2",
-                    "prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1.5",
-                    // Paragraphs
-                    "prose-p:my-2 prose-p:leading-relaxed",
-                    // Lists
-                    "prose-ul:my-2 prose-ul:pl-4",
-                    "prose-ol:my-2 prose-ol:pl-4",
-                    "prose-li:my-0.5 prose-li:marker:text-zinc-500",
-                    // Code
-                    "prose-code:bg-zinc-700/60 prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:font-normal",
-                    "prose-code:before:content-none prose-code:after:content-none",
-                    "prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-700/50 prose-pre:rounded-lg prose-pre:text-zinc-300",
-                    // Strong/emphasis
-                    "prose-strong:text-zinc-100 prose-strong:font-semibold",
-                    "prose-em:text-zinc-300",
-                    // Links
-                    "prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
-                    // Blockquotes
-                    "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-300",
-                    // Tables
-                    "prose-table:border prose-table:border-zinc-700/50",
-                    "prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-200 prose-th:font-medium",
-                    "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-700/50"
-                  )}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
+                <div className={cn(
+                  "prose prose-sm prose-invert max-w-none",
+                  "text-[13px] leading-relaxed text-zinc-200",
+                  // Headings - clear hierarchy
+                  "prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
+                  "prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",
+                  "prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2",
+                  "prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1.5",
+                  // Paragraphs
+                  "prose-p:my-2 prose-p:leading-relaxed",
+                  // Lists
+                  "prose-ul:my-2 prose-ul:pl-4",
+                  "prose-ol:my-2 prose-ol:pl-4",
+                  "prose-li:my-0.5 prose-li:marker:text-zinc-500",
+                  // Code
+                  "prose-code:bg-zinc-700/60 prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:font-normal",
+                  "prose-code:before:content-none prose-code:after:content-none",
+                  "prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-700/50 prose-pre:rounded-xl prose-pre:text-zinc-300",
+                  // Strong/emphasis
+                  "prose-strong:text-zinc-100 prose-strong:font-semibold",
+                  "prose-em:text-zinc-300",
+                  // Links
+                  "prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
+                  // Blockquotes
+                  "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-300",
+                  // Tables
+                  "prose-table:border prose-table:border-zinc-700/50",
+                  "prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-200 prose-th:font-medium",
+                  "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-700/50"
+                )}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
             <MessageActions content={message.content} messageId={message.id} />

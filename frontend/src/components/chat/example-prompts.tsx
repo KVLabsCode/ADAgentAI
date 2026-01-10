@@ -21,7 +21,7 @@ export function ExamplePrompts({ onPromptClick }: ExamplePromptsProps) {
           key={prompt}
           onClick={() => onPromptClick(prompt)}
           className={cn(
-            "text-left px-2.5 py-2 rounded border border-border/30",
+            "text-left px-2.5 py-2 rounded-xl border border-border/30",
             "text-xs text-muted-foreground/80",
             "hover:bg-muted/50 hover:text-foreground hover:border-border/50",
             "transition-all duration-150",

@@ -113,13 +113,13 @@ export default function AuthenticatedLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/40 px-4 sm:px-6">
+      <SidebarInset className="relative overflow-y-auto">
+        <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center justify-between border-b border-border/30 px-4 sm:px-6 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
           <SidebarTrigger className="md:hidden" />
           <div className="flex-1" />
           <ThemeToggle />
         </header>
-        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+        <div className="flex-1 min-h-0 flex flex-col">
           {children}
         </div>
       </SidebarInset>
