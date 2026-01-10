@@ -95,12 +95,14 @@ AI-powered assistant for managing AdMob and Google Ad Manager accounts. Ask ques
 
 ### Installation
 
+NOTE: Make sure you have `pnpm` installed. If not, run `npm install -g pnpm@latest-10`.
+
 ```bash
 # Frontend dependencies
-cd frontend && npm install
+cd frontend && pnpm install
 
 # API dependencies
-cd ../backend/api && bun install
+cd ../backend/api && pnpm install
 
 # Python dependencies
 cd .. && pip install -r requirements.txt
@@ -110,14 +112,14 @@ cd .. && pip install -r requirements.txt
 
 ```bash
 cd backend/api
-bun run db:push      # Create tables
-bun run db:studio    # Open Drizzle Studio (optional)
+pnpm run db:push      # Create tables
+pnpm run db:studio    # Open Drizzle Studio (optional)
 ```
 
 ### Run Development
 
 ```bash
-cd frontend && npm run dev
+cd frontend && pnpm dev
 ```
 
 This starts all three services concurrently:
