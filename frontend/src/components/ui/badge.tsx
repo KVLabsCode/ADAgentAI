@@ -37,7 +37,6 @@ function Badge({
 
   return (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}

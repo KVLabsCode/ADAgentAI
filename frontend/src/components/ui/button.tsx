@@ -51,7 +51,6 @@ function Button({
 
   return (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="button"
       data-variant={variant}

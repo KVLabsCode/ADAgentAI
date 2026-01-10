@@ -403,7 +403,6 @@ function SidebarGroupLabel({
 
   return (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
@@ -427,7 +426,6 @@ function SidebarGroupAction({
 
   return (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
@@ -520,7 +518,6 @@ function SidebarMenuButton({
 
   const button = (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
@@ -568,7 +565,6 @@ function SidebarMenuAction({
 
   return (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
@@ -697,7 +693,6 @@ function SidebarMenuSubButton({
 
   return (
     <Comp
-      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
       ref={ref}
       data-slot="sidebar-menu-sub-button"
       data-sidebar="menu-sub-button"
