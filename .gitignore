@@ -51,3 +51,4 @@ test-results/
 *.jpeg
 .claude/
 .playwright-mcp/
+.mcp.json
