@@ -27,6 +27,7 @@ interface UserContextValue {
   hasWaitlistAccess: boolean | null // null = not checked yet
   waitlistAccessReason: string | null // "not_on_waitlist", "pending_approval", "rejected"
   isCheckingWaitlist: boolean
+  recheckWaitlistAccess: () => Promise<void>
   // Terms of Service
   hasAcceptedTos: boolean | null // null = not checked yet
   isCheckingTos: boolean
@@ -140,40 +141,41 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [neonUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Check waitlist access when user authenticates
-  React.useEffect(() => {
-    async function checkWaitlistAccess() {
-      if (!neonUser?.email) {
-        setHasWaitlistAccess(null)
-        setWaitlistAccessReason(null)
-        return
-      }
-
-      setIsCheckingWaitlist(true)
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-        const response = await fetch(`${apiUrl}/api/waitlist/access/${encodeURIComponent(neonUser.email)}`)
-        const data = await response.json()
-
-        if (data.hasAccess) {
-          setHasWaitlistAccess(true)
-          setWaitlistAccessReason(null)
-        } else {
-          setHasWaitlistAccess(false)
-          setWaitlistAccessReason(data.reason || 'unknown')
-        }
-      } catch (error) {
-        console.error('Failed to check waitlist access:', error)
-        // On error, allow access to prevent lockout
-        setHasWaitlistAccess(true)
-        setWaitlistAccessReason(null)
-      } finally {
-        setIsCheckingWaitlist(false)
-      }
+  // Reusable function to check waitlist access
+  const recheckWaitlistAccess = useCallback(async () => {
+    if (!neonUser?.email) {
+      setHasWaitlistAccess(null)
+      setWaitlistAccessReason(null)
+      return
     }
 
-    checkWaitlistAccess()
+    setIsCheckingWaitlist(true)
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await fetch(`${apiUrl}/api/waitlist/access/${encodeURIComponent(neonUser.email)}`)
+      const data = await response.json()
+
+      if (data.hasAccess) {
+        setHasWaitlistAccess(true)
+        setWaitlistAccessReason(null)
+      } else {
+        setHasWaitlistAccess(false)
+        setWaitlistAccessReason(data.reason || 'unknown')
+      }
+    } catch (error) {
+      console.error('Failed to check waitlist access:', error)
+      // On error, allow access to prevent lockout
+      setHasWaitlistAccess(true)
+      setWaitlistAccessReason(null)
+    } finally {
+      setIsCheckingWaitlist(false)
+    }
   }, [neonUser?.email])
+
+  // Check waitlist access when user authenticates
+  React.useEffect(() => {
+    recheckWaitlistAccess()
+  }, [recheckWaitlistAccess])
 
   // Check ToS acceptance when user authenticates and has waitlist access
   React.useEffect(() => {
@@ -434,6 +436,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     hasWaitlistAccess,
     waitlistAccessReason,
     isCheckingWaitlist,
+    recheckWaitlistAccess,
     hasAcceptedTos,
     isCheckingTos,
     acceptTos,

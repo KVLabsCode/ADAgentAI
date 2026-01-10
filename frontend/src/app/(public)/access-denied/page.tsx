@@ -1,25 +1,33 @@
 "use client"
 
 import Link from "next/link"
-import { Clock, XCircle, ArrowLeft } from "lucide-react"
+import { Clock, Scroll, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useUser } from "@/hooks/use-user"
+import { AuthenticatedWaitlistDialog } from "@/components/authenticated-waitlist-dialog"
 
 export default function AccessDeniedPage() {
-  const { waitlistAccessReason, signOut, user } = useUser()
+  const { waitlistAccessReason, signOut, user, recheckWaitlistAccess } = useUser()
 
   const getContent = () => {
     switch (waitlistAccessReason) {
       case "not_on_waitlist":
         return {
-          icon: <XCircle className="h-12 w-12 text-muted-foreground" />,
-          title: "Not on the waitlist",
-          description: "You need to join the waitlist first. Once approved, you'll be able to access ADAgentAI.",
+          icon: <Scroll className="h-12 w-12 text-muted-foreground" />,
+          title: "Waitlist",
+          description: "Please join our waitlist to be able to access our product.",
           action: (
             <div className="flex flex-col gap-2">
-              <Button asChild>
-                <Link href="/">Join Waitlist</Link>
-              </Button>
+              {user?.email ? (
+                <AuthenticatedWaitlistDialog
+                  email={user.email}
+                  onSuccess={recheckWaitlistAccess}
+                />
+              ) : (
+                <Button asChild>
+                  <Link href="/">Join Waitlist</Link>
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign out
               </Button>
@@ -29,8 +37,8 @@ export default function AccessDeniedPage() {
       case "pending_approval":
         return {
           icon: <Clock className="h-12 w-12 text-amber-500" />,
-          title: "Waiting for approval",
-          description: "You're on the waitlist! We'll send you an email when your access is ready.",
+          title: "You’re on the waitlist",
+          description: "Thank you for your interest in our product. We will get in touch with you as soon as possible.",
           action: (
             <div className="flex flex-col gap-2">
               <Button variant="outline" asChild>
@@ -71,9 +79,16 @@ export default function AccessDeniedPage() {
           description: "You don't have access to ADAgentAI. Please join the waitlist to get started.",
           action: (
             <div className="flex flex-col gap-2">
-              <Button asChild>
-                <Link href="/">Join Waitlist</Link>
-              </Button>
+              {user?.email ? (
+                <AuthenticatedWaitlistDialog
+                  email={user.email}
+                  onSuccess={recheckWaitlistAccess}
+                />
+              ) : (
+                <Button asChild>
+                  <Link href="/">Join Waitlist</Link>
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign out
               </Button>
