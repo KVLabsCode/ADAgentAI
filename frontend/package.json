@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/kill-ports.cjs && concurrently --names \"next,api,agent\" -c \"cyan,yellow,magenta\" \"next dev\" \"cd ../backend/api && bun --hot src/index.ts\" \"cd ../backend && python chat_server.py\"",
+    "dev": "node scripts/kill-ports.cjs && concurrently --names \"next,api,agent\" -c \"cyan,yellow,magenta\" \"next dev\" \"cd ../backend/api && bun --hot src/index.ts\" \"cd ../backend && source venv/bin/activate && AGENT_PORT=5001 python chat_server.py\"",
     "dev:clean": "node scripts/kill-ports.cjs",
     "dev:frontend": "next dev",
     "dev:backend": "cd ../backend/api && bun --hot src/index.ts",
-    "dev:agent": "cd ../backend && python chat_server.py",
+    "dev:agent": "cd ../backend && source venv/bin/activate && AGENT_PORT=5001 python chat_server.py",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

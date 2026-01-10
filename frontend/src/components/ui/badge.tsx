@@ -29,6 +29,7 @@ function Badge({
   className,
   variant,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
@@ -36,6 +37,8 @@ function Badge({
 
   return (
     <Comp
+      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
+      ref={ref}
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}
       {...props}

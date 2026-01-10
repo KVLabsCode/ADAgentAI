@@ -10,7 +10,7 @@ const os = require('os');
 
 const ports = process.argv.slice(2).length > 0
   ? process.argv.slice(2).map(Number)
-  : [3000, 3001, 5000];
+  : [3000, 3001, 5001];
 
 const isWindows = os.platform() === 'win32';
 

@@ -396,12 +396,15 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
 function SidebarGroupLabel({
   className,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"div"> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "div"
 
   return (
     <Comp
+      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
+      ref={ref}
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
@@ -417,12 +420,15 @@ function SidebarGroupLabel({
 function SidebarGroupAction({
   className,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"button"> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "button"
 
   return (
     <Comp
+      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
+      ref={ref}
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
       className={cn(
@@ -502,6 +508,7 @@ function SidebarMenuButton({
   size = "default",
   tooltip,
   className,
+  ref,
   ...props
 }: React.ComponentProps<"button"> & {
   asChild?: boolean
@@ -513,6 +520,8 @@ function SidebarMenuButton({
 
   const button = (
     <Comp
+      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
+      ref={ref}
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
       data-size={size}
@@ -549,6 +558,7 @@ function SidebarMenuAction({
   className,
   asChild = false,
   showOnHover = false,
+  ref,
   ...props
 }: React.ComponentProps<"button"> & {
   asChild?: boolean
@@ -558,6 +568,8 @@ function SidebarMenuAction({
 
   return (
     <Comp
+      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
+      ref={ref}
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
       className={cn(
@@ -674,6 +686,7 @@ function SidebarMenuSubButton({
   size = "md",
   isActive = false,
   className,
+  ref,
   ...props
 }: React.ComponentProps<"a"> & {
   asChild?: boolean
@@ -684,6 +697,8 @@ function SidebarMenuSubButton({
 
   return (
     <Comp
+      // @ts-expect-error - React 19 ref type incompatibility with Radix UI Slot
+      ref={ref}
       data-slot="sidebar-menu-sub-button"
       data-sidebar="menu-sub-button"
       data-size={size}
