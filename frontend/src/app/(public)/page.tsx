@@ -25,9 +25,9 @@ export default function LandingPage() {
               AI-powered ad platform management
             </h1>
 
-            <p className="text-muted-foreground max-w-lg mx-auto">
-              Connect your AdMob and Google Ad Manager accounts.
-              Ask questions in plain English. Get instant insights.
+            <p className="text-muted-foreground max-w-lg mx-auto text-sm">
+              Connect your AdMob account or join the waitlist for
+              Google Ad Manager support. Ask questions in plain English.
             </p>
 
             {/* CTA - Show waitlist for non-authenticated, dashboard link for authenticated */}
@@ -107,11 +107,15 @@ export default function LandingPage() {
                 </div>
                 <span className="text-sm font-medium">AdMob</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-semibold">
+              <div className="flex items-center gap-2 grayscale brightness-75 opacity-70">
+                <div className="h-8 w-8 rounded bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-semibold relative overflow-hidden">
                   G
+                  <div className="absolute inset-0 bg-black/20" />
                 </div>
-                <span className="text-sm font-medium">Google Ad Manager</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Google Ad Manager</span>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Coming Soon</span>
+                </div>
               </div>
             </div>
           </div>

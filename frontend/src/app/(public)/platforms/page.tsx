@@ -23,7 +23,7 @@ const platforms = [
     letter: "G",
     gradient: "from-blue-500 to-blue-600",
     description: "Enterprise ad serving platform for publishers.",
-    status: "available",
+    status: "coming-soon",
     features: [
       "Line item performance",
       "Inventory forecasting",

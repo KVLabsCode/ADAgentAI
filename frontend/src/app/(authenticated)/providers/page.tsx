@@ -273,18 +273,17 @@ function ProvidersContent() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => handleConnect("gam")}
-                disabled={!!connectingType}
+                disabled={true}
                 className="text-xs"
               >
                 <div className="flex items-center gap-2">
-                  {connectingType === 'gam' ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  ) : (
-                    <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
-                      G
-                    </div>
-                  )}
-                  <span>{connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}</span>
+                  <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                    G
+                  </div>
+                  <span className="flex-1 text-muted-foreground">Google Ad Manager</span>
+                  <Badge variant="outline" className="text-[8px] h-3 px-1 border-border/40 text-muted-foreground/60 leading-none">
+                    Soon
+                  </Badge>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -330,8 +329,13 @@ function ProvidersContent() {
                   <DropdownMenuItem onClick={() => handleConnect("admob")} className="text-xs" disabled={!!connectingType}>
                     {connectingType === 'admob' ? 'Connecting...' : 'AdMob'}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs" disabled={!!connectingType}>
-                    {connectingType === 'gam' ? 'Connecting...' : 'Google Ad Manager'}
+                  <DropdownMenuItem onClick={() => handleConnect("gam")} className="text-xs" disabled={true}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>Google Ad Manager</span>
+                      <Badge variant="outline" className="text-[8px] h-3 px-1 border-border/40 text-muted-foreground/60 leading-none ml-2">
+                        Soon
+                      </Badge>
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -449,7 +453,7 @@ function ProvidersContent() {
               </div>
               <div>
                 <p className="text-xs font-medium">Google Ad Manager</p>
-                <p className="text-[10px] text-muted-foreground/60">Available</p>
+                <p className="text-[10px] text-muted-foreground/60">Coming soon</p>
               </div>
             </div>
           </div>

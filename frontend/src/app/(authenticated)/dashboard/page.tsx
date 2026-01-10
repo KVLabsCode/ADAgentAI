@@ -145,7 +145,7 @@ export default function DashboardPage() {
             <span className="text-sm font-medium">Connect Provider</span>
           </div>
           <p className="text-[11px] text-muted-foreground/70 mb-2">
-            Link your AdMob or Google Ad Manager account.
+            Link your AdMob account. Google Ad Manager coming soon.
           </p>
           <span className="inline-flex items-center text-[11px] font-medium text-foreground/60 group-hover:text-foreground/80 transition-colors">
             Add provider

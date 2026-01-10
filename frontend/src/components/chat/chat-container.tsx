@@ -408,7 +408,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
               <p className="text-xs text-muted-foreground/70">
                 {hasProviders
                   ? "Ask about your ad performance, create reports, or get optimization tips."
-                  : "Link your AdMob or Google Ad Manager account to begin."}
+                  : "Link your AdMob account to begin."}
               </p>
             </div>
 
