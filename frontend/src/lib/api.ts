@@ -2,7 +2,7 @@
  * API client for connecting to CrewAI agent service
  */
 
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5000";
+const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5001";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 /**

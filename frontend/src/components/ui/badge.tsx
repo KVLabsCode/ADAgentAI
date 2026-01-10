@@ -29,6 +29,7 @@ function Badge({
   className,
   variant,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
@@ -36,6 +37,7 @@ function Badge({
 
   return (
     <Comp
+      ref={ref}
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}
       {...props}
