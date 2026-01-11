@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Clock, Scroll, ArrowLeft } from "lucide-react"
+import { Clock, Scroll, ArrowLeft, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useUser } from "@/hooks/use-user"
 import { AuthenticatedWaitlistDialog } from "@/components/authenticated-waitlist-dialog"
