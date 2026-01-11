@@ -49,6 +49,7 @@ async def stream_chat_response(
     user_id: Optional[str] = None,
     organization_id: Optional[str] = None,
     conversation_history: Optional[list] = None,
+    selected_model: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream a chat response using CrewAI with real-time interleaved events.
 
@@ -63,6 +64,13 @@ async def stream_chat_response(
     - result: Final response
     - error: Error messages
     - done: Stream complete
+
+    Args:
+        user_query: The user's message
+        user_id: User ID for OAuth tokens
+        organization_id: Organization ID for org-scoped operations
+        conversation_history: Previous conversation for context
+        selected_model: LLM model to use (e.g., "anthropic/claude-sonnet-4-20250514")
 
     IMPORTANT: CrewAI runs in a background thread to prevent hook blocking
     from deadlocking the SSE event stream.
@@ -96,8 +104,8 @@ async def stream_chat_response(
         agent_name = f"{service.title()} {capability.title()} Specialist"
         yield format_sse(AgentEvent(agent=agent_name).model_dump(mode='json'))
 
-        # Build crew with conversation history
-        crew = get_crew_for_query(user_query, service, capability, user_id, organization_id, conversation_history)
+        # Build crew with conversation history and selected model
+        crew = get_crew_for_query(user_query, service, capability, user_id, organization_id, conversation_history, selected_model)
 
         # Run CrewAI in background thread (hooks may block, this prevents deadlock)
         result_queue = thread_queue.Queue()

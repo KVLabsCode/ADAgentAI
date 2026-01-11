@@ -24,8 +24,8 @@ api_env_path = Path(__file__).parent / "api" / ".env"
 if api_env_path.exists():
     load_dotenv(api_env_path)
 
-# Set model before imports
-os.environ.setdefault("MODEL", "anthropic/claude-sonnet-4-20250514")
+# Note: Model configuration is handled by ad_platform_crew.config.settings
+# Set via LLM_PROVIDER and LLM_MODEL environment variables, or use MODEL_PRESET
 
 # Add project to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -145,12 +145,18 @@ async def chat_stream(request: Request, body: ChatRequest):
     # Extract organization ID from request body or header
     organization_id = body.organization_id or request.headers.get("x-organization-id")
 
+    # Extract selected model from context
+    selected_model = None
+    if body.context and isinstance(body.context, dict):
+        selected_model = body.context.get("selectedModel")
+
     return StreamingResponse(
         stream_chat_response(
             user_query=body.message,
             user_id=user_id,
             organization_id=organization_id,
             conversation_history=body.history,
+            selected_model=selected_model,
         ),
         media_type="text/event-stream",
         headers={

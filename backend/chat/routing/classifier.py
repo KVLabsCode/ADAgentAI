@@ -62,11 +62,20 @@ def get_router_llm():
     """Get or create the router LLM (lightweight model for classification)."""
     global _router_llm
     if _router_llm is None:
-        _router_llm = LLM(
-            model=settings.llm.model_string,
-            temperature=0.0,
-            max_tokens=100,
-        )
+        llm_kwargs = {
+            "model": settings.llm.model_string,
+            "temperature": 0.0,
+            "max_tokens": 100,
+        }
+
+        # Add OpenRouter-specific configuration
+        if settings.llm.is_openrouter:
+            if settings.llm.base_url:
+                llm_kwargs["base_url"] = settings.llm.base_url
+            if settings.llm.api_key:
+                llm_kwargs["api_key"] = settings.llm.api_key
+
+        _router_llm = LLM(**llm_kwargs)
     return _router_llm
 
 

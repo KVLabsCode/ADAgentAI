@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from crewai import Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task, LLM
 
 from ad_platform_crew.factory.agent_factory import get_factory
 from ad_platform_crew.config.settings import settings
@@ -16,6 +16,7 @@ def get_crew_for_query(
     user_id: Optional[str] = None,
     organization_id: Optional[str] = None,
     conversation_history: Optional[list] = None,
+    selected_model: Optional[str] = None,
 ) -> Crew:
     """Create a crew with streaming enabled for the specified service/capability.
 
@@ -26,6 +27,7 @@ def get_crew_for_query(
         user_id: User ID for OAuth tokens
         organization_id: Organization ID for org-scoped operations
         conversation_history: Previous conversation for context
+        selected_model: LLM model to use (e.g., "anthropic/claude-sonnet-4-20250514" or "openrouter/google/gemini-2.5-flash-lite")
 
     Returns:
         Configured Crew ready for streaming execution
@@ -41,9 +43,12 @@ def get_crew_for_query(
     # Build conversation context string for task description
     conversation_context = _build_conversation_context(conversation_history)
 
+    # Create LLM instance based on selected model
+    llm = _create_llm_from_selection(selected_model)
+
     # Handle general queries with a simple response
     if service == "general":
-        return _build_general_crew(user_query, conversation_context)
+        return _build_general_crew(user_query, conversation_context, llm)
 
     # Create the appropriate specialist crew
     return _build_specialist_crew(
@@ -51,7 +56,60 @@ def get_crew_for_query(
         service=service,
         capability=capability,
         conversation_context=conversation_context,
+        llm=llm,
     )
+
+
+def _create_llm_from_selection(selected_model: Optional[str]) -> LLM:
+    """Create an LLM instance based on user's model selection.
+
+    Args:
+        selected_model: Model string from frontend (e.g., "anthropic/claude-sonnet-4-20250514"
+                       or "openrouter/google/gemini-2.5-flash-lite")
+
+    Returns:
+        Configured LLM instance
+    """
+    # If no model selected, use default from settings
+    if not selected_model:
+        llm_kwargs = {
+            "model": settings.llm.model_string,
+            "temperature": settings.llm.temperature,
+            "max_tokens": settings.llm.max_tokens,
+        }
+        if settings.llm.is_openrouter:
+            if settings.llm.base_url:
+                llm_kwargs["base_url"] = settings.llm.base_url
+            if settings.llm.api_key:
+                llm_kwargs["api_key"] = settings.llm.api_key
+        return LLM(**llm_kwargs)
+
+    # Parse selected model to determine provider
+    # Format: "provider/model" or "openrouter/provider/model"
+    if selected_model.startswith("openrouter/"):
+        # OpenRouter model: "openrouter/google/gemini-2.5-flash-lite"
+        model_path = selected_model[len("openrouter/"):]  # "google/gemini-2.5-flash-lite"
+        return LLM(
+            model=f"openrouter/{model_path}",
+            temperature=settings.llm.temperature,
+            max_tokens=settings.llm.max_tokens,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+        )
+    elif selected_model.startswith("anthropic/"):
+        # Anthropic model: "anthropic/claude-sonnet-4-20250514"
+        return LLM(
+            model=selected_model,
+            temperature=settings.llm.temperature,
+            max_tokens=settings.llm.max_tokens,
+        )
+    else:
+        # Unknown format, try as-is
+        return LLM(
+            model=selected_model,
+            temperature=settings.llm.temperature,
+            max_tokens=settings.llm.max_tokens,
+        )
 
 
 def _build_conversation_context(conversation_history: Optional[list]) -> str:
@@ -70,14 +128,14 @@ def _build_conversation_context(conversation_history: Optional[list]) -> str:
     return "\n".join(context_parts)
 
 
-def _build_general_crew(user_query: str, conversation_context: str) -> Crew:
+def _build_general_crew(user_query: str, conversation_context: str, llm: LLM) -> Crew:
     """Build a crew for general queries."""
     general_agent = Agent(
         role="General Assistant",
         goal="Help users with questions about AdMob and Google Ad Manager",
         backstory="You are a helpful assistant that can answer general questions about ad monetization platforms.",
         verbose=False,
-        llm=settings.llm.model_string,
+        llm=llm,
     )
 
     task_description = f"Answer this question: {user_query}"
@@ -109,12 +167,13 @@ def _build_specialist_crew(
     service: str,
     capability: str,
     conversation_context: str,
+    llm: LLM,
 ) -> Crew:
     """Build a crew with specialized agent for ad platform queries."""
     factory = get_factory()
 
-    # Create the appropriate specialist
-    specialist = factory.create_specialist(service, capability, verbose=False)
+    # Create the appropriate specialist with custom LLM
+    specialist = factory.create_specialist(service, capability, verbose=False, llm=llm)
 
     # Create task with service-specific instructions
     instructions = _get_service_instructions(service)

@@ -11,6 +11,7 @@ crewai-tools
 # LLM providers
 langchain-anthropic
 anthropic
+litellm  # Multi-provider support (OpenRouter, OpenAI, etc.)
 
 # Data validation
 pydantic>=2.0.0

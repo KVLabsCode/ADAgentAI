@@ -60,11 +60,20 @@ class AgentFactory:
 
     def _create_llm(self) -> LLM:
         """Create the shared LLM instance."""
-        return LLM(
-            model=settings.llm.model_string,
-            temperature=settings.llm.temperature,
-            max_tokens=settings.llm.max_tokens,
-        )
+        llm_kwargs = {
+            "model": settings.llm.model_string,
+            "temperature": settings.llm.temperature,
+            "max_tokens": settings.llm.max_tokens,
+        }
+
+        # Add OpenRouter-specific configuration
+        if settings.llm.is_openrouter:
+            if settings.llm.base_url:
+                llm_kwargs["base_url"] = settings.llm.base_url
+            if settings.llm.api_key:
+                llm_kwargs["api_key"] = settings.llm.api_key
+
+        return LLM(**llm_kwargs)
 
     def _get_tool_module(self, service_key: str) -> dict:
         """
@@ -215,7 +224,8 @@ class AgentFactory:
         self,
         service_key: str,
         capability: str,
-        verbose: bool = True
+        verbose: bool = True,
+        llm: Optional[LLM] = None,
     ) -> Agent:
         """
         Create a specialist agent for a service capability.
@@ -228,6 +238,7 @@ class AgentFactory:
             service_key: Service key (e.g., "admob")
             capability: Capability key (e.g., "inventory")
             verbose: Enable verbose output
+            llm: Optional LLM instance to use (defaults to factory's shared LLM)
 
         Returns:
             Configured specialist Agent
@@ -250,7 +261,7 @@ class AgentFactory:
                 "backstory",
                 f"Expert in {service['display_name']} {capability} management."
             ).strip(),
-            llm=self._llm,
+            llm=llm or self._llm,
             tools=tools,
             verbose=verbose,
             allow_delegation=False,

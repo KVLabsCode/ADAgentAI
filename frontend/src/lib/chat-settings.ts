@@ -32,7 +32,7 @@ export const useChatSettings = create<ChatSettingsState>()(
   persist(
     (set, get) => ({
       displayMode: "detailed",
-      selectedModel: "claude-sonnet-4-20250514",
+      selectedModel: "openrouter/google/gemini-2.5-flash-lite-preview-06-17",
       responseStyle: "concise",
       enabledProviderIds: [], // Empty means all are enabled
       enabledAppIds: {}, // Empty means all apps enabled for all providers
@@ -82,13 +82,25 @@ export const useChatSettings = create<ChatSettingsState>()(
   )
 )
 
-// Available models
+// Available models grouped by provider
 export const AVAILABLE_MODELS = [
   {
     provider: "Anthropic",
     models: [
-      { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Fast and capable" },
-      { id: "claude-opus-4-20250514", name: "Claude Opus 4", description: "Most powerful" },
+      { id: "anthropic/claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Fast and capable" },
+    ],
+  },
+  {
+    provider: "Google",
+    models: [
+      { id: "openrouter/google/gemini-2.5-flash-lite-preview-06-17", name: "Gemini 2.5 Flash Lite", description: "Fast and cost-effective" },
+      { id: "openrouter/google/gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Latest Gemini model" },
+    ],
+  },
+  {
+    provider: "OpenAI",
+    models: [
+      { id: "openrouter/openai/gpt-5-mini", name: "GPT-5 Mini", description: "Compact and efficient" },
     ],
   },
 ]

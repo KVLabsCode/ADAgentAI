@@ -21,7 +21,7 @@ interface ChatContainerProps {
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const pathname = usePathname()
   const { user, getAccessToken } = useUser()
-  const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext } = useChatSettings()
+  const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel } = useChatSettings()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
@@ -106,7 +106,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     enabledAppIds,
     responseStyle,
     autoIncludeContext,
-  }), [enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext])
+    selectedModel,
+  }), [enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel])
 
   // Create a new chat session
   const createSession = async (title?: string): Promise<string | null> => {
