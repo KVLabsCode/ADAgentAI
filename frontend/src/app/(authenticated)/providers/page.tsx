@@ -39,7 +39,7 @@ interface ProviderWithEnabled extends Provider {
 
 function ProvidersContent() {
   const searchParams = useSearchParams()
-  const { getAccessToken } = useUser()
+  const { getAccessToken, selectedOrganizationId } = useUser()
   const [providers, setProviders] = React.useState<ProviderWithEnabled[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [connectingType, setConnectingType] = React.useState<string | null>(null)
@@ -54,7 +54,7 @@ function ProvidersContent() {
   const fetchProviders = React.useCallback(async () => {
     try {
       const accessToken = await getAccessToken()
-      const response = await authFetch(`${API_URL}/api/providers`, accessToken)
+      const response = await authFetch(`${API_URL}/api/providers`, accessToken, {}, selectedOrganizationId)
 
       if (response.ok) {
         const data = await response.json()
@@ -77,7 +77,7 @@ function ProvidersContent() {
     } finally {
       setIsLoading(false)
     }
-  }, [getAccessToken])
+  }, [getAccessToken, selectedOrganizationId])
 
   React.useEffect(() => {
     fetchProviders()
@@ -124,7 +124,7 @@ function ProvidersContent() {
       // Call API to get OAuth URL
       const response = await authFetch(`${API_URL}/api/providers/connect/${type}`, accessToken, {
         method: 'POST',
-      })
+      }, selectedOrganizationId)
 
       if (!response.ok) {
         throw new Error('Failed to initiate OAuth')
@@ -169,7 +169,7 @@ function ProvidersContent() {
       const accessToken = await getAccessToken()
       const response = await authFetch(`${API_URL}/api/providers/${providerId}`, accessToken, {
         method: 'DELETE',
-      })
+      }, selectedOrganizationId)
 
       if (response.ok) {
         setProviders(prev => prev.filter(p => p.id !== providerId))
@@ -199,7 +199,7 @@ function ProvidersContent() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isEnabled: enabled }),
-      })
+      }, selectedOrganizationId)
 
       if (response.ok) {
         setProviders(prev => prev.map(p =>
