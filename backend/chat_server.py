@@ -24,7 +24,8 @@ if sys.platform == "win32":
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-# Load environment variables from consolidated backend/.env
+# Load environment variables FIRST before any imports from chat package
+# This ensures DATABASE_URL is available when chat.graph.builder is imported
 from dotenv import load_dotenv
 env_path = Path(__file__).parent / ".env"
 if env_path.exists():
@@ -35,11 +36,11 @@ else:
     if api_env_path.exists():
         load_dotenv(api_env_path)
 
+# Add project to path BEFORE importing chat package
+sys.path.insert(0, str(Path(__file__).parent))
+
 # Note: Model configuration is handled in the LangGraph nodes
 # Router uses Claude Haiku, specialists use the user's selected model
-
-# Add project to path
-sys.path.insert(0, str(Path(__file__).parent))
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
