@@ -89,37 +89,35 @@ AI-powered assistant for managing AdMob and Google Ad Manager accounts. Ask ques
 
 ### Prerequisites
 
-- Node.js 20+
-- Bun 1.0+
+- Bun 1.0+ (https://bun.sh)
 - Python 3.11+
+- uv (Python package manager)
 
 ### Installation
 
-NOTE: Make sure you have `pnpm` installed. If not, run `npm install -g pnpm@latest-10`.
-
 ```bash
 # Frontend dependencies
-cd frontend && pnpm install
+cd frontend && bun install
 
 # API dependencies
-cd ../backend/api && pnpm install
+cd ../backend/api && bun install
 
 # Python dependencies
-cd .. && pip install -r requirements.txt
+cd .. && uv sync
 ```
 
 ### Database Setup
 
 ```bash
 cd backend/api
-pnpm run db:push      # Create tables
-pnpm run db:studio    # Open Drizzle Studio (optional)
+bun run db:push      # Create tables
+bun run db:studio    # Open Drizzle Studio (optional)
 ```
 
 ### Run Development
 
 ```bash
-cd frontend && pnpm dev
+cd frontend && bun run dev
 ```
 
 This starts all three services concurrently:

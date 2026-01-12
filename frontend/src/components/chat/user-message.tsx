@@ -16,14 +16,14 @@ export function UserMessage({ content }: UserMessageProps) {
   const isShort = content.length <= 80 && !content.includes('\n')
 
   return (
-    <div className="flex gap-2.5 justify-end">
+    <div className="flex items-start gap-2.5 justify-end">
       <div
         className={cn(
           "max-w-[80%]",
-          "bg-sky-900/80 border border-sky-700/50",
-          "rounded-2xl",
+          "bg-zinc-700/60 border border-zinc-600/40",
+          "rounded-xl",
           // Match card height for short messages, allow expansion for longer
-          isShort ? "h-10 px-3 flex items-center" : "px-3 py-2.5"
+          isShort ? "h-10 px-3.5 flex items-center" : "px-3.5 py-2.5"
         )}
       >
         <p className={cn(
@@ -42,8 +42,8 @@ export function UserMessage({ content }: UserMessageProps) {
           className="flex-shrink-0 w-10 h-10 rounded-full object-cover"
         />
       ) : (
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-sky-600 flex items-center justify-center">
-          <User className="h-5 w-5 text-white" />
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-zinc-600 flex items-center justify-center">
+          <User className="h-5 w-5 text-zinc-300" />
         </div>
       )}
     </div>

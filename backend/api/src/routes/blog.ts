@@ -6,6 +6,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { db } from "../db";
 import { blogPosts, type NewBlogPost } from "../db/schema";
 import { requireAuth, requireAdmin } from "../middleware/auth";
+import { logAuditEntry } from "../lib/audit";
 
 const blog = new Hono();
 
@@ -127,6 +128,7 @@ adminBlog.get(
     status: z.enum(["draft", "published"]).optional(),
   })),
   async (c) => {
+    const adminUser = c.get("user");
     const { category, featured, status, limit, offset } = c.req.valid("query");
 
     const posts = await db.query.blogPosts.findMany({
@@ -149,6 +151,13 @@ adminBlog.get(
       },
     });
 
+    // Log admin access
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "list_blog_posts",
+      metadata: { category, featured, status, limit, offset, count: posts.length },
+    });
+
     return c.json({ posts });
   }
 );
@@ -157,6 +166,7 @@ adminBlog.get(
  * GET /admin/blog/:id - Get single post by ID (including drafts)
  */
 adminBlog.get("/:id", async (c) => {
+  const adminUser = c.get("user");
   const id = c.req.param("id");
 
   const post = await db.query.blogPosts.findFirst({
@@ -175,6 +185,14 @@ adminBlog.get("/:id", async (c) => {
   if (!post) {
     return c.json({ error: "Post not found" }, 404);
   }
+
+  // Log admin access
+  await logAuditEntry({
+    adminUserId: adminUser.id,
+    action: "view_blog_post",
+    targetResourceId: id,
+    metadata: { slug: post.slug, status: post.status },
+  });
 
   return c.json({ post });
 });
@@ -207,6 +225,14 @@ adminBlog.post(
       } satisfies NewBlogPost)
       .returning();
 
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: user.id,
+      action: "create_blog_post",
+      targetResourceId: post.id,
+      metadata: { slug: post.slug, title: post.title, status: post.status },
+    });
+
     return c.json({ post }, 201);
   }
 );
@@ -218,6 +244,7 @@ adminBlog.put(
   "/:id",
   zValidator("json", updatePostSchema),
   async (c) => {
+    const adminUser = c.get("user");
     const id = c.req.param("id");
     const data = c.req.valid("json");
 
@@ -258,6 +285,19 @@ adminBlog.put(
       .where(eq(blogPosts.id, id))
       .returning();
 
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "update_blog_post",
+      targetResourceId: id,
+      metadata: {
+        slug: post.slug,
+        previousStatus: existingPost.status,
+        newStatus: post.status,
+        changedFields: Object.keys(data),
+      },
+    });
+
     return c.json({ post });
   }
 );
@@ -266,6 +306,7 @@ adminBlog.put(
  * DELETE /admin/blog/:id - Delete post
  */
 adminBlog.delete("/:id", async (c) => {
+  const adminUser = c.get("user");
   const id = c.req.param("id");
 
   const [deleted] = await db
@@ -276,6 +317,14 @@ adminBlog.delete("/:id", async (c) => {
   if (!deleted) {
     return c.json({ error: "Post not found" }, 404);
   }
+
+  // Log admin action
+  await logAuditEntry({
+    adminUserId: adminUser.id,
+    action: "delete_blog_post",
+    targetResourceId: id,
+    metadata: { slug: deleted.slug, title: deleted.title },
+  });
 
   return c.json({ success: true });
 });

@@ -4,7 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Sparkles, Brain, ChevronDown, Clock, Check, X, Route, Zap, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck } from "lucide-react"
+import { Sparkles, Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, ExternalLink, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,11 +20,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useChatSettings } from "@/lib/chat-settings"
-import type { Message, StreamEventItem } from "@/lib/types"
+import type { Message, StreamEventItem, JSONSchema } from "@/lib/types"
+import { ParameterForm } from "./parameter-form"
 
 interface AssistantMessageProps {
   message: Message
-  onToolApproval?: (approvalId: string, approved: boolean) => void
+  onToolApproval?: (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => void
   pendingApprovals?: Map<string, boolean | null>
 }
 
@@ -34,21 +35,146 @@ function getShortToolName(fullName: string): string {
   return parts[parts.length - 1] || fullName
 }
 
-// List of dangerous tools that require approval
-const DANGEROUS_TOOLS = [
-  "Create AdMob App", "Create AdMob Ad Unit",
-  "Create Ad Unit Mapping", "Batch Create Ad Unit Mappings",
-  "Create Mediation Group", "Update Mediation Group",
-  "Create Mediation A/B Experiment", "Stop Mediation A/B Experiment",
-  "Create Ad Unit", "Update Ad Unit",
-  "Create Order", "Update Order",
-  "Create Line Item", "Update Line Item",
-  "Create Creative", "Create Site", "Update Site",
-  "Submit Sites for Approval",
-]
+// =============================================================================
+// Tool Metadata Extraction
+// =============================================================================
 
+interface ToolMetadata {
+  displayName: string
+  category: string  // e.g., "Ad Manager > Ad Units"
+  operationType: "Create" | "Update" | "Delete" | "Batch" | "Action"
+  riskLevel: "low" | "medium" | "high"
+  entityType: string  // e.g., "Ad Unit", "Order", "Site"
+  docUrl?: string
+}
+
+function getToolMetadata(mcpToolName: string): ToolMetadata {
+  const shortName = getShortToolName(mcpToolName)
+
+  // Determine provider
+  const isAdMob = shortName.startsWith("admob_")
+  const isAdManager = shortName.startsWith("admanager_")
+  const provider = isAdMob ? "AdMob" : isAdManager ? "Ad Manager" : "Tool"
+
+  // Remove prefix and clean name
+  let cleanName = shortName
+    .replace(/^admob_/, "")
+    .replace(/^admanager_/, "")
+    .replace(/networks_/g, "")
+
+  // Determine operation type
+  let operationType: ToolMetadata["operationType"] = "Action"
+  if (cleanName.startsWith("batch_")) {
+    operationType = "Batch"
+    cleanName = cleanName.replace(/^batch_/, "")
+  } else if (cleanName.startsWith("create_")) {
+    operationType = "Create"
+  } else if (cleanName.startsWith("patch_") || cleanName.startsWith("update_")) {
+    operationType = "Update"
+  } else if (cleanName.startsWith("delete_")) {
+    operationType = "Delete"
+  }
+
+  // Extract entity type
+  const entityParts = cleanName
+    .replace(/^(create|patch|update|delete|activate|deactivate|archive|submit|run|stop|allow|block|cancel)_/, "")
+    .replace(/_for_approval$/, "")
+    .replace(/_ad_breaks$/, " Ad Breaks")
+    .replace(/_ad_review_center_ads$/, "")
+    .split("_")
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+  const entityType = entityParts.join(" ")
+    .replace(/s$/, "") // singularize
+    .replace(/By Asset Key$/, "")
+    .replace(/By Custom Asset Key$/, "")
+    .trim()
+
+  // Determine risk level
+  let riskLevel: ToolMetadata["riskLevel"] = "low"
+  if (cleanName.includes("delete") || cleanName.includes("archive")) {
+    riskLevel = "high"
+  } else if (operationType === "Batch") {
+    riskLevel = "high"
+  } else if (operationType === "Update" || cleanName.includes("deactivate")) {
+    riskLevel = "medium"
+  } else if (operationType === "Create") {
+    riskLevel = "low"
+  }
+
+  // Build category path
+  const category = `${provider} › ${entityType}s`
+
+  // Format display name
+  const displayName = shortName
+    .replace(/^admob_/, "")
+    .replace(/^admanager_/, "")
+    .replace(/networks_/g, "")
+    .split("_")
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ")
+
+  // API documentation URL
+  const docUrl = isAdManager
+    ? "https://developers.google.com/ad-manager/api/rest"
+    : isAdMob
+      ? "https://developers.google.com/admob/api/reference/rest"
+      : undefined
+
+  return { displayName, category, operationType, riskLevel, entityType, docUrl }
+}
+
+// Risk level styling
+const RISK_STYLES = {
+  low: { bg: "bg-emerald-500/20", text: "text-emerald-400", border: "border-emerald-500/30" },
+  medium: { bg: "bg-amber-500/20", text: "text-amber-400", border: "border-amber-500/30" },
+  high: { bg: "bg-red-500/20", text: "text-red-400", border: "border-red-500/30" },
+}
+
+// Operation type styling
+const OP_STYLES = {
+  Create: { bg: "bg-emerald-500/20", text: "text-emerald-400" },
+  Update: { bg: "bg-amber-500/20", text: "text-amber-400" },
+  Delete: { bg: "bg-red-500/20", text: "text-red-400" },
+  Batch: { bg: "bg-violet-500/20", text: "text-violet-400" },
+  Action: { bg: "bg-sky-500/20", text: "text-sky-400" },
+}
+
+// Check if a tool requires approval (write operation) - dynamic detection
 function isWriteOperation(toolName: string): boolean {
-  return DANGEROUS_TOOLS.includes(toolName)
+  const name = toolName.toLowerCase()
+  return (
+    name.includes("create") ||
+    name.includes("update") ||
+    name.includes("patch") ||
+    name.includes("delete") ||
+    name.includes("batch") ||
+    name.includes("activate") ||
+    name.includes("deactivate") ||
+    name.includes("archive") ||
+    name.includes("submit") ||
+    name.includes("allow") ||
+    name.includes("block") ||
+    name.includes("cancel") ||
+    name.includes("stop") ||
+    name.includes("run_networks_reports") // Report runs modify state
+  )
+}
+
+// Get appropriate icon for tool based on operation type
+function getToolIcon(toolName: string): { icon: React.ComponentType<{ className?: string }>; type: "read" | "create" | "update" | "delete" } {
+  const name = toolName.toLowerCase()
+
+  if (name.includes("delete") || name.includes("archive") || name.includes("remove")) {
+    return { icon: Trash2, type: "delete" }
+  }
+  if (name.includes("create") || name.includes("add") || name.includes("new")) {
+    return { icon: Plus, type: "create" }
+  }
+  if (name.includes("update") || name.includes("patch") || name.includes("edit") || name.includes("modify") || name.includes("activate") || name.includes("deactivate")) {
+    return { icon: PenLine, type: "update" }
+  }
+  // Default to read/fetch icon
+  return { icon: FileSearch, type: "read" }
 }
 
 // Syntax highlighting for JSON
@@ -202,41 +328,89 @@ function ThinkingBlock({ content }: { content: string }) {
   )
 }
 
-// Tool Approval Required - auto-expanded
+// Tool Approval Required - auto-expanded with editable parameters and metadata
 interface ToolApprovalBlockProps {
   approvalId: string
   toolName: string
   toolInput: string
-  onApproval: (approved: boolean) => void
+  parameterSchema?: JSONSchema
+  onApproval: (approved: boolean, modifiedParams?: Record<string, unknown>) => void
   isPending: boolean
 }
 
-function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, onApproval, isPending }: ToolApprovalBlockProps) {
+function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending }: ToolApprovalBlockProps) {
   const [isOpen, setIsOpen] = React.useState(true) // Auto-expand for approval
-  const shortName = getShortToolName(toolName)
 
-  let parsedInput: Record<string, unknown> = {}
-  try {
-    parsedInput = JSON.parse(toolInput)
-  } catch {
-    parsedInput = { raw: toolInput }
+  // Get tool metadata for enhanced display
+  const metadata = React.useMemo(() => getToolMetadata(toolName), [toolName])
+  const riskStyle = RISK_STYLES[metadata.riskLevel]
+  const opStyle = OP_STYLES[metadata.operationType]
+
+  // Get appropriate icon for this tool type
+  const toolIcon = getToolIcon(toolName)
+  const ToolIconComponent = metadata.riskLevel === "high" ? AlertTriangle : toolIcon.icon
+
+  // Parse initial values from tool input
+  const initialValues = React.useMemo(() => {
+    try {
+      return JSON.parse(toolInput) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }, [toolInput])
+
+  // Extract affected entity from params (e.g., ad_units_id, network_code)
+  const affectedEntity = React.useMemo(() => {
+    const keys = Object.keys(initialValues)
+    // Look for ID fields
+    const idKey = keys.find(k => k.endsWith("_id") || k === "network_code")
+    if (idKey && initialValues[idKey]) {
+      return `${idKey.replace(/_/g, " ")}: ${String(initialValues[idKey]).slice(0, 20)}${String(initialValues[idKey]).length > 20 ? "..." : ""}`
+    }
+    return null
+  }, [initialValues])
+
+  // Track modified parameters and validation state
+  const [currentValues, setCurrentValues] = React.useState<Record<string, unknown>>(initialValues)
+  const [hasChanges, setHasChanges] = React.useState(false)
+  const [hasErrors, setHasErrors] = React.useState(false)
+
+  const handleParamChange = React.useCallback((values: Record<string, unknown>, changed: boolean, errors: boolean) => {
+    setCurrentValues(values)
+    setHasChanges(changed)
+    setHasErrors(errors)
+  }, [])
+
+  const handleApproval = (approved: boolean) => {
+    if (approved && hasChanges) {
+      onApproval(true, currentValues)
+    } else {
+      onApproval(approved)
+    }
   }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className={cn(
+        "rounded-2xl overflow-hidden bg-zinc-800/50 border",
+        metadata.riskLevel === "high" ? "border-red-500/30" : "border-zinc-700/50"
+      )}>
         <CollapsibleTrigger asChild>
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
-              <IconBox color="amber">
-                <Zap className="h-3.5 w-3.5 text-amber-400" />
+              <IconBox color={metadata.riskLevel === "high" ? "red" : metadata.riskLevel === "medium" ? "amber" : "emerald"}>
+                <ToolIconComponent className={cn("h-3.5 w-3.5", metadata.riskLevel === "high" ? "text-red-400" : metadata.riskLevel === "medium" ? "text-amber-400" : "text-emerald-400")} />
               </IconBox>
-              <code className="text-xs font-medium text-zinc-100 font-mono truncate">{shortName}</code>
+              <span className="text-xs font-medium text-zinc-100 truncate">{metadata.displayName}</span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-amber-500/30 text-amber-300">
-                <Clock className="h-2.5 w-2.5" />
-                Approval
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Operation Type Badge */}
+              <Badge className={cn("h-5 text-[8px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none", opStyle.bg, opStyle.text)}>
+                {metadata.operationType}
+              </Badge>
+              {/* Risk Level Badge */}
+              <Badge className={cn("h-5 text-[8px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none", riskStyle.bg, riskStyle.text)}>
+                {metadata.riskLevel === "high" ? "High Risk" : metadata.riskLevel === "medium" ? "Med Risk" : "Low"}
               </Badge>
               <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 transition-transform duration-200", isOpen && "rotate-180")} />
             </div>
@@ -244,29 +418,86 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, onApp
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-700/50 mt-1">
-            <CodeBlock title="Request" content={parsedInput} maxHeight="140px" />
+            {/* Metadata Header */}
+            <div className="flex items-center justify-between text-[10px]">
+              <div className="flex items-center gap-3">
+                <span className="text-zinc-500">{metadata.category}</span>
+                {affectedEntity && (
+                  <>
+                    <span className="text-zinc-600">•</span>
+                    <span className="text-zinc-400 font-mono">{affectedEntity}</span>
+                  </>
+                )}
+              </div>
+              {metadata.docUrl && (
+                <a
+                  href={metadata.docUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Docs
+                </a>
+              )}
+            </div>
+
+            {/* Editable form when schema available, otherwise static JSON */}
+            {parameterSchema && isPending ? (
+              <ParameterForm
+                schema={parameterSchema}
+                initialValues={initialValues}
+                onChange={handleParamChange}
+                disabled={!isPending}
+              />
+            ) : (
+              <CodeBlock title="Request" content={initialValues} maxHeight="140px" />
+            )}
+
+            {/* Approval Actions */}
             {isPending && (
               <div className="flex items-center justify-between gap-3 pt-2 border-t border-zinc-700/30">
-                <p className="text-[10px] text-zinc-400">
-                  This action will modify data
-                </p>
+                <div className="flex items-center gap-2 text-[10px]">
+                  {metadata.riskLevel === "high" ? (
+                    <>
+                      <AlertTriangle className="h-3 w-3 text-red-400" />
+                      <span className="text-red-300">This action may have significant impact</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-3 w-3 text-zinc-500" />
+                      <span className="text-zinc-400">
+                        {hasErrors ? "Fill required fields" : hasChanges ? "Review changes" : "Approval required"}
+                      </span>
+                    </>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 px-3 text-[11px] text-zinc-300 hover:text-white hover:bg-red-500/80"
-                    onClick={(e) => { e.stopPropagation(); onApproval(false) }}
+                    onClick={(e) => { e.stopPropagation(); handleApproval(false) }}
                   >
                     <X className="h-3 w-3 mr-1" />
                     Deny
                   </Button>
                   <Button
                     size="sm"
-                    className="h-7 px-3 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white"
-                    onClick={(e) => { e.stopPropagation(); onApproval(true) }}
+                    disabled={hasErrors}
+                    className={cn(
+                      "h-7 px-3 text-[11px] text-white",
+                      hasErrors
+                        ? "bg-zinc-600 cursor-not-allowed opacity-50"
+                        : hasChanges
+                          ? "bg-amber-600 hover:bg-amber-500"
+                          : "bg-emerald-600 hover:bg-emerald-500"
+                    )}
+                    onClick={(e) => { e.stopPropagation(); handleApproval(true) }}
                   >
                     <Check className="h-3 w-3 mr-1" />
-                    Allow
+                    {hasChanges ? "Allow with Changes" : "Allow"}
                   </Button>
                 </div>
               </div>
@@ -326,6 +557,10 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only auto-collapse on isPending change
   }, [isPending])
 
+  // Get appropriate icon for this tool type
+  const toolIcon = getToolIcon(name)
+  const ToolIconComponent = toolIcon.icon
+
   // Icon color based on state
   const iconColor = isPending ? "amber" : isDenied ? "red" : "emerald"
   const iconTextColor = isPending ? "text-amber-400" : isDenied ? "text-red-400" : "text-emerald-400"
@@ -337,7 +572,7 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
           <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
               <IconBox color={iconColor}>
-                <Zap className={cn("h-3.5 w-3.5", iconTextColor)} />
+                <ToolIconComponent className={cn("h-3.5 w-3.5", iconTextColor)} />
               </IconBox>
               <code className="text-xs font-medium text-zinc-100 font-mono truncate">{shortName}</code>
             </div>
@@ -530,7 +765,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
     | { type: "routing"; service: string; capability: string; thinking?: string; key: string }
     | { type: "thinking"; content: string; key: string }
     | { type: "tool_group"; tool: { name: string; params: Record<string, unknown>; approved?: boolean }; result?: unknown; key: string }
-    | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; key: string }
+    | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: JSONSchema; key: string }
     | { type: "tool_denied"; tool_name: string; reason: string; key: string }
   > = []
 
@@ -586,7 +821,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
               if (event.type === "tool_approval_required") {
                 const approvalState = pendingApprovals.get(event.approval_id)
                 const isPending = approvalState === undefined || approvalState === null
-                return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} onApproval={(approved) => onToolApproval?.(event.approval_id, approved)} isPending={isPending} />
+                return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} />
               }
               if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
               return null
@@ -606,7 +841,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
             if (event.type === "tool_approval_required") {
               const approvalState = pendingApprovals.get(event.approval_id)
               const isPending = approvalState === undefined || approvalState === null
-              return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} onApproval={(approved) => onToolApproval?.(event.approval_id, approved)} isPending={isPending} />
+              return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} />
             }
             if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
             if (event.type === "tool_group") return <MCPToolBlock key={event.key} name={event.tool.name} params={event.tool.params} result={event.result} hasResult={event.result !== undefined} onApproval={(approved) => handleApproval(event.tool.name, approved)} approvalState={event.tool.approved === true ? true : getApprovalState(event.tool.name)} />

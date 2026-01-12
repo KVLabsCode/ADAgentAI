@@ -1,11 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
-import { streamChat, approveTool, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
+import { streamChat, approveTool, pollForStreamResult, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
 import { useUser } from "@/hooks/use-user"
 import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
@@ -18,21 +18,120 @@ interface ChatContainerProps {
   sessionId?: string
 }
 
+const CHAT_STORAGE_KEY = "adagent_active_chat"
+
+// Load chat state from localStorage
+function loadChatState(): { messages: Message[], sessionId: string | null } | null {
+  if (typeof window === "undefined") return null
+  try {
+    const saved = localStorage.getItem(CHAT_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Validate structure
+      if (parsed && Array.isArray(parsed.messages)) {
+        return { messages: parsed.messages, sessionId: parsed.sessionId || null }
+      }
+    }
+  } catch (e) {
+    console.error("[ChatPersistence] Load error:", e)
+  }
+  return null
+}
+
+// Save chat state to localStorage
+function saveChatState(messages: Message[], sessionId: string | null) {
+  if (typeof window === "undefined") return
+  try {
+    // Only save if there are messages
+    if (messages.length > 0) {
+      const data = JSON.stringify({ messages, sessionId })
+      localStorage.setItem(CHAT_STORAGE_KEY, data)
+    } else {
+      localStorage.removeItem(CHAT_STORAGE_KEY)
+    }
+  } catch (e) {
+    console.error("[ChatPersistence] Save error:", e)
+  }
+}
+
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const newChatParam = searchParams.get('new') // Timestamp param to force new chat
   const { user, getAccessToken } = useUser()
   const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel } = useChatSettings()
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = React.useState(false)
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(initialSessionId || null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
+  const [isHydrated, setIsHydrated] = React.useState(false)
+
+  // Stream ID for reconnection after navigation
+  const currentStreamIdRef = React.useRef<string | null>(null)
+  const currentAssistantIdRef = React.useRef<string | null>(null)
 
   // Tool approval state: Map<approvalId, approved | null>
   const [pendingApprovals, setPendingApprovals] = React.useState<Map<string, boolean | null>>(new Map())
 
-  // Reset state when navigating to a new/different chat session
-  // Uses initialSessionId as the trigger - when it changes, we reset all state
+  // Hydrate from localStorage after mount (client-side only)
+  // Simple rule: localStorage wins if it has more messages for the same session
   React.useEffect(() => {
+    const saved = loadChatState()
+
+    // Case 1: Same session, localStorage has more messages (mid-conversation restore)
+    if (saved && initialSessionId && saved.sessionId === initialSessionId) {
+      if (saved.messages.length > initialMessages.length) {
+        setMessages(saved.messages)
+        setCurrentSessionId(saved.sessionId)
+        setIsHydrated(true)
+        return
+      }
+    }
+
+    // Case 2: New chat page, restore from localStorage if available
+    if (!initialSessionId && saved && saved.messages.length > 0) {
+      setMessages(saved.messages)
+      setCurrentSessionId(saved.sessionId)
+      // Update URL to match the restored session
+      if (saved.sessionId) {
+        window.history.replaceState(null, '', `/chat/${saved.sessionId}`)
+      }
+      setIsHydrated(true)
+      return
+    }
+
+    // Case 3: Use server data (or empty for new chat)
+    setIsHydrated(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run once on mount
+  }, [])
+
+  // Persist chat state to localStorage when messages or sessionId change
+  React.useEffect(() => {
+    if (!isHydrated) return
+    saveChatState(messages, currentSessionId)
+  }, [messages, currentSessionId, isHydrated])
+
+  // Track the last sessionId we've seen to detect actual navigation (not initial mount)
+  const lastSessionIdRef = React.useRef<string | undefined>(undefined)
+  const hasInitialized = React.useRef(false)
+
+  // Reset state when navigating to a DIFFERENT chat session (not on initial mount)
+  React.useEffect(() => {
+    // Skip until hydration is complete
+    if (!isHydrated) return
+
+    // Skip on first run after hydration
+    if (!hasInitialized.current) {
+      hasInitialized.current = true
+      lastSessionIdRef.current = initialSessionId
+      return
+    }
+
+    // Only reset if sessionId actually changed
+    if (lastSessionIdRef.current === initialSessionId) return
+
+    lastSessionIdRef.current = initialSessionId
+
     // Abort any pending request when session changes
     abortControllerRef.current?.abort()
 
@@ -41,8 +140,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     setCurrentSessionId(initialSessionId || null)
     setIsLoading(false)
     setPendingApprovals(new Map())
+    currentStreamIdRef.current = null
+    currentAssistantIdRef.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reset on sessionId change
-  }, [initialSessionId])
+  }, [initialSessionId, isHydrated])
 
   // Track previous pathname to detect navigation from /chat/[id] to /chat
   const prevPathnameRef = React.useRef(pathname)
@@ -55,17 +156,36 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
 
     // Only reset when navigating FROM /chat/[id] TO /chat (not during initial load or history.replaceState)
     if (pathname === '/chat' && prevPathname?.startsWith('/chat/') && prevPathname !== '/chat') {
-      // We navigated back to /chat from a session - reset state
+      // We navigated back to /chat from a session - reset state and clear localStorage
       abortControllerRef.current?.abort()
       setMessages([])
       setCurrentSessionId(null)
       setIsLoading(false)
       setPendingApprovals(new Map())
+      currentStreamIdRef.current = null
+      currentAssistantIdRef.current = null
+      localStorage.removeItem(CHAT_STORAGE_KEY)
     }
   }, [pathname])
 
+  // Reset state when ?new= param changes (user clicked "New Chat" while already on chat)
+  React.useEffect(() => {
+    if (newChatParam && pathname === '/chat') {
+      abortControllerRef.current?.abort()
+      setMessages([])
+      setCurrentSessionId(null)
+      setIsLoading(false)
+      setPendingApprovals(new Map())
+      currentStreamIdRef.current = null
+      currentAssistantIdRef.current = null
+      localStorage.removeItem(CHAT_STORAGE_KEY)
+      // Clean up URL by removing the ?new= param
+      window.history.replaceState({}, '', '/chat')
+    }
+  }, [newChatParam, pathname])
+
   // Handle tool approval from user - calls backend API and updates local state
-  const handleToolApproval = React.useCallback(async (approvalId: string, approved: boolean) => {
+  const handleToolApproval = React.useCallback(async (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => {
     // Optimistically update UI
     setPendingApprovals(prev => {
       const newMap = new Map(prev)
@@ -73,17 +193,95 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
       return newMap
     })
 
-    // Call backend API to actually approve/deny the tool
+    // Call backend API to actually approve/deny the tool (with optional modified params)
     try {
-      const success = await approveTool(approvalId, approved)
-      if (!success) {
-        console.error(`Failed to ${approved ? 'approve' : 'deny'} tool`)
+      const result = await approveTool(approvalId, approved, modifiedParams)
+      if (!result.success) {
+        console.error(`Failed to ${approved ? 'approve' : 'deny'} tool:`, result.error)
+
+        // Show user-friendly message for expired approvals
+        if (result.expired) {
+          alert("This approval has expired (you may have navigated away). Please send a new message to try again.")
+        }
+
         // Revert on failure
         setPendingApprovals(prev => {
           const newMap = new Map(prev)
           newMap.set(approvalId, null)
           return newMap
         })
+        return
+      }
+
+      // If approved and we have a stream ID, poll for result after a delay
+      // This handles cases where SSE stream stalls or disconnects
+      if (approved && currentStreamIdRef.current && currentAssistantIdRef.current) {
+        const streamId = currentStreamIdRef.current
+        const assistantId = currentAssistantIdRef.current
+
+        // Always poll after a short delay as fallback (SSE might have stalled)
+        console.log(`[ChatContainer] Approval succeeded, will poll for result in 3s: ${streamId}`)
+
+        // Wait 3 seconds to give SSE a chance, then poll if still no result
+        setTimeout(async () => {
+          // Check if message already has content (SSE delivered it)
+          const currentMessages = await new Promise<Message[]>(resolve => {
+            setMessages(prev => { resolve(prev); return prev })
+          })
+          const msg = currentMessages.find(m => m.id === assistantId)
+
+          // If message still has no meaningful content, poll for result
+          if (!msg?.content || msg.content.length < 50) {
+            console.log(`[ChatContainer] No result via SSE, polling: ${streamId}`)
+            pollForStreamResult(streamId, 30, 2000).then(streamResult => {
+              if (streamResult?.status === "done" && streamResult.result) {
+                setMessages(prev =>
+                  prev.map(m =>
+                    m.id === assistantId
+                      ? { ...m, content: streamResult.result || m.content }
+                      : m
+                  )
+                )
+                setIsLoading(false)
+              }
+            })
+          }
+        }, 3000)
+
+        // Legacy: If not currently loading (stream fully disconnected), poll immediately
+        if (!isLoading) {
+          console.log(`[ChatContainer] Stream already disconnected, polling now: ${streamId}`)
+
+          // Show loading state
+          setIsLoading(true)
+
+          // Poll for result in background
+          pollForStreamResult(streamId, 30, 2000).then(streamResult => {
+            setIsLoading(false)
+
+            if (streamResult?.status === "done" && streamResult.result) {
+              // Update the assistant message with the result
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, content: streamResult.result || m.content }
+                    : m
+                )
+              )
+            } else if (streamResult?.error) {
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, content: `Error: ${streamResult.error}` }
+                    : m
+                )
+              )
+            }
+          }).catch(err => {
+            console.error('[ChatContainer] Error polling for result:', err)
+            setIsLoading(false)
+          })
+        }
       }
     } catch (error) {
       console.error('Error calling approveTool:', error)
@@ -94,7 +292,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         return newMap
       })
     }
-  }, [])
+  }, [isLoading])
 
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
@@ -195,6 +393,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     setMessages(prev => [...prev, userMessage, assistantMessage])
     setIsLoading(true)
 
+    // Store assistant ID for potential reconnection
+    currentAssistantIdRef.current = assistantId
+    currentStreamIdRef.current = null // Will be set when stream starts
+
     // Save user message to database (don't await to avoid blocking UI)
     if (sessionId) {
       saveMessage(sessionId, 'user', content)
@@ -217,6 +419,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     await streamChat(
       content,
       {
+        onStreamId: (streamId) => {
+          // Store stream ID for potential reconnection after navigation
+          currentStreamIdRef.current = streamId
+        },
         onRouting: (service, capability, thinking) => {
           // Add routing event to show the decision process (with optional thinking)
           events.push({ type: "routing", service, capability, thinking })
@@ -297,9 +503,15 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             )
           )
         },
-        onToolApprovalRequired: (approvalId, toolName, toolInput) => {
-          // Add approval request event for UI display
-          events.push({ type: "tool_approval_required", approval_id: approvalId, tool_name: toolName, tool_input: toolInput })
+        onToolApprovalRequired: (approvalId, toolName, toolInput, parameterSchema) => {
+          // Add approval request event for UI display (with optional schema for editable form)
+          events.push({
+            type: "tool_approval_required",
+            approval_id: approvalId,
+            tool_name: toolName,
+            tool_input: toolInput,
+            parameter_schema: parameterSchema as import("@/lib/types").JSONSchema | undefined
+          })
           // Mark as pending in approval state
           setPendingApprovals(prev => {
             const newMap = new Map(prev)

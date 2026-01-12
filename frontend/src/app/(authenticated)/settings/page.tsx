@@ -8,6 +8,14 @@ import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { GmailEmailInput, GMAIL_DOMAINS, getFullEmail } from "@/components/ui/gmail-email-input"
+import {
+  PageContainer,
+  PageHeader,
+  SectionCard,
+  SectionCardHeader,
+  SectionCardContent,
+  ConfigField,
+} from "@/components/ui/theme"
 import { useChatSettings } from "@/lib/chat-settings"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
@@ -334,56 +342,61 @@ export default function SettingsPage() {
     }
   }
 
+  // Show skeleton layout while mounting to prevent flash
   if (!mounted) {
-    return null
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Settings"
+          description="Manage your application preferences."
+        />
+        <div className="space-y-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded border border-border/30 p-4 animate-pulse">
+              <div className="h-4 w-32 bg-muted rounded mb-2" />
+              <div className="h-3 w-48 bg-muted/50 rounded" />
+            </div>
+          ))}
+        </div>
+      </PageContainer>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
-      <div className="space-y-0.5">
-        <h1 className="text-base font-medium tracking-tight">Settings</h1>
-        <p className="text-xs text-muted-foreground/80">
-          Manage your application preferences.
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Settings"
+        description="Manage your application preferences."
+      />
 
       {/* Chat Display */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <MessageSquare className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Chat Display</h2>
-            <p className="text-[10px] text-muted-foreground/60">Configure how agent activity is displayed.</p>
-          </div>
-        </div>
-        <div className="px-3 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium">Compact mode</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                Show thinking and tool calls in a single combined box.
-              </p>
-            </div>
+      <SectionCard>
+        <SectionCardHeader
+          icon={MessageSquare}
+          title="Chat Display"
+          description="Configure how agent activity is displayed."
+        />
+        <SectionCardContent>
+          <ConfigField
+            label="Compact mode"
+            description="Show thinking and tool calls in a single combined box."
+          >
             <Switch
               checked={displayMode === "compact"}
               onCheckedChange={(checked) => setDisplayMode(checked ? "compact" : "detailed")}
             />
-          </div>
-        </div>
-      </div>
+          </ConfigField>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Organization */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <Building2 className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Organization</h2>
-            <p className="text-[10px] text-muted-foreground/60">
-              {selectedOrganization ? `Manage ${selectedOrganization.name}` : "Select an organization to manage"}
-            </p>
-          </div>
-        </div>
-        <div className="px-3 py-3 space-y-4">
+      <SectionCard>
+        <SectionCardHeader
+          icon={Building2}
+          title="Organization"
+          description={selectedOrganization ? `Manage ${selectedOrganization.name}` : "Select an organization to manage"}
+        />
+        <SectionCardContent className="space-y-4">
           {!selectedOrganization ? (
             <p className="text-xs text-muted-foreground text-center py-4">
               Switch to an organization using the sidebar to manage members.
@@ -699,26 +712,21 @@ export default function SettingsPage() {
               )}
             </>
           )}
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Appearance */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <Sun className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Appearance</h2>
-            <p className="text-[10px] text-muted-foreground/60">Customize how ADAgentAI looks.</p>
-          </div>
-        </div>
-        <div className="px-3 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium">Theme</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                Select your preferred color scheme.
-              </p>
-            </div>
+      <SectionCard>
+        <SectionCardHeader
+          icon={Sun}
+          title="Appearance"
+          description="Customize how ADAgentAI looks."
+        />
+        <SectionCardContent>
+          <ConfigField
+            label="Theme"
+            description="Select your preferred color scheme."
+          >
             <div className="flex gap-1">
               <Button
                 variant={theme === "light" ? "default" : "outline"}
@@ -748,86 +756,68 @@ export default function SettingsPage() {
                 System
               </Button>
             </div>
-          </div>
-        </div>
-      </div>
+          </ConfigField>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Notifications */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <Bell className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Notifications</h2>
-            <p className="text-[10px] text-muted-foreground/60">Configure how you receive updates.</p>
-          </div>
-        </div>
-        <div className="px-3 py-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium">Email notifications</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                Receive email updates about your ad performance.
-              </p>
-            </div>
+      <SectionCard>
+        <SectionCardHeader
+          icon={Bell}
+          title="Notifications"
+          description="Configure how you receive updates."
+        />
+        <SectionCardContent className="space-y-3">
+          <ConfigField
+            label="Email notifications"
+            description="Receive email updates about your ad performance."
+          >
             <Switch defaultChecked />
-          </div>
+          </ConfigField>
           <div className="border-t border-border/20 pt-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium">Weekly digest</p>
-                <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                  Get a weekly summary of your ad metrics.
-                </p>
-              </div>
+            <ConfigField
+              label="Weekly digest"
+              description="Get a weekly summary of your ad metrics."
+            >
               <Switch />
-            </div>
+            </ConfigField>
           </div>
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Privacy */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <Shield className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Privacy</h2>
-            <p className="text-[10px] text-muted-foreground/60">Manage your data and privacy settings.</p>
-          </div>
-        </div>
-        <div className="px-3 py-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium">Usage analytics</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                Help improve ADAgentAI by sharing anonymous usage data.
-              </p>
-            </div>
+      <SectionCard>
+        <SectionCardHeader
+          icon={Shield}
+          title="Privacy"
+          description="Manage your data and privacy settings."
+        />
+        <SectionCardContent className="space-y-3">
+          <ConfigField
+            label="Usage analytics"
+            description="Help improve ADAgentAI by sharing anonymous usage data."
+          >
             <Switch defaultChecked />
-          </div>
+          </ConfigField>
           <div className="border-t border-border/20 pt-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium">Chat history</p>
-                <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                  Store conversation history for future reference.
-                </p>
-              </div>
+            <ConfigField
+              label="Chat history"
+              description="Store conversation history for future reference."
+            >
               <Switch defaultChecked />
-            </div>
+            </ConfigField>
           </div>
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Account */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <User className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Account</h2>
-            <p className="text-[10px] text-muted-foreground/60">Manage your account settings.</p>
-          </div>
-        </div>
-        <div className="px-3 py-3">
+      <SectionCard>
+        <SectionCardHeader
+          icon={User}
+          title="Account"
+          description="Manage your account settings."
+        />
+        <SectionCardContent>
           <div className="flex items-center justify-between py-2 px-2 rounded bg-destructive/5 border border-destructive/20">
             <div>
               <p className="text-xs font-medium text-destructive">Delete Account</p>
@@ -902,8 +892,8 @@ export default function SettingsPage() {
               </AlertDialogContent>
             </AlertDialog>
           </div>
-        </div>
-      </div>
-    </div>
+        </SectionCardContent>
+      </SectionCard>
+    </PageContainer>
   )
 }

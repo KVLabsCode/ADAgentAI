@@ -1,10 +1,29 @@
+// JSON Schema types for parameter editing
+export interface SchemaProperty {
+  type: "string" | "number" | "integer" | "boolean" | "array"
+  description?: string
+  enum?: string[]
+  default?: unknown
+  minLength?: number
+  maxLength?: number
+  minimum?: number
+  maximum?: number
+  items?: SchemaProperty
+}
+
+export interface JSONSchema {
+  type: "object"
+  properties: Record<string, SchemaProperty>
+  required?: string[]
+}
+
 // Sequential event types for streaming
 export type StreamEventItem =
   | { type: "routing"; service: string; capability: string; thinking?: string }
   | { type: "thinking"; content: string }
   | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean }
   | { type: "tool_result"; name: string; result: unknown }
-  | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string }
+  | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: JSONSchema }
   | { type: "tool_denied"; tool_name: string; reason: string }
 
 export interface Message {

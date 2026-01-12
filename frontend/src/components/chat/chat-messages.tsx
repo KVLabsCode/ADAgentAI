@@ -10,7 +10,7 @@ import type { Message } from "@/lib/types"
 interface ChatMessagesProps {
   messages: Message[]
   isLoading?: boolean
-  onToolApproval?: (approvalId: string, approved: boolean) => void
+  onToolApproval?: (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => void
   pendingApprovals?: Map<string, boolean | null>  // Map of approval ID -> approval state
 }
 

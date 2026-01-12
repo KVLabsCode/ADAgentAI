@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Moon, Sun, Loader2 } from "lucide-react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
@@ -66,7 +66,21 @@ export default function AuthenticatedLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { isLoading, isAuthenticated, hasWaitlistAccess, isCheckingWaitlist, hasAcceptedTos, isCheckingTos } = useUser()
+
+  // Track if we've completed initial auth check to prevent flashing on subsequent updates
+  const [hasInitialized, setHasInitialized] = React.useState(false)
+
+  // Only show model selector on chat pages
+  const showModelSelector = pathname === "/chat" || pathname.startsWith("/chat/")
+
+  // Mark as initialized once we've completed the first auth check
+  React.useEffect(() => {
+    if (!isLoading && !isCheckingWaitlist && !isCheckingTos) {
+      setHasInitialized(true)
+    }
+  }, [isLoading, isCheckingWaitlist, isCheckingTos])
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -81,8 +95,8 @@ export default function AuthenticatedLayout({
     }
   }, [isLoading, isAuthenticated, isCheckingWaitlist, hasWaitlistAccess, router])
 
-  // Show loading state while checking auth, waitlist, or ToS
-  if (isLoading || isCheckingWaitlist || isCheckingTos) {
+  // Show loading state only during initial load, not on subsequent re-checks
+  if (!hasInitialized && (isLoading || isCheckingWaitlist || isCheckingTos)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -118,7 +132,7 @@ export default function AuthenticatedLayout({
         <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center justify-between border-b border-border/30 px-4 sm:px-6 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="md:hidden" />
-            <ModelSelector />
+            {showModelSelector && <ModelSelector />}
           </div>
           <ThemeToggle />
         </header>

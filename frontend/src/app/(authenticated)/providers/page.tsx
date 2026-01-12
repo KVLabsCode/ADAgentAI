@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { Plug, Plus, Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react"
+import { Plug, Plus, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -24,6 +24,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  PageContainer,
+  PageHeader,
+  SectionCard,
+  SectionCardHeader,
+  SectionCardContent,
+  EmptyState,
+  StatusMessage,
+} from "@/components/ui/theme"
 import { AccountSelectionModal } from "@/components/providers/account-selection-modal"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
@@ -39,7 +48,7 @@ interface ProviderWithEnabled extends Provider {
 
 function ProvidersContent() {
   const searchParams = useSearchParams()
-  const { getAccessToken, selectedOrganizationId } = useUser()
+  const { getAccessToken, selectedOrganizationId, isAuthenticated, isLoading: isAuthLoading } = useUser()
   const [providers, setProviders] = React.useState<ProviderWithEnabled[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [connectingType, setConnectingType] = React.useState<string | null>(null)
@@ -47,17 +56,32 @@ function ProvidersContent() {
   const [accountSelectionOpen, setAccountSelectionOpen] = React.useState(false)
   const [pendingAccounts, setPendingAccounts] = React.useState<OAuthAccount[]>([])
   const [pendingProviderType] = React.useState<"admob" | "gam">("gam")
-  const [canManage, setCanManage] = React.useState(false) // Can user connect/disconnect?
+  // Personal context should allow management by default
+  // When in org context, this gets updated by API response
+  const [canManage, setCanManage] = React.useState<boolean | null>(null) // null = not loaded yet
   const [togglingProvider, setTogglingProvider] = React.useState<string | null>(null)
 
   // Fetch providers on mount
   const fetchProviders = React.useCallback(async () => {
     try {
       const accessToken = await getAccessToken()
+      console.log('[Providers] Fetching with orgId:', selectedOrganizationId, 'token:', accessToken ? 'present' : 'null')
+
+      if (!accessToken) {
+        console.warn('[Providers] No access token available - user may not be authenticated')
+        // Default to canManage=true in personal context when auth fails
+        if (!selectedOrganizationId) {
+          setCanManage(true)
+        }
+        setIsLoading(false)
+        return
+      }
+
       const response = await authFetch(`${API_URL}/api/providers`, accessToken, {}, selectedOrganizationId)
 
       if (response.ok) {
         const data = await response.json()
+        console.log('[Providers] API response:', { canManage: data.canManage, providerCount: data.providers?.length })
         // Map API response to Provider type
         setProviders(data.providers.map((p: Record<string, unknown>) => ({
           id: p.id,
@@ -71,17 +95,33 @@ function ProvidersContent() {
         })))
         // Set canManage from API response
         setCanManage(data.canManage === true)
+      } else {
+        console.error('[Providers] API error:', response.status, response.statusText)
+        // On error, default to allowing management in personal context
+        if (!selectedOrganizationId) {
+          setCanManage(true)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch providers:', error)
+      // On error, default to allowing management in personal context
+      if (!selectedOrganizationId) {
+        setCanManage(true)
+      }
     } finally {
       setIsLoading(false)
     }
   }, [getAccessToken, selectedOrganizationId])
 
+  // Wait for auth to be ready before fetching
   React.useEffect(() => {
-    fetchProviders()
-  }, [fetchProviders])
+    if (!isAuthLoading && isAuthenticated) {
+      fetchProviders()
+    } else if (!isAuthLoading && !isAuthenticated) {
+      // Not authenticated, stop loading
+      setIsLoading(false)
+    }
+  }, [fetchProviders, isAuthLoading, isAuthenticated])
 
   // Handle OAuth callback messages
   React.useEffect(() => {
@@ -220,36 +260,20 @@ function ProvidersContent() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
+    <PageContainer>
       {/* Status Message */}
       {statusMessage && (
-        <div className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-md text-xs",
-          statusMessage.type === 'success'
-            ? "bg-green-500/10 text-green-600 dark:text-green-400"
-            : "bg-red-500/10 text-red-600 dark:text-red-400"
-        )}>
-          {statusMessage.type === 'success' ? (
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          ) : (
-            <XCircle className="h-3.5 w-3.5" />
-          )}
-          {statusMessage.text}
-        </div>
+        <StatusMessage type={statusMessage.type} message={statusMessage.text} />
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="space-y-0.5">
-          <h1 className="text-base font-medium tracking-tight">Connected Providers</h1>
-          <p className="text-xs text-muted-foreground/70">
-            Manage your ad platform connections.
-          </p>
-        </div>
-
+      <PageHeader
+        title="Connected Providers"
+        description="Manage your ad platform connections."
+      >
         {canManage && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" className="h-7 text-xs px-2.5">
+              <Button size="sm" className="h-8 text-xs">
                 <Plus className="mr-1 h-3 w-3" />
                 Connect
               </Button>
@@ -264,7 +288,7 @@ function ProvidersContent() {
                   {connectingType === 'admob' ? (
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : (
-                    <div className="h-5 w-5 rounded bg-green-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                    <div className="h-5 w-5 rounded bg-emerald-600 flex items-center justify-center text-white text-[9px] font-semibold">
                       A
                     </div>
                   )}
@@ -277,7 +301,7 @@ function ProvidersContent() {
                 className="text-xs"
               >
                 <div className="flex items-center gap-2">
-                  <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+                  <div className="h-5 w-5 rounded bg-muted flex items-center justify-center text-muted-foreground text-[9px] font-semibold">
                     G
                   </div>
                   <span className="flex-1 text-muted-foreground">Google Ad Manager</span>
@@ -289,38 +313,36 @@ function ProvidersContent() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-      </div>
+      </PageHeader>
 
       {isLoading ? (
-        <div className="grid gap-2">
-          {[1, 2].map((i) => (
-            <div key={i} className="rounded border border-border/30 px-3 py-2.5 animate-pulse">
-              <div className="flex items-center gap-2.5">
-                <div className="h-6 w-6 rounded bg-muted" />
+        <SectionCard>
+          <div className="p-4 space-y-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 animate-pulse">
+                <div className="h-8 w-8 rounded bg-muted" />
                 <div className="space-y-1.5">
                   <div className="h-3.5 w-32 bg-muted rounded" />
                   <div className="h-2.5 w-24 bg-muted rounded" />
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </SectionCard>
       ) : providers.length === 0 ? (
-        <div className="rounded border border-border/30">
-          <div className="flex flex-col items-center justify-center py-8 px-4">
-            <div className="rounded bg-muted/50 p-2.5 mb-3">
-              <Plug className="h-5 w-5 text-muted-foreground/50" />
-            </div>
-            <h3 className="text-sm font-medium mb-1">No providers connected</h3>
-            <p className="text-[11px] text-muted-foreground/70 text-center max-w-xs mb-3">
-              {canManage
-                ? "Connect your AdMob or Google Ad Manager account to start."
-                : "No ad platforms have been connected yet. Contact your organization admin to connect providers."}
-            </p>
+        <SectionCard>
+          <EmptyState
+            icon={Plug}
+            title="No providers connected"
+            description={canManage === false
+              ? "No ad platforms have been connected yet. Contact your organization admin to connect providers."
+              : "Connect your AdMob or Google Ad Manager account to start."}
+            className="py-12"
+          >
             {canManage && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="h-7 text-xs">
+                  <Button size="sm" className="h-8 text-xs">
                     <Plus className="mr-1 h-3 w-3" />
                     Connect provider
                   </Button>
@@ -340,125 +362,128 @@ function ProvidersContent() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-          </div>
-        </div>
+          </EmptyState>
+        </SectionCard>
       ) : (
-        <div className="grid gap-2">
-          {providers.map((provider) => (
-            <div key={provider.id} className="rounded border border-border/30 px-3 py-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={cn(
-                      "h-6 w-6 rounded flex items-center justify-center text-white text-[10px] font-semibold",
-                      provider.type === "admob"
-                        ? "bg-green-600/90"
-                        : "bg-blue-600/90"
-                    )}
-                  >
-                    {provider.type === "admob" ? "A" : "G"}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium">
-                        {provider.displayName}
-                      </span>
-                      <Badge variant="outline" className="text-[9px] h-4 px-1 border-border/40">
-                        {provider.type === "admob" ? "AdMob" : "GAM"}
-                      </Badge>
-                      <div className="flex items-center gap-1">
-                        <div className="h-1.5 w-1.5 rounded-full bg-green-500/80" />
-                        <span className="text-[10px] text-muted-foreground/60">Connected</span>
+        <SectionCard>
+          <SectionCardContent padded={false}>
+            <div className="divide-y divide-border/30">
+              {providers.map((provider) => (
+                <div key={provider.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "h-8 w-8 rounded flex items-center justify-center text-white text-xs font-semibold",
+                          provider.type === "admob"
+                            ? "bg-emerald-600"
+                            : "bg-muted"
+                        )}
+                      >
+                        {provider.type === "admob" ? "A" : "G"}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {provider.displayName}
+                          </span>
+                          <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+                            {provider.type === "admob" ? "AdMob" : "GAM"}
+                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            <span className="text-[10px] text-muted-foreground">Connected</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                          {provider.type === "admob"
+                            ? provider.identifiers.publisherId
+                            : `${provider.identifiers.networkCode} • ${provider.identifiers.accountName}`
+                          }
+                        </p>
                       </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground/60 font-mono mt-0.5">
-                      {provider.type === "admob"
-                        ? provider.identifiers.publisherId
-                        : `${provider.identifiers.networkCode} • ${provider.identifiers.accountName}`
-                      }
-                    </p>
+
+                    <div className="flex items-center gap-3">
+                      {/* Enable/Disable toggle - available to all users */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">
+                          {provider.isEnabled ? "Enabled" : "Disabled"}
+                        </span>
+                        <Switch
+                          checked={provider.isEnabled}
+                          onCheckedChange={(checked) => handleToggleEnabled(provider.id, checked)}
+                          disabled={togglingProvider === provider.id}
+                          className="scale-75"
+                        />
+                      </div>
+
+                      {/* Disconnect button - only for admins */}
+                      {canManage && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-500">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-base">Disconnect {provider.displayName}?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-xs">
+                                This will remove access to this ad platform for the entire organization. You can reconnect at any time.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDisconnect(provider.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs h-8"
+                              >
+                                Disconnect
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  {/* Enable/Disable toggle - available to all users */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-muted-foreground/60">
-                      {provider.isEnabled ? "Enabled" : "Disabled"}
-                    </span>
-                    <Switch
-                      checked={provider.isEnabled}
-                      onCheckedChange={(checked) => handleToggleEnabled(provider.id, checked)}
-                      disabled={togglingProvider === provider.id}
-                      className="scale-75"
-                    />
-                  </div>
-
-                  {/* Disconnect button - only for admins */}
-                  {canManage && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/50 hover:text-destructive">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-base">Disconnect {provider.displayName}?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-xs">
-                            This will remove access to this ad platform for the entire organization. You can reconnect at any time.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDisconnect(provider.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs h-8"
-                          >
-                            Disconnect
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </SectionCardContent>
+        </SectionCard>
       )}
 
       {/* Supported Platforms Info */}
-      <div className="rounded border border-border/30 bg-muted/20">
-        <div className="px-3 py-2 border-b border-border/30">
-          <h2 className="text-xs font-medium">Supported Platforms</h2>
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            ADAgentAI currently supports these ad platforms.
-          </p>
-        </div>
-        <div className="p-2">
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-background/50">
-              <div className="h-5 w-5 rounded bg-green-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+      <SectionCard>
+        <SectionCardHeader
+          icon={Plug}
+          title="Supported Platforms"
+          description="ADAgentAI currently supports these ad platforms."
+        />
+        <SectionCardContent>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex items-center gap-3 p-3 rounded border border-border/30">
+              <div className="h-8 w-8 rounded bg-emerald-600 flex items-center justify-center text-white text-xs font-semibold">
                 A
               </div>
               <div>
                 <p className="text-xs font-medium">AdMob</p>
-                <p className="text-[10px] text-muted-foreground/60">Available</p>
+                <p className="text-[10px] text-muted-foreground">Available</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-background/50">
-              <div className="h-5 w-5 rounded bg-blue-600/90 flex items-center justify-center text-white text-[9px] font-semibold">
+            <div className="flex items-center gap-3 p-3 rounded border border-border/30">
+              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs font-semibold">
                 G
               </div>
               <div>
-                <p className="text-xs font-medium">Google Ad Manager</p>
-                <p className="text-[10px] text-muted-foreground/60">Coming soon</p>
+                <p className="text-xs font-medium text-muted-foreground">Google Ad Manager</p>
+                <p className="text-[10px] text-muted-foreground">Coming soon</p>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Account Selection Modal - shown when OAuth returns multiple accounts */}
       <AccountSelectionModal
@@ -469,34 +494,34 @@ function ProvidersContent() {
         onConfirm={handleAccountSelected}
         onCancel={handleAccountSelectionCancel}
       />
-    </div>
+    </PageContainer>
   )
 }
 
 function ProvidersLoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
+    <PageContainer>
       <div className="flex items-center justify-between">
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           <div className="h-4 w-40 bg-muted rounded animate-pulse" />
-          <div className="h-3 w-56 bg-muted rounded animate-pulse mt-1" />
+          <div className="h-3 w-56 bg-muted rounded animate-pulse" />
         </div>
-        <div className="h-7 w-20 bg-muted rounded animate-pulse" />
+        <div className="h-8 w-20 bg-muted rounded animate-pulse" />
       </div>
-      <div className="grid gap-2">
-        {[1, 2].map((i) => (
-          <div key={i} className="rounded border border-border/30 px-3 py-2.5 animate-pulse">
-            <div className="flex items-center gap-2.5">
-              <div className="h-6 w-6 rounded bg-muted" />
+      <SectionCard>
+        <div className="p-4 space-y-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-3 animate-pulse">
+              <div className="h-8 w-8 rounded bg-muted" />
               <div className="space-y-1.5">
                 <div className="h-3.5 w-32 bg-muted rounded" />
                 <div className="h-2.5 w-24 bg-muted rounded" />
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      </SectionCard>
+    </PageContainer>
   )
 }
 

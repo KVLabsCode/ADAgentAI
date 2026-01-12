@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/ui/page-header"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -237,20 +238,17 @@ export default function BlogAdminPage() {
   return (
     <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Blog Admin</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Manage your blog posts
-          </p>
-        </div>
+      <PageHeader
+        title="Blog Admin"
+        description="Manage your blog posts"
+      >
         <Button asChild size="sm" className="h-8 text-xs">
           <Link href="/dashboard/blog/new">
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             New Post
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Search */}
       <div className="relative max-w-sm">
@@ -294,9 +292,9 @@ export default function BlogAdminPage() {
             <Table>
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                  <TableRow key={headerGroup.id} className="hover:bg-transparent border-border/50">
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className="h-10 text-xs">
+                      <TableHead key={header.id} className="h-10 text-xs font-medium text-muted-foreground">
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -311,7 +309,7 @@ export default function BlogAdminPage() {
               <TableBody>
                 {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id}>
+                    <TableRow key={row.id} className="border-border/50">
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="py-3">
                           {flexRender(

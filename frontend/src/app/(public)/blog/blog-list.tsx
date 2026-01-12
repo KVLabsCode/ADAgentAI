@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRight, Calendar, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { BlogPostMeta } from "@/lib/blog"
@@ -78,9 +79,11 @@ export function BlogList({ posts }: BlogListProps) {
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       {featuredPost.author.image ? (
-                        <img
+                        <Image
                           src={featuredPost.author.image}
                           alt={featuredPost.author.name}
+                          width={20}
+                          height={20}
                           className="h-5 w-5 rounded-full object-cover"
                         />
                       ) : (
@@ -136,9 +139,11 @@ export function BlogList({ posts }: BlogListProps) {
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/30">
                       <div className="flex items-center gap-2">
                         {post.author.image ? (
-                          <img
+                          <Image
                             src={post.author.image}
                             alt={post.author.name}
+                            width={20}
+                            height={20}
                             className="h-5 w-5 rounded-full object-cover"
                           />
                         ) : (

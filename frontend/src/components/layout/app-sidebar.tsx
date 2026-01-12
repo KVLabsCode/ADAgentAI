@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquarePlus,
@@ -15,15 +15,19 @@ import {
   LogOut,
   ChevronUp,
   PanelLeftClose,
-  FileText,
   Users,
   User,
   Plus,
   Check,
   ChevronDown,
   Globe,
-  Bot,
   Shield,
+  BarChart3,
+  MessageSquare,
+  Cog,
+  FileCode,
+  PenSquare,
+  UserPlus,
 } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
 
@@ -70,17 +74,36 @@ const bottomNavItems = [
 ]
 
 const adminNavItems = [
-  { title: "Waitlist", url: "/dashboard/waitlist", icon: Users },
-  { title: "Blog", url: "/dashboard/blog", icon: FileText },
-  { title: "Agent Prompts", url: "/dashboard/agents", icon: Bot },
+  { title: "Admin Home", url: "/admin", icon: Shield },
+  { title: "Usage", url: "/admin/usage", icon: BarChart3 },
+  { title: "Conversations", url: "/admin/conversations", icon: MessageSquare },
+  { title: "System", url: "/admin/system", icon: Cog },
+  { title: "Prompts", url: "/admin/prompts", icon: FileCode },
+  { title: "Blog", url: "/dashboard/blog", icon: PenSquare },
+  { title: "Waitlist", url: "/dashboard/waitlist", icon: UserPlus },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { toggleSidebar, state } = useSidebar()
   const { user, isAdmin, signOut, selectedOrganization, selectedOrgRole, organizations, selectOrganization, createOrganization } = useUser()
   const [mounted, setMounted] = useState(false)
   const [isCreatingOrg, setIsCreatingOrg] = useState(false)
+
+  // Handle New Chat click - forces fresh navigation even when already on /chat or /chat/[id]
+  const handleNewChat = (e: React.MouseEvent) => {
+    e.preventDefault()
+    // Clear any existing chat state in localStorage
+    localStorage.removeItem('adagent_active_chat')
+    // Force navigation by going to a dummy route then back, or use router.refresh
+    if (pathname === '/chat' || pathname.startsWith('/chat/')) {
+      // If already on chat, need to force a re-render
+      router.push('/chat?new=' + Date.now())
+    } else {
+      router.push('/chat')
+    }
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -115,15 +138,15 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/40">
-      <SidebarHeader className="h-12 flex flex-row items-center justify-between border-b border-border/40 px-2">
+      <SidebarHeader className="h-14 flex flex-row items-center justify-between border-b border-border/40 px-2">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 pl-2 group-data-[collapsible=icon]:hidden"
+          className="flex items-center gap-2.5 pl-2 group-data-[collapsible=icon]:hidden"
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-foreground text-background text-[10px] font-semibold shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-background text-xs font-bold shrink-0">
             AD
           </div>
-          <span className="text-sm font-medium tracking-tight">
+          <span className="text-[15px] font-semibold tracking-tight">
             ADAgentAI
           </span>
         </Link>
@@ -163,14 +186,14 @@ export function AppSidebar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent/50 transition-colors group-data-[collapsible=icon]:justify-center">
-                <div className="h-5 w-5 rounded flex items-center justify-center shrink-0 bg-muted">
+                <div className="h-6 w-6 rounded-md flex items-center justify-center shrink-0 bg-muted">
                   {selectedOrganization ? (
-                    <Users className="h-3 w-3 text-muted-foreground" />
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
                   ) : (
-                    <User className="h-3 w-3 text-muted-foreground" />
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                 </div>
-                <span className="flex-1 text-left truncate text-xs group-data-[collapsible=icon]:hidden">
+                <span className="flex-1 text-left truncate text-[13px] group-data-[collapsible=icon]:hidden">
                   {selectedOrganization?.name || "Personal"}
                   {selectedOrgRole && (
                     <span className="ml-1 text-[10px] text-muted-foreground capitalize">
@@ -234,14 +257,23 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
+                    isActive={item.title === "New Chat"
+                      ? pathname === "/chat" && !pathname.includes("/chat/")
+                      : pathname === item.url || pathname.startsWith(item.url + "/")}
                     tooltip={item.title}
-                    className="h-9 text-sm"
+                    className="h-8 text-xs"
                   >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
+                    {item.title === "New Chat" ? (
+                      <a href="/chat" onClick={handleNewChat}>
+                        <item.icon className="h-3.5 w-3.5" />
+                        <span>{item.title}</span>
+                      </a>
+                    ) : (
+                      <Link href={item.url}>
+                        <item.icon className="h-3.5 w-3.5" />
+                        <span>{item.title}</span>
+                      </Link>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -261,21 +293,27 @@ export function AppSidebar() {
               </div>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0.5">
-                  {adminNavItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
-                        tooltip={item.title}
-                        className="h-9 text-sm"
-                      >
-                        <Link href={item.url}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {adminNavItems.map((item) => {
+                    // For /admin, only exact match (not /admin/usage etc.)
+                    const isActive = item.url === "/admin"
+                      ? pathname === "/admin"
+                      : pathname === item.url || pathname.startsWith(item.url + "/")
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          tooltip={item.title}
+                          className="h-8 text-xs"
+                        >
+                          <Link href={item.url}>
+                            <item.icon className="h-3.5 w-3.5" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -293,10 +331,10 @@ export function AppSidebar() {
                     asChild
                     isActive={pathname === item.url}
                     tooltip={item.title}
-                    className="h-9 text-sm"
+                    className="h-8 text-xs"
                   >
                     <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="h-3.5 w-3.5" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -322,9 +360,9 @@ export function AppSidebar() {
                         {user?.name?.charAt(0).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="grid flex-1 text-left leading-tight">
-                      <span className="truncate text-xs font-medium">{user?.name || 'User'}</span>
-                      <span className="truncate text-[10px] text-muted-foreground">
+                    <div className="grid flex-1 text-left leading-normal">
+                      <span className="truncate text-xs font-medium leading-tight">{user?.name || 'User'}</span>
+                      <span className="truncate text-[10px] text-muted-foreground leading-normal pb-0.5">
                         {user?.email || ''}
                       </span>
                     </div>

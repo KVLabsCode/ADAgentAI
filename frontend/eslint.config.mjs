@@ -25,6 +25,13 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Test files - disable React hooks rule (Playwright's `use` is not a React hook)
+  {
+    files: ["tests/**/*.ts", "tests/**/*.tsx"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

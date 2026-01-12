@@ -45,6 +45,7 @@ coverage/
 .nyc_output/
 playwright-report/
 test-results/
+tests/e2e/.auth/
 
 # Misc
 *.png
@@ -53,3 +54,11 @@ test-results/
 .claude/
 .playwright-mcp/
 .mcp.json
+desktop.ini
+
+# Claude Code temp files
+tmpclaude-*/
+nul
+
+# Project docs (not for repo)
+SPEC.md

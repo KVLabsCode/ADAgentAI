@@ -13,11 +13,18 @@ import {
   ExternalLink,
   AlertCircle,
   Loader2,
-  CheckCircle2,
-  XCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  PageContainer,
+  PageHeader,
+  SectionCard,
+  SectionCardHeader,
+  SectionCardContent,
+  EmptyState,
+  StatusMessage,
+} from "@/components/ui/theme"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -238,114 +245,102 @@ function BillingContent() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
-        <div className="space-y-0.5">
-          <h1 className="text-base font-medium tracking-tight">Billing</h1>
-          <p className="text-xs text-muted-foreground/80">
-            Manage your subscription and payment methods.
-          </p>
-        </div>
+      <PageContainer>
+        <PageHeader
+          title="Billing"
+          description="Manage your subscription and payment methods."
+        />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded border border-border/30 p-3 animate-pulse">
-              <div className="h-4 w-32 bg-muted rounded mb-2" />
-              <div className="h-3 w-48 bg-muted rounded" />
-            </div>
+            <SectionCard key={i}>
+              <div className="p-4 animate-pulse">
+                <div className="h-4 w-32 bg-muted rounded mb-2" />
+                <div className="h-3 w-48 bg-muted rounded" />
+              </div>
+            </SectionCard>
           ))}
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   if (loadError) {
     return (
-      <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
-        <div className="space-y-0.5">
-          <h1 className="text-base font-medium tracking-tight">Billing</h1>
-          <p className="text-xs text-muted-foreground/80">
-            Manage your subscription and payment methods.
-          </p>
-        </div>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="rounded-full bg-red-500/10 p-3 mb-3">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-          </div>
-          <p className="text-sm font-medium text-foreground/80 mb-1">Unable to load billing</p>
-          <p className="text-xs text-muted-foreground/70 mb-4 max-w-sm">{loadError}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={() => {
-              setLoadError(null)
-              setIsLoading(true)
-              fetchBillingData()
-            }}
+      <PageContainer>
+        <PageHeader
+          title="Billing"
+          description="Manage your subscription and payment methods."
+        />
+        <SectionCard>
+          <EmptyState
+            icon={AlertCircle}
+            title="Unable to load billing"
+            description={loadError}
+            className="py-12"
           >
-            Try again
-          </Button>
-        </div>
-      </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                setLoadError(null)
+                setIsLoading(true)
+                fetchBillingData()
+              }}
+            >
+              Try again
+            </Button>
+          </EmptyState>
+        </SectionCard>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
+    <PageContainer>
       {/* Status Message */}
       {statusMessage && (
-        <div className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-md text-xs",
-          statusMessage.type === 'success'
-            ? "bg-green-500/10 text-green-600 dark:text-green-400"
-            : "bg-red-500/10 text-red-600 dark:text-red-400"
-        )}>
-          {statusMessage.type === 'success' ? (
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          ) : (
-            <XCircle className="h-3.5 w-3.5" />
-          )}
-          {statusMessage.text}
-        </div>
+        <StatusMessage type={statusMessage.type} message={statusMessage.text} />
       )}
 
-      <div className="space-y-0.5">
-        <h1 className="text-base font-medium tracking-tight">Billing</h1>
-        <p className="text-xs text-muted-foreground/80">
-          Manage your subscription and payment methods.
-        </p>
-      </div>
+      <PageHeader
+        title="Billing"
+        description="Manage your subscription and payment methods."
+      />
 
       {/* Current Plan */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center justify-between">
+      <SectionCard>
+        <SectionCardHeader
+          icon={CreditCard}
+          title="Current Plan"
+        >
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-medium">Current Plan</h2>
             <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
               {isPro ? subscription?.plan?.name || 'Pro' : 'Trial'}
             </Badge>
+            <div className="flex items-center gap-1.5">
+              <div className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                subscription?.cancelAtPeriodEnd ? "bg-amber-500" : "bg-emerald-500"
+              )} />
+              <span className="text-[10px] text-muted-foreground">
+                {subscription?.cancelAtPeriodEnd ? 'Cancelling' : 'Active'}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              subscription?.cancelAtPeriodEnd ? "bg-amber-500/80" : "bg-green-500/80"
-            )} />
-            <span className="text-[10px] text-muted-foreground/60">
-              {subscription?.cancelAtPeriodEnd ? 'Cancelling' : 'Active'}
-            </span>
-          </div>
-        </div>
-        <div className="px-3 py-2.5">
+        </SectionCardHeader>
+        <SectionCardContent>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">
                 {isPro && subscription?.plan
                   ? formatCurrency(subscription.plan.amount, subscription.plan.currency)
                   : '$0'}
-                <span className="text-xs text-muted-foreground/60 font-normal">/month</span>
+                <span className="text-xs text-muted-foreground font-normal">/month</span>
               </p>
               {usage && (
                 <>
-                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     {usage.limit.chatMessages === -1
                       ? 'Unlimited queries'
                       : `${usage.chatMessages} of ${usage.limit.chatMessages} queries used`}
@@ -353,7 +348,7 @@ function BillingContent() {
                   {usage.limit.chatMessages !== -1 && (
                     <div className="mt-2 h-1 w-32 bg-muted/50 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-primary/70 rounded-full transition-all"
+                        className="h-full bg-foreground/70 rounded-full transition-all"
                         style={{ width: `${usagePercent}%` }}
                       />
                     </div>
@@ -361,7 +356,7 @@ function BillingContent() {
                 </>
               )}
               {subscription?.currentPeriodEnd && (
-                <p className="text-[10px] text-muted-foreground/50 mt-1">
+                <p className="text-[10px] text-muted-foreground mt-1">
                   {subscription.cancelAtPeriodEnd ? 'Ends' : 'Renews'} {formatDate(subscription.currentPeriodEnd)}
                 </p>
               )}
@@ -371,7 +366,7 @@ function BillingContent() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs px-2"
+                  className="h-8 text-xs"
                   onClick={handleManageSubscription}
                   disabled={isOpeningPortal}
                 >
@@ -385,12 +380,12 @@ function BillingContent() {
               )}
             </div>
           </div>
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Available Plans */}
       <div>
-        <h2 className="text-xs font-medium mb-2">Available Plans</h2>
+        <h2 className="text-sm font-medium mb-3">Available Plans</h2>
         <div className="grid gap-2 sm:grid-cols-3">
           {tiers.map((tier) => {
             const isCurrent = (tier.name === 'Trial' && !isPro) || (tier.name === 'Pro' && isPro)
@@ -401,58 +396,58 @@ function BillingContent() {
               <div
                 key={tier.name}
                 className={cn(
-                  "rounded border px-3 py-2.5",
+                  "rounded border p-4",
                   tier.popular
-                    ? "border-primary/50 bg-primary/[0.02]"
+                    ? "border-foreground/30"
                     : "border-border/30",
                   isCurrent && "bg-muted/30"
                 )}
               >
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     {tier.name === "Enterprise" ? (
-                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                      <Crown className="h-3.5 w-3.5 text-muted-foreground" />
                     ) : tier.popular ? (
-                      <Zap className="h-3.5 w-3.5 text-primary" />
+                      <Zap className="h-3.5 w-3.5 text-foreground" />
                     ) : (
-                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground/50" />
+                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
                     <span className="text-sm font-medium">{tier.name}</span>
                   </div>
                   {tier.popular && !isCurrent && (
-                    <Badge className="text-[8px] h-3.5 px-1 bg-primary/10 text-primary border-0">
+                    <Badge variant="outline" className="text-[8px] h-3.5 px-1">
                       Popular
                     </Badge>
                   )}
                   {isCurrent && (
-                    <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-border/40">
+                    <Badge variant="outline" className="text-[8px] h-3.5 px-1">
                       Current
                     </Badge>
                   )}
                 </div>
-                <div className="mb-1.5">
+                <div className="mb-2">
                   <span className="text-lg font-semibold">{tier.price}</span>
                   {tier.price !== "Custom" && (
-                    <span className="text-[10px] text-muted-foreground/60">/mo</span>
+                    <span className="text-[10px] text-muted-foreground">/mo</span>
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground/70 mb-2">{tier.description}</p>
-                <ul className="space-y-1 mb-2.5">
+                <p className="text-[10px] text-muted-foreground mb-3">{tier.description}</p>
+                <ul className="space-y-1 mb-3">
                   {tier.features.slice(0, 3).map((feature) => (
-                    <li key={feature} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
-                      <Check className="h-2.5 w-2.5 text-green-500/70 shrink-0" />
+                    <li key={feature} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <Check className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
                       {feature}
                     </li>
                   ))}
                   {tier.features.length > 3 && (
-                    <li className="text-[10px] text-muted-foreground/50">
+                    <li className="text-[10px] text-muted-foreground">
                       +{tier.features.length - 3} more
                     </li>
                   )}
                 </ul>
                 <Button
                   size="sm"
-                  className="w-full h-7 text-xs"
+                  className="w-full h-8 text-xs"
                   variant={isCurrent ? "outline" : tier.popular ? "default" : "outline"}
                   disabled={isCurrent || isUpgradingThis || (tier.name === 'Enterprise')}
                   onClick={() => canUpgrade && handleUpgrade(tier.priceId)}
@@ -478,93 +473,87 @@ function BillingContent() {
 
       {/* Payment Methods - Managed via Polar Portal */}
       {isPro && (
-        <div className="rounded border border-border/30">
-          <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
-            <div>
-              <h2 className="text-xs font-medium">Payment Methods</h2>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                Manage payment methods in the billing portal.
-              </p>
-            </div>
+        <SectionCard>
+          <SectionCardHeader
+            icon={CreditCard}
+            title="Payment Methods"
+            description="Manage payment methods in the billing portal."
+          >
             <Button
               size="sm"
               variant="outline"
-              className="h-6 text-[10px] px-2"
+              className="h-8 text-xs"
               onClick={handleManageSubscription}
               disabled={isOpeningPortal}
             >
               {isOpeningPortal ? (
-                <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               ) : (
-                <ExternalLink className="h-2.5 w-2.5 mr-1" />
+                <ExternalLink className="h-3 w-3 mr-1" />
               )}
               Manage
             </Button>
-          </div>
-          <div className="px-3 py-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-12 rounded border border-border/40 bg-muted/30 flex items-center justify-center">
-                <CreditCard className="h-4 w-4 text-muted-foreground/50" />
+          </SectionCardHeader>
+          <SectionCardContent>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-14 rounded border border-border/30 bg-muted/30 flex items-center justify-center">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground/70">
+                <p className="text-xs text-muted-foreground">
                   Payment methods are managed through Polar
                 </p>
-                <p className="text-[10px] text-muted-foreground/50">
+                <p className="text-[10px] text-muted-foreground">
                   Click &quot;Manage&quot; to update your billing details
                 </p>
               </div>
             </div>
-          </div>
-        </div>
+          </SectionCardContent>
+        </SectionCard>
       )}
 
       {/* Invoice History */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2 border-b border-border/30">
-          <h2 className="text-xs font-medium">Invoice History</h2>
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            Your past invoices and payments.
-          </p>
-        </div>
-        <div className="px-3 py-2">
+      <SectionCard>
+        <SectionCardHeader
+          icon={FileText}
+          title="Invoice History"
+          description="Your past invoices and payments."
+        />
+        <SectionCardContent>
           {invoices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="rounded bg-muted/50 p-2 mb-2">
-                <FileText className="h-4 w-4 text-muted-foreground/50" />
-              </div>
-              <p className="text-[11px] text-muted-foreground/70">No invoices yet</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                Invoices will appear here after your first payment
-              </p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="No invoices yet"
+              description="Invoices will appear here after your first payment"
+              className="py-8"
+            />
           ) : (
             <div className="space-y-1">
               {invoices.map((invoice) => (
                 <div
                   key={invoice.id}
-                  className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-muted/30 transition-colors"
+                  className="flex items-center justify-between py-2 px-3 -mx-3 rounded hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-7 w-7 rounded bg-muted/50 flex items-center justify-center">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded bg-muted/50 flex items-center justify-center">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         <span className="text-xs font-medium">{invoice.product}</span>
                         <Badge
-                          variant="secondary"
-                          className="text-[8px] h-3.5 px-1 bg-green-500/10 text-green-600"
+                          variant="outline"
+                          className="text-[8px] h-3.5 px-1 bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
                         >
                           paid
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground/60">
+                        <span className="text-[10px] text-muted-foreground">
                           {formatDate(invoice.createdAt)}
                         </span>
-                        <span className="text-[10px] text-muted-foreground/40">•</span>
-                        <span className="text-[10px] text-muted-foreground/60">
+                        <span className="text-[10px] text-muted-foreground">•</span>
+                        <span className="text-[10px] text-muted-foreground">
                           {formatCurrency(invoice.amount, invoice.currency)}
                         </span>
                       </div>
@@ -574,43 +563,43 @@ function BillingContent() {
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Help Notice */}
-      <div className="flex items-start gap-2 px-3 py-2 rounded bg-muted/30 border border-border/20">
-        <AlertCircle className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-2 px-4 py-3 rounded border border-border/30 bg-muted/20">
+        <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
         <div>
-          <p className="text-[11px] text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground">
             Need help with billing? Contact{" "}
-            <a href="mailto:support@adagent.app" className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline">
+            <a href="mailto:support@adagent.app" className="text-foreground hover:underline underline-offset-2">
               support@adagent.app
             </a>
           </p>
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 
 function BillingLoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
-      <div className="space-y-0.5">
-        <h1 className="text-base font-medium tracking-tight">Billing</h1>
-        <p className="text-xs text-muted-foreground/80">
-          Manage your subscription and payment methods.
-        </p>
+    <PageContainer>
+      <div className="space-y-1">
+        <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+        <div className="h-3 w-56 bg-muted rounded animate-pulse" />
       </div>
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="rounded border border-border/30 p-3 animate-pulse">
-            <div className="h-4 w-32 bg-muted rounded mb-2" />
-            <div className="h-3 w-48 bg-muted rounded" />
-          </div>
+          <SectionCard key={i}>
+            <div className="p-4 animate-pulse">
+              <div className="h-4 w-32 bg-muted rounded mb-2" />
+              <div className="h-3 w-48 bg-muted rounded" />
+            </div>
+          </SectionCard>
         ))}
       </div>
-    </div>
+    </PageContainer>
   )
 }
 

@@ -7,8 +7,14 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { db } from "../db";
 import { crewAgents, crewTasks } from "../db/schema";
+import { requireAuth, requireAdmin } from "../middleware/auth";
+import { logAuditEntry } from "../lib/audit";
 
 const app = new Hono();
+
+// All agent routes require authentication and admin role
+app.use("*", requireAuth);
+app.use("*", requireAdmin);
 
 // Path to the CrewAI config directory (only for services.yaml now)
 const getConfigDir = (): string => {
@@ -54,6 +60,8 @@ function readYamlFile(filename: string): Record<string, unknown> {
 
 // Get all agents
 app.get("/", async (c) => {
+  const adminUser = c.get("user");
+
   try {
     const agents = await db.select().from(crewAgents).orderBy(crewAgents.key);
 
@@ -71,6 +79,13 @@ app.get("/", async (c) => {
       coordinates: agent.coordinates,
     }));
 
+    // Log admin access
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "list_agents",
+      metadata: { count: agentList.length },
+    });
+
     return c.json({ agents: agentList });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -81,6 +96,7 @@ app.get("/", async (c) => {
 
 // Get single agent
 app.get("/:key", async (c) => {
+  const adminUser = c.get("user");
   const key = c.req.param("key");
 
   // Skip if this looks like a sub-route
@@ -94,6 +110,14 @@ app.get("/:key", async (c) => {
     if (!agent) {
       return c.json({ error: "Agent not found" }, 404);
     }
+
+    // Log admin access
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "view_agent",
+      targetResourceId: key,
+      metadata: { service: agent.service, capability: agent.capability },
+    });
 
     return c.json({
       key: agent.key,
@@ -129,6 +153,7 @@ const createAgentSchema = z.object({
 });
 
 app.post("/", zValidator("json", createAgentSchema), async (c) => {
+  const adminUser = c.get("user");
   const data = c.req.valid("json");
 
   try {
@@ -150,6 +175,14 @@ app.post("/", zValidator("json", createAgentSchema), async (c) => {
       isOrchestrator: data.is_orchestrator ?? false,
       coordinates: data.coordinates || null,
     }).returning();
+
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "create_agent",
+      targetResourceId: newAgent.key,
+      metadata: { service: newAgent.service, capability: newAgent.capability },
+    });
 
     return c.json({
       success: true,
@@ -187,6 +220,7 @@ const updateAgentSchema = z.object({
 });
 
 app.put("/:key", zValidator("json", updateAgentSchema), async (c) => {
+  const adminUser = c.get("user");
   const key = c.req.param("key");
   const updates = c.req.valid("json");
 
@@ -212,6 +246,14 @@ app.put("/:key", zValidator("json", updateAgentSchema), async (c) => {
       .where(eq(crewAgents.key, key))
       .returning();
 
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "update_agent",
+      targetResourceId: key,
+      metadata: { service: updated.service, capability: updated.capability },
+    });
+
     return c.json({
       success: true,
       message: "Agent updated",
@@ -236,6 +278,7 @@ app.put("/:key", zValidator("json", updateAgentSchema), async (c) => {
 
 // Delete agent
 app.delete("/:key", async (c) => {
+  const adminUser = c.get("user");
   const key = c.req.param("key");
 
   if (key === "tasks" || key === "services" || key === "debug" || key === "seed") {
@@ -250,6 +293,14 @@ app.delete("/:key", async (c) => {
 
     await db.delete(crewAgents).where(eq(crewAgents.key, key));
 
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "delete_agent",
+      targetResourceId: key,
+      metadata: { service: existing.service, capability: existing.capability },
+    });
+
     return c.json({ success: true, message: "Agent deleted" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -263,6 +314,8 @@ app.delete("/:key", async (c) => {
 
 // Get all tasks
 app.get("/tasks/list", async (c) => {
+  const adminUser = c.get("user");
+
   try {
     const tasks = await db.select().from(crewTasks).orderBy(crewTasks.key);
 
@@ -274,6 +327,13 @@ app.get("/tasks/list", async (c) => {
       context: task.context,
     }));
 
+    // Log admin access
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "list_tasks",
+      metadata: { count: taskList.length },
+    });
+
     return c.json({ tasks: taskList });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -284,6 +344,7 @@ app.get("/tasks/list", async (c) => {
 
 // Get single task
 app.get("/tasks/:key", async (c) => {
+  const adminUser = c.get("user");
   const key = c.req.param("key");
 
   try {
@@ -292,6 +353,14 @@ app.get("/tasks/:key", async (c) => {
     if (!task) {
       return c.json({ error: "Task not found" }, 404);
     }
+
+    // Log admin access
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "view_task",
+      targetResourceId: key,
+      metadata: { agentKey: task.agentKey },
+    });
 
     return c.json({
       key: task.key,
@@ -317,6 +386,7 @@ const createTaskSchema = z.object({
 });
 
 app.post("/tasks", zValidator("json", createTaskSchema), async (c) => {
+  const adminUser = c.get("user");
   const data = c.req.valid("json");
 
   try {
@@ -332,6 +402,14 @@ app.post("/tasks", zValidator("json", createTaskSchema), async (c) => {
       agentKey: data.agent,
       context: data.context || null,
     }).returning();
+
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "create_task",
+      targetResourceId: newTask.key,
+      metadata: { agentKey: newTask.agentKey },
+    });
 
     return c.json({
       success: true,
@@ -359,6 +437,7 @@ const updateTaskSchema = z.object({
 });
 
 app.put("/tasks/:key", zValidator("json", updateTaskSchema), async (c) => {
+  const adminUser = c.get("user");
   const key = c.req.param("key");
   const updates = c.req.valid("json");
 
@@ -379,6 +458,14 @@ app.put("/tasks/:key", zValidator("json", updateTaskSchema), async (c) => {
       .where(eq(crewTasks.key, key))
       .returning();
 
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "update_task",
+      targetResourceId: key,
+      metadata: { agentKey: updated.agentKey, previousAgentKey: existing.agentKey },
+    });
+
     return c.json({
       success: true,
       message: "Task updated",
@@ -398,6 +485,7 @@ app.put("/tasks/:key", zValidator("json", updateTaskSchema), async (c) => {
 
 // Delete task
 app.delete("/tasks/:key", async (c) => {
+  const adminUser = c.get("user");
   const key = c.req.param("key");
 
   try {
@@ -407,6 +495,14 @@ app.delete("/tasks/:key", async (c) => {
     }
 
     await db.delete(crewTasks).where(eq(crewTasks.key, key));
+
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "delete_task",
+      targetResourceId: key,
+      metadata: { agentKey: existing.agentKey },
+    });
 
     return c.json({ success: true, message: "Task deleted" });
   } catch (error) {
@@ -435,6 +531,8 @@ app.get("/services/list", async (c) => {
 // =============================================================================
 
 app.post("/seed", async (c) => {
+  const adminUser = c.get("user");
+
   try {
     // Read YAML files
     const agentsYaml = readYamlFile("agents.yaml") as Record<string, Record<string, unknown>>;
@@ -476,6 +574,13 @@ app.post("/seed", async (c) => {
     }));
 
     await db.insert(crewTasks).values(taskInserts);
+
+    // Log admin action
+    await logAuditEntry({
+      adminUserId: adminUser.id,
+      action: "seed_agents",
+      metadata: { agentsSeeded: agentInserts.length, tasksSeeded: taskInserts.length },
+    });
 
     return c.json({
       success: true,

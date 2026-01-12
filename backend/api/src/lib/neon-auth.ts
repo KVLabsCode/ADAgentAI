@@ -16,6 +16,7 @@ interface NeonAuthUser {
   displayName: string | null;
   profileImageUrl: string | null;
   role: string | null; // 'admin' or 'user' - set in Neon Console
+  organizationId: string | null; // Organization ID from JWT claims (if multi-tenant)
 }
 
 type ValidateTokenResult = {
@@ -57,6 +58,40 @@ async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
 }
 
 /**
+ * Extract organization ID from JWT payload
+ * Checks common claim names: org, org_id, organization_id
+ */
+function extractOrgFromJWT(payload: jose.JWTPayload): string | null {
+  // Check common organization claim names
+  const orgClaims = ['org', 'org_id', 'organization_id', 'orgId', 'organizationId'];
+  for (const claim of orgClaims) {
+    const value = payload[claim];
+    if (typeof value === 'string' && value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+/**
+ * Look up user role from database (for JWT tokens that don't include role)
+ */
+async function getUserRoleFromDB(userId: string): Promise<string | null> {
+  try {
+    const result = await db.execute(sql`
+      SELECT role FROM neon_auth."user"
+      WHERE id = ${userId}
+      LIMIT 1
+    `);
+    const rows = result.rows as Array<{ role: string | null }>;
+    return rows[0]?.role || null;
+  } catch (error) {
+    console.error("[NeonAuth] Failed to lookup user role:", error);
+    return null;
+  }
+}
+
+/**
  * Validate a JWT token using JWKS
  */
 async function validateJWT(token: string): Promise<ValidateTokenResult> {
@@ -64,7 +99,17 @@ async function validateJWT(token: string): Promise<ValidateTokenResult> {
     const jwks = await getJWKS();
     const { payload } = await jose.jwtVerify(token, jwks);
 
-    console.log("[NeonAuth] JWT validated, user:", payload.sub, payload.email);
+    // Extract organization from JWT claims
+    const organizationId = extractOrgFromJWT(payload);
+
+    // Get role from database - JWT "role" claim is often just "authenticated"
+    // which is a Neon Auth default, not our app's actual role (admin/user)
+    let role: string | null = null;
+    if (payload.sub) {
+      role = await getUserRoleFromDB(payload.sub as string);
+    }
+
+    console.log("[NeonAuth] JWT validated, user:", payload.sub, payload.email, "org:", organizationId, "role:", role);
 
     return {
       success: true,
@@ -73,7 +118,8 @@ async function validateJWT(token: string): Promise<ValidateTokenResult> {
         primaryEmail: (payload.email as string) || null,
         displayName: (payload.name as string) || null,
         profileImageUrl: null, // JWT doesn't include image
-        role: (payload.role as string) || null,
+        role,
+        organizationId,
       },
     };
   } catch (error) {
@@ -130,6 +176,7 @@ async function validateSessionToken(sessionToken: string): Promise<ValidateToken
         displayName: row.name,
         profileImageUrl: row.image,
         role: row.role,
+        organizationId: null, // Session tokens don't include org; use x-organization-id header
       },
     };
   } catch (error) {
@@ -182,11 +229,14 @@ export function extractAccessToken(headers: Headers): string | null {
 /**
  * Simplified token validation that returns user or null
  * Used by internal endpoints for service-to-service auth
+ *
+ * Note: organizationId from JWT claims may be null. If so, the caller
+ * should use the x-organization-id header for org context (validated by middleware).
  */
 export async function validateToken(token: string): Promise<{
   id: string;
   email: string | null;
-  organizationId?: string | null;
+  organizationId: string | null;
 } | null> {
   const result = await validateNeonAuthToken(token);
   if (!result.success) {
@@ -196,6 +246,6 @@ export async function validateToken(token: string): Promise<{
   return {
     id: result.user.id,
     email: result.user.primaryEmail,
-    organizationId: null, // TODO: Extract from JWT claims if needed
+    organizationId: result.user.organizationId,
   };
 }

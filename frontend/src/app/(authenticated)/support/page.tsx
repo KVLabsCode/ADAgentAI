@@ -11,6 +11,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  PageContainer,
+  PageHeader,
+  SectionCard,
+  SectionCardHeader,
+  SectionCardContent,
+} from "@/components/ui/theme"
 import { cn } from "@/lib/utils"
 
 const faqs = [
@@ -63,102 +70,98 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
-      <div className="space-y-0.5">
-        <h1 className="text-base font-medium tracking-tight">Support</h1>
-        <p className="text-xs text-muted-foreground/80">
-          Get help with ADAgentAI or contact our team.
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Support"
+        description="Get help with ADAgentAI or contact our team."
+      />
 
       {/* Quick Links */}
       <div className="grid gap-2 sm:grid-cols-3">
         <Link
           href="#"
-          className="group rounded border border-border/30 px-3 py-2.5 hover:border-border/50 hover:bg-muted/20 transition-all duration-150"
+          className="group rounded border border-border/30 p-4 hover:border-foreground/20 hover:bg-muted/20 transition-all duration-150"
         >
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
-              <Book className="h-3 w-3 text-primary" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+              <Book className="h-4 w-4 text-muted-foreground" />
             </div>
-            <span className="text-xs font-medium group-hover:text-primary transition-colors">Documentation</span>
+            <span className="text-xs font-medium group-hover:text-foreground transition-colors">Documentation</span>
           </div>
-          <p className="text-[10px] text-muted-foreground/60">
+          <p className="text-[10px] text-muted-foreground">
             Learn how to use ADAgentAI effectively.
           </p>
         </Link>
 
         <Link
           href="#"
-          className="group rounded border border-border/30 px-3 py-2.5 hover:border-border/50 hover:bg-muted/20 transition-all duration-150"
+          className="group rounded border border-border/30 p-4 hover:border-foreground/20 hover:bg-muted/20 transition-all duration-150"
         >
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
-              <FileText className="h-3 w-3 text-primary" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+              <FileText className="h-4 w-4 text-muted-foreground" />
             </div>
-            <span className="text-xs font-medium group-hover:text-primary transition-colors">API Reference</span>
+            <span className="text-xs font-medium group-hover:text-foreground transition-colors">API Reference</span>
           </div>
-          <p className="text-[10px] text-muted-foreground/60">
+          <p className="text-[10px] text-muted-foreground">
             Technical documentation for developers.
           </p>
         </Link>
 
         <Link
           href="#"
-          className="group rounded border border-border/30 px-3 py-2.5 hover:border-border/50 hover:bg-muted/20 transition-all duration-150"
+          className="group rounded border border-border/30 p-4 hover:border-foreground/20 hover:bg-muted/20 transition-all duration-150"
         >
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
-              <MessageCircle className="h-3 w-3 text-primary" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
             </div>
-            <span className="text-xs font-medium group-hover:text-primary transition-colors">Community</span>
+            <span className="text-xs font-medium group-hover:text-foreground transition-colors">Community</span>
           </div>
-          <p className="text-[10px] text-muted-foreground/60">
+          <p className="text-[10px] text-muted-foreground">
             Join our Discord community.
           </p>
         </Link>
       </div>
 
       {/* FAQ */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Frequently Asked Questions</h2>
-            <p className="text-[10px] text-muted-foreground/60">Common questions about ADAgentAI.</p>
+      <SectionCard>
+        <SectionCardHeader
+          icon={HelpCircle}
+          title="Frequently Asked Questions"
+          description="Common questions about ADAgentAI."
+        />
+        <SectionCardContent padded={false}>
+          <div className="px-4 py-2 divide-y divide-border/30">
+            {faqs.map((faq, i) => (
+              <FAQItem key={i} question={faq.question} answer={faq.answer} />
+            ))}
           </div>
-        </div>
-        <div className="px-3 py-2 divide-y divide-border/20">
-          {faqs.map((faq, i) => (
-            <FAQItem key={i} question={faq.question} answer={faq.answer} />
-          ))}
-        </div>
-      </div>
+        </SectionCardContent>
+      </SectionCard>
 
       {/* Contact Form */}
-      <div className="rounded border border-border/30">
-        <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
-          <Mail className="h-3.5 w-3.5 text-muted-foreground/70" />
-          <div>
-            <h2 className="text-xs font-medium">Contact Us</h2>
-            <p className="text-[10px] text-muted-foreground/60">Can&apos;t find what you&apos;re looking for? Send us a message.</p>
-          </div>
-        </div>
-        <div className="px-3 py-3">
+      <SectionCard>
+        <SectionCardHeader
+          icon={Mail}
+          title="Contact Us"
+          description="Can't find what you're looking for? Send us a message."
+        />
+        <SectionCardContent>
           {submitted ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center mb-2">
-                <MessageCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
+                <MessageCircle className="h-5 w-5 text-emerald-500" />
               </div>
-              <p className="text-xs font-medium mb-0.5">Message sent!</p>
-              <p className="text-[10px] text-muted-foreground/60">
+              <p className="text-sm font-medium mb-1">Message sent!</p>
+              <p className="text-xs text-muted-foreground">
                 We&apos;ll get back to you within 24 hours.
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-[11px] font-medium block mb-1">Subject</label>
+                <label className="text-xs font-medium block mb-1.5">Subject</label>
                 <Input
                   placeholder="What can we help you with?"
                   required
@@ -166,21 +169,21 @@ export default function SupportPage() {
                 />
               </div>
               <div>
-                <label className="text-[11px] font-medium block mb-1">Message</label>
+                <label className="text-xs font-medium block mb-1.5">Message</label>
                 <Textarea
                   placeholder="Describe your issue or question..."
-                  className="min-h-[80px] resize-none text-xs"
+                  className="min-h-[100px] resize-none text-xs"
                   required
                 />
               </div>
-              <Button type="submit" size="sm" className="h-7 text-xs">
+              <Button type="submit" size="sm" className="h-8 text-xs">
                 <Send className="h-3 w-3 mr-1.5" />
                 Send Message
               </Button>
             </form>
           )}
-        </div>
-      </div>
-    </div>
+        </SectionCardContent>
+      </SectionCard>
+    </PageContainer>
   )
 }

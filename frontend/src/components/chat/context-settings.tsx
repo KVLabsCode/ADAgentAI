@@ -18,6 +18,7 @@ import {
   Palette,
   Check,
   Minus,
+  ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -30,7 +31,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useChatSettings } from "@/lib/chat-settings"
 import { useSidebar } from "@/components/ui/sidebar"
@@ -111,10 +111,14 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
 
   const {
     responseStyle,
+    contextMode,
+    safeMode,
     enabledProviderIds,
     enabledAppIds,
     autoIncludeContext,
     setResponseStyle,
+    setContextMode,
+    setSafeMode,
     toggleProvider,
     toggleApp,
     setEnabledAppIds,
@@ -280,20 +284,22 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
     const canExpand = provider.type === "admob"
     const isLast = index === total - 1
     const highlighted = matchesSearch(provider.displayName)
+    const isEnabled = isProviderEnabled(provider.id)
 
     return (
       <div key={provider.id} className="relative">
         {/* Provider Row */}
         <div
           className={cn(
-            "flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 pr-3 sm:pr-4 transition-colors group",
+            "flex items-center gap-1.5 py-1.5 pr-3 transition-colors group",
             "hover:bg-muted/40",
-            isExpanded && "bg-muted/20"
+            isExpanded && "bg-muted/20",
+            !isEnabled && "opacity-50"
           )}
-          style={{ paddingLeft: "1.75rem" }}
+          style={{ paddingLeft: "1.5rem" }}
         >
           {/* Tree connector */}
-          <div className="absolute left-2 sm:left-4 top-0 bottom-0 flex">
+          <div className="absolute left-2 top-0 bottom-0 flex">
             <TreeLine isLast={isLast && !isExpanded} />
           </div>
 
@@ -302,24 +308,24 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
             <button
               onClick={() => toggleProviderExpanded(provider.id, provider.type)}
               className={cn(
-                "p-1 rounded transition-all duration-200 shrink-0",
+                "p-0.5 rounded transition-all duration-200 shrink-0",
                 "hover:bg-muted-foreground/10",
                 isExpanded && "bg-muted-foreground/5"
               )}
             >
               {isLoading ? (
-                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-muted-foreground" />
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
               ) : (
                 <ChevronRight
                   className={cn(
-                    "h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground transition-transform duration-200",
+                    "h-3 w-3 text-muted-foreground transition-transform duration-200",
                     isExpanded && "rotate-90"
                   )}
                 />
               )}
             </button>
           ) : (
-            <div className="w-5 sm:w-6 shrink-0" />
+            <div className="w-4 shrink-0" />
           )}
 
           {/* Checkbox */}
@@ -327,22 +333,28 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
             checked={isProviderEnabled(provider.id)}
             indeterminate={appState === "some"}
             onCheckedChange={() => toggleProvider(provider.id)}
-            className="shrink-0"
+            className="shrink-0 h-3.5 w-3.5"
           />
 
           {/* Provider info */}
           <div className="flex-1 min-w-0 ml-1 overflow-hidden">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span
                 className={cn(
-                  "text-xs sm:text-sm font-medium truncate block max-w-full",
-                  highlighted && "bg-yellow-500/20 text-yellow-200 px-1 -mx-1 rounded"
+                  "text-xs font-medium truncate block max-w-full",
+                  highlighted && "bg-yellow-500/20 text-yellow-200 px-1 -mx-1 rounded",
+                  !isEnabled && "text-muted-foreground"
                 )}
               >
                 {provider.displayName}
               </span>
+              {!isEnabled && (
+                <span className="text-[8px] px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                  Disabled
+                </span>
+              )}
             </div>
-            <p className="text-[10px] sm:text-[11px] text-muted-foreground/70 truncate font-mono">
+            <p className="text-[9px] text-muted-foreground/70 truncate font-mono">
               {provider.type === "admob"
                 ? provider.identifiers.publisherId
                 : `Network: ${provider.identifiers.networkCode}`}
@@ -353,7 +365,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
           {allApps.length > 0 && (
             <div
               className={cn(
-                "px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium transition-colors shrink-0",
+                "px-1.5 py-0.5 rounded-full text-[9px] font-medium transition-colors shrink-0",
                 appState === "all"
                   ? "bg-emerald-500/10 text-emerald-400"
                   : appState === "none"
@@ -375,63 +387,70 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
               "relative overflow-hidden transition-all duration-200",
               "border-l border-border/30"
             )}
-            style={{ marginLeft: "1.5rem" }}
+            style={{ marginLeft: "1.25rem" }}
           >
             {isLoading ? (
-              <div className="flex items-center gap-2 sm:gap-3 py-3 sm:py-4 pl-4 sm:pl-6 text-xs sm:text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+              <div className="flex items-center gap-2 py-2 pl-3 text-[10px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Loading apps...</span>
               </div>
             ) : filteredAppsList.length === 0 ? (
-              <div className="py-2.5 sm:py-3 pl-4 sm:pl-6 text-xs sm:text-sm text-muted-foreground/60">
+              <div className="py-2 pl-3 text-[10px] text-muted-foreground/60">
                 {searchQuery ? "No matching apps" : "No apps found"}
               </div>
             ) : (
-              <div className="py-1">
+              <div className="py-0.5">
                 {/* Select all */}
-                <div className="flex items-center gap-2 sm:gap-3 py-1.5 sm:py-2 pl-4 sm:pl-6 pr-3 sm:pr-4 hover:bg-muted/30 transition-colors">
+                <div className={cn(
+                  "flex items-center gap-2 py-1 pl-3 pr-3 hover:bg-muted/30 transition-colors",
+                  !isEnabled && "opacity-50 pointer-events-none"
+                )}>
                   <TreeCheckbox
                     checked={appState === "all"}
                     indeterminate={appState === "some"}
                     onCheckedChange={() => toggleAllApps(provider.id)}
-                    className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0"
+                    className="h-3 w-3 shrink-0"
                   />
-                  <span className="text-[11px] sm:text-xs text-muted-foreground">Select all</span>
+                  <span className="text-[10px] text-muted-foreground">Select all</span>
                 </div>
 
                 {/* App list */}
                 {filteredAppsList.map((app, appIndex) => {
                   const appHighlighted = matchesSearch(app.name)
                   const isLastApp = appIndex === filteredAppsList.length - 1
+                  // App is only enabled if both parent provider and app itself are enabled
+                  const appEnabled = isEnabled && isAppEnabled(provider.id, app.id)
 
                   return (
                     <div
                       key={app.id}
                       className={cn(
-                        "flex items-center gap-2 sm:gap-3 py-1.5 sm:py-2 pl-4 sm:pl-6 pr-3 sm:pr-4 transition-colors",
-                        "hover:bg-muted/30 group/app"
+                        "flex items-center gap-1.5 py-1 pl-3 pr-3 transition-colors",
+                        "hover:bg-muted/30 group/app",
+                        !appEnabled && "opacity-50",
+                        !isEnabled && "pointer-events-none"
                       )}
                     >
                       {/* App tree connector */}
-                      <div className="relative -ml-2 w-3 sm:w-4 h-full flex items-center shrink-0">
+                      <div className="relative -ml-1.5 w-3 h-full flex items-center shrink-0">
                         <div
                           className={cn(
                             "absolute left-0 w-px bg-border/40",
                             isLastApp ? "top-0 h-1/2" : "top-0 bottom-0 -translate-y-full h-[200%]"
                           )}
                         />
-                        <div className="absolute left-0 w-1.5 sm:w-2 h-px bg-border/40" />
+                        <div className="absolute left-0 w-1.5 h-px bg-border/40" />
                       </div>
 
                       <TreeCheckbox
                         checked={isAppEnabled(provider.id, app.id)}
                         onCheckedChange={() => toggleApp(provider.id, app.id)}
-                        className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0"
+                        className="h-3 w-3 shrink-0"
                       />
 
                       <Smartphone
                         className={cn(
-                          "h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 transition-colors",
+                          "h-3 w-3 shrink-0 transition-colors",
                           app.platform === "ANDROID"
                             ? "text-green-500"
                             : "text-blue-500"
@@ -440,15 +459,12 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
 
                       <span
                         className={cn(
-                          "text-[11px] sm:text-xs flex-1 truncate min-w-0",
-                          appHighlighted && "bg-yellow-500/20 text-yellow-200 px-1 -mx-1 rounded"
+                          "text-[10px] flex-1 truncate min-w-0",
+                          appHighlighted && "bg-yellow-500/20 text-yellow-200 px-1 -mx-1 rounded",
+                          !appEnabled && "text-muted-foreground"
                         )}
                       >
                         {app.name}
-                      </span>
-
-                      <span className="text-[9px] sm:text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wide shrink-0 hidden xs:block">
-                        {app.platform === "ANDROID" ? "Android" : app.platform === "IOS" ? "iOS" : ""}
                       </span>
                     </div>
                   )
@@ -479,28 +495,28 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         <button
           onClick={() => toggleSection(id)}
           className={cn(
-            "flex items-center gap-2 sm:gap-3 w-full px-3 sm:px-5 py-2.5 sm:py-3 transition-colors",
+            "flex items-center gap-2 w-full px-3 py-2 transition-colors",
             "hover:bg-muted/30",
             isExpanded && "bg-muted/10"
           )}
         >
           <ChevronRight
             className={cn(
-              "h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0",
+              "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 shrink-0",
               isExpanded && "rotate-90"
             )}
           />
-          <div className={cn("p-1.5 rounded-md shrink-0", iconColor)}>
+          <div className={cn("p-1 rounded shrink-0", iconColor)}>
             {icon}
           </div>
-          <span className="text-sm font-semibold flex-1 text-left truncate">{title}</span>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-muted-foreground">
+          <span className="text-xs font-medium flex-1 text-left truncate">{title}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] text-muted-foreground">
               {enabledCount}/{providerList.length}
             </span>
             <div
               className={cn(
-                "w-2 h-2 rounded-full",
+                "w-1.5 h-1.5 rounded-full",
                 enabledCount === providerList.length
                   ? "bg-emerald-500"
                   : enabledCount > 0
@@ -513,9 +529,9 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
 
         {/* Section content */}
         {isExpanded && (
-          <div className="pb-2">
+          <div className="pb-1">
             {filteredList.length === 0 ? (
-              <p className="text-sm text-muted-foreground/60 px-3 sm:px-5 py-3">
+              <p className="text-xs text-muted-foreground/60 px-3 py-2">
                 {searchQuery ? "No matching accounts" : "No accounts"}
               </p>
             ) : (
@@ -532,13 +548,13 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
   // Placeholder section
   const renderPlaceholder = (title: string, icon: React.ReactNode, iconColor: string) => (
     <div className="border-b border-border/20 last:border-b-0">
-      <div className="flex items-center gap-2 sm:gap-3 w-full px-3 sm:px-5 py-2.5 sm:py-3 opacity-40">
-        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-        <div className={cn("p-1.5 rounded-md shrink-0", iconColor)}>
+      <div className="flex items-center gap-2 w-full px-3 py-1.5 opacity-40">
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <div className={cn("p-1 rounded shrink-0", iconColor)}>
           {icon}
         </div>
-        <span className="text-xs sm:text-sm font-medium flex-1 text-left truncate">{title}</span>
-        <span className="text-[9px] sm:text-[10px] text-muted-foreground bg-muted/50 px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+        <span className="text-xs font-medium flex-1 text-left truncate">{title}</span>
+        <span className="text-[9px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full shrink-0">
           Soon
         </span>
       </div>
@@ -565,18 +581,18 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
       </DialogTrigger>
 
       <DialogContent
-        className="w-[calc(100%-2rem)] sm:max-w-[680px] p-0 gap-0 max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden border-border/50 bg-background/95 backdrop-blur-xl"
-        style={{ left: isMobile ? "50%" : dialogOffset }}
+        className="w-[calc(100%-1rem)] sm:max-w-[420px] lg:max-w-[520px] xl:max-w-[600px] p-0 gap-0 max-h-[65vh] lg:max-h-[75vh] flex flex-col border-border/30 !bg-background"
+        style={{ left: isMobile ? "50%" : dialogOffset, overflow: "hidden" }}
       >
         {/* Header */}
-        <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border/30 shrink-0 bg-muted/20">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 shrink-0">
-              <Settings2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+        <DialogHeader className="px-3 lg:px-4 py-2 lg:py-3 border-b border-border/30 shrink-0 bg-card">
+          <div className="flex items-center gap-2">
+            <div className="p-1 lg:p-1.5 rounded border border-border/50 shrink-0">
+              <Settings2 className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base sm:text-lg font-semibold truncate">Context Settings</DialogTitle>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-1">
+              <DialogTitle className="text-xs lg:text-sm font-medium">Context Settings</DialogTitle>
+              <p className="text-[9px] lg:text-[10px] text-muted-foreground">
                 Select accounts and apps for your queries
               </p>
             </div>
@@ -584,31 +600,31 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         </DialogHeader>
 
         {/* Search */}
-        <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-b border-border/20 shrink-0 bg-background">
+        <div className="px-3 lg:px-4 py-1.5 lg:py-2 border-b border-border/20 shrink-0 bg-background">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 lg:h-3.5 lg:w-3.5 text-muted-foreground/50" />
             <Input
               placeholder="Search accounts, apps..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={cn(
-                "pl-10 h-9 sm:h-10 text-sm bg-muted/30 border-border/30",
-                "focus:bg-muted/50 focus:border-border/50 transition-colors"
+                "pl-7 lg:pl-8 h-7 lg:h-8 text-[11px] lg:text-xs border-border/30 bg-card",
+                "focus:border-border/50 transition-colors"
               )}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-md transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded transition-colors"
               >
-                <X className="h-4 w-4 text-muted-foreground" />
+                <X className="h-3 w-3 lg:h-3.5 lg:w-3.5 text-muted-foreground" />
               </button>
             )}
           </div>
         </div>
 
         {/* Content */}
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-background">
           <div className="py-2">
             {/* AdMob Section */}
             {admobProviders.length > 0 &&
@@ -678,20 +694,20 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
               </>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        {/* Footer */}
-        <div className="border-t border-border/30 p-4 sm:p-5 shrink-0 bg-muted/10">
-          {/* Controls row - stack on mobile, inline on larger screens */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            {/* Response Style - segmented control */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className="text-xs text-muted-foreground shrink-0">Response:</span>
-              <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
+        {/* Footer - solid background with z-index to stay above scroll content */}
+        <div className="border-t border-border/30 px-3 lg:px-4 py-2 lg:py-3 shrink-0 relative z-10 bg-card">
+          {/* Controls row */}
+          <div className="flex items-center justify-between gap-2 lg:gap-3">
+            {/* Response Style */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <span className="text-[9px] lg:text-[10px] text-muted-foreground shrink-0">Response:</span>
+              <div className="flex gap-0.5 p-0.5 rounded border border-border/50 bg-muted">
                 <button
                   onClick={() => setResponseStyle("concise")}
                   className={cn(
-                    "px-2.5 sm:px-3 py-1 text-xs font-medium rounded-md transition-all duration-200",
+                    "px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium rounded transition-all",
                     responseStyle === "concise"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -702,7 +718,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
                 <button
                   onClick={() => setResponseStyle("detailed")}
                   className={cn(
-                    "px-2.5 sm:px-3 py-1 text-xs font-medium rounded-md transition-all duration-200",
+                    "px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium rounded transition-all",
                     responseStyle === "detailed"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -713,46 +729,86 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
               </div>
             </div>
 
-            {/* Auto-context - inline with switch */}
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground cursor-pointer truncate" htmlFor="auto-context">
-                Auto-include context
+            {/* Context Mode */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <span className="text-[9px] lg:text-[10px] text-muted-foreground shrink-0">Context:</span>
+              <div className="flex gap-0.5 p-0.5 rounded border border-border/50 bg-muted">
+                <button
+                  onClick={() => setContextMode("soft")}
+                  title="Warns about disabled entities but allows operations"
+                  className={cn(
+                    "px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium rounded transition-all",
+                    contextMode === "soft"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Soft
+                </button>
+                <button
+                  onClick={() => setContextMode("strict")}
+                  title="Blocks operations on disabled entities"
+                  className={cn(
+                    "px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium rounded transition-all",
+                    contextMode === "strict"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Strict
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Safe Mode and Auto-context row */}
+          <div className="flex items-center gap-3 lg:gap-4 mt-2 pt-2 border-t border-border/20">
+            {/* Safe Mode */}
+            <div className="flex items-center gap-1">
+              <ShieldCheck className={cn(
+                "h-3 w-3 shrink-0 transition-colors",
+                safeMode ? "text-emerald-500" : "text-muted-foreground/50"
+              )} />
+              <Label
+                className="text-[9px] lg:text-[10px] text-muted-foreground cursor-pointer"
+                htmlFor="safe-mode"
+              >
+                Safe
+              </Label>
+              <Switch
+                id="safe-mode"
+                checked={safeMode}
+                onCheckedChange={setSafeMode}
+                className="scale-[0.65] lg:scale-75 shrink-0"
+              />
+            </div>
+
+            {/* Auto-context */}
+            <div className="flex items-center gap-1">
+              <Label className="text-[9px] lg:text-[10px] text-muted-foreground cursor-pointer" htmlFor="auto-context">
+                Auto-include
               </Label>
               <Switch
                 id="auto-context"
                 checked={autoIncludeContext}
                 onCheckedChange={setAutoIncludeContext}
-                className="scale-90 shrink-0"
+                className="scale-[0.65] lg:scale-75 shrink-0"
               />
             </div>
-          </div>
 
-          {/* Summary */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-border/20">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground">{enabledProviderCount}</span>
-                {" "}of {providers.length} accounts
+            {/* Summary and Done button inline */}
+            <div className="flex-1 flex items-center justify-end gap-2">
+              <span className="text-[9px] lg:text-[10px] text-muted-foreground">
+                <span className="font-medium text-foreground">{enabledProviderCount}</span>/{providers.length}
               </span>
-              {totalAppsCount > 0 && (
-                <span>
-                  <span className="font-medium text-foreground">
-                    {Object.entries(enabledAppIds).reduce((acc, [pid, ids]) => {
-                      const all = providerApps[pid]?.length || 0
-                      return acc + (ids?.length || all)
-                    }, 0)}
-                  </span>
-                  {" "}of {totalAppsCount} apps
-                </span>
-              )}
+              <Button
+                size="sm"
+                onClick={() => setOpen(false)}
+                className="h-6 lg:h-7 px-2 lg:px-3 text-[10px] lg:text-xs"
+              >
+                Done
+              </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setOpen(false)}
-              className="h-8 px-4 w-full sm:w-auto"
-            >
-              Done
-            </Button>
           </div>
         </div>
       </DialogContent>

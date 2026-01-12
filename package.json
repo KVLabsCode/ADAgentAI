@@ -1,8 +1,0 @@
-{
-  "devDependencies": {
-    "shadcn": "^3.6.3"
-  },
-  "dependencies": {
-    "@neondatabase/mcp-server-neon": "^0.6.5"
-  }
-}

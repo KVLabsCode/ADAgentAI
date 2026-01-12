@@ -1,7 +1,19 @@
 "use client"
 
+import Image from "next/image"
 import { PortableText, type PortableTextComponents } from "@portabletext/react"
 import type { PortableTextBlock } from "@/lib/sanity"
+
+function getSanityImageUrl(ref: string): string {
+  const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
+  const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET
+  const fileName = ref
+    .replace("image-", "")
+    .replace("-jpg", ".jpg")
+    .replace("-png", ".png")
+    .replace("-webp", ".webp")
+  return `https://cdn.sanity.io/images/${projectId}/${dataset}/${fileName}`
+}
 
 const components: PortableTextComponents = {
   block: {
@@ -78,11 +90,15 @@ const components: PortableTextComponents = {
   types: {
     image: ({ value }) => (
       <figure className="my-8">
-        <img
-          src={`https://cdn.sanity.io/images/${process.env.NEXT_PUBLIC_SANITY_PROJECT_ID}/${process.env.NEXT_PUBLIC_SANITY_DATASET}/${value.asset._ref.replace("image-", "").replace("-jpg", ".jpg").replace("-png", ".png").replace("-webp", ".webp")}`}
-          alt={value.alt || ""}
-          className="rounded-lg w-full"
-        />
+        <div className="relative w-full aspect-video">
+          <Image
+            src={getSanityImageUrl(value.asset._ref)}
+            alt={value.alt || ""}
+            fill
+            className="rounded-lg object-cover"
+            sizes="(max-width: 768px) 100vw, 768px"
+          />
+        </div>
         {value.caption && (
           <figcaption className="text-xs text-muted-foreground text-center mt-2">
             {value.caption}

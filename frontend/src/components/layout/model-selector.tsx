@@ -33,20 +33,20 @@ export function ModelSelector() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground/70 hover:text-foreground/80 gap-1.5"
+          className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-zinc-800/60 gap-1.5 rounded-md border border-transparent hover:border-zinc-700/50 transition-colors"
         >
-          <Sparkles className="h-3 w-3" />
-          <span>{selectedModelInfo?.name || "Select model"}</span>
-          <ChevronDown className="h-3 w-3 opacity-50" />
+          <Sparkles className="h-3 w-3 text-zinc-400" />
+          <span className="font-medium">{selectedModelInfo?.name || "Select model"}</span>
+          <ChevronDown className="h-3 w-3 text-zinc-500" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search models..." className="h-9" />
-          <CommandList>
-            <CommandEmpty>No models found.</CommandEmpty>
+      <PopoverContent className="w-72 p-0 rounded-lg border-zinc-700/50 bg-zinc-900/95 backdrop-blur-sm" align="start">
+        <Command className="bg-transparent">
+          <CommandInput placeholder="Search models..." className="h-9 border-b border-zinc-700/50 text-sm" />
+          <CommandList className="max-h-[300px]">
+            <CommandEmpty className="py-4 text-xs text-zinc-500">No models found.</CommandEmpty>
             {AVAILABLE_MODELS.map((group) => (
-              <CommandGroup key={group.provider} heading={group.provider}>
+              <CommandGroup key={group.provider} heading={group.provider} className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-500 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
                 {group.models.map((model) => (
                   <CommandItem
                     key={model.id}
@@ -55,16 +55,16 @@ export function ModelSelector() {
                       setSelectedModel(model.id)
                       setOpen(false)
                     }}
-                    className="flex items-center justify-between"
+                    className="flex items-center justify-between px-2 py-2 rounded-md mx-1 cursor-pointer"
                   >
-                    <div className="flex flex-col">
-                      <span className="text-sm">{model.name}</span>
-                      <span className="text-[10px] text-muted-foreground">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-zinc-200">{model.name}</span>
+                      <span className="text-[10px] text-zinc-500">
                         {model.description}
                       </span>
                     </div>
                     {selectedModel === model.id && (
-                      <Check className="h-4 w-4 text-primary" />
+                      <Check className="h-3.5 w-3.5 text-zinc-400" />
                     )}
                   </CommandItem>
                 ))}

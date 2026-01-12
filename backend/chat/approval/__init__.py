@@ -1,6 +1,6 @@
 """Tool approval system for dangerous operations."""
 
-from .models import PendingApproval, DANGEROUS_TOOLS, is_dangerous_tool, get_mcp_tool_name
+from .models import PendingApproval, DANGEROUS_TOOLS, is_dangerous_tool, get_tool_display_name
 from .handlers import (
     create_pending_approval,
     resolve_approval,
@@ -26,6 +26,7 @@ __all__ = [
     "PendingApproval",
     "DANGEROUS_TOOLS",
     "is_dangerous_tool",
+    "get_tool_display_name",
     # Handlers
     "create_pending_approval",
     "resolve_approval",

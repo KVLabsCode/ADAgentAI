@@ -65,6 +65,7 @@ class ToolApprovalRequiredEvent(BaseModel):
     approval_id: str
     tool_name: str
     tool_input: str
+    parameter_schema: Optional[dict] = None  # JSON Schema for editable params
 
 
 class ToolDeniedEvent(BaseModel):

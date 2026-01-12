@@ -62,8 +62,12 @@ const OAUTH_CONFIG = {
  * Returns true if personal context (no org) or if user is admin/owner
  */
 async function isOrgAdmin(userId: string, organizationId: string | null): Promise<boolean> {
+  console.log(`[isOrgAdmin] userId: ${userId}, organizationId: ${organizationId}`);
   // Personal context - user owns their own providers
-  if (!organizationId) return true;
+  if (!organizationId) {
+    console.log('[isOrgAdmin] Personal context - returning true');
+    return true;
+  }
 
   // Check org membership role via Neon Auth
   const result = await db.execute(sql`
@@ -74,10 +78,15 @@ async function isOrgAdmin(userId: string, organizationId: string | null): Promis
   `);
 
   const rows = result.rows as Array<{ role: string }>;
-  if (!rows || rows.length === 0) return false;
+  if (!rows || rows.length === 0) {
+    console.log('[isOrgAdmin] No membership found - returning false');
+    return false;
+  }
 
   const role = rows[0].role;
-  return role === "owner" || role === "admin";
+  const isAdmin = role === "owner" || role === "admin";
+  console.log(`[isOrgAdmin] Role: ${role}, isAdmin: ${isAdmin}`);
+  return isAdmin;
 }
 
 // ============================================================
@@ -92,6 +101,8 @@ async function isOrgAdmin(userId: string, organizationId: string | null): Promis
 providers.get("/", async (c) => {
   const user = c.get("user");
   const organizationId = user.organizationId;
+
+  console.log(`[Providers GET] userId: ${user.id}, organizationId: ${organizationId || 'personal (null)'}`);
 
   // Build filter: if org selected, filter by org; otherwise personal (null organizationId)
   const whereClause = organizationId
@@ -129,6 +140,7 @@ providers.get("/", async (c) => {
 
   // Check if user can manage providers (admin/owner)
   const canManage = await isOrgAdmin(user.id, organizationId);
+  console.log(`[Providers GET] canManage: ${canManage}, providerCount: ${orgProviders.length}`);
 
   return c.json({
     providers: orgProviders.map((p) => ({
@@ -277,11 +289,15 @@ providers.get(
       const encryptedAccessToken = await safeEncrypt(tokens.access_token);
       const encryptedRefreshToken = await safeEncrypt(tokens.refresh_token);
 
-      // Check if provider already connected
+      // Check if provider already connected (must match organization scope)
       const existing = await db.query.connectedProviders.findFirst({
         where: and(
           eq(connectedProviders.userId, userId),
-          eq(connectedProviders.provider, type)
+          eq(connectedProviders.provider, type),
+          // Must match organization context: org-scoped or personal (null)
+          organizationId
+            ? eq(connectedProviders.organizationId, organizationId)
+            : isNull(connectedProviders.organizationId)
         ),
       });
 
@@ -338,16 +354,21 @@ providers.get(
 
 /**
  * GET /providers/:id/apps - List apps for an AdMob provider
+ * SECURITY: Validates provider belongs to user's current org context
  */
 providers.get("/:id/apps", async (c) => {
   const user = c.get("user");
   const providerId = c.req.param("id");
 
-  // Find the provider connection
+  // Find the provider connection with org validation
   const provider = await db.query.connectedProviders.findFirst({
     where: and(
       eq(connectedProviders.id, providerId),
-      eq(connectedProviders.userId, user.id)
+      eq(connectedProviders.userId, user.id),
+      // SECURITY: Ensure provider belongs to user's current org context
+      user.organizationId
+        ? eq(connectedProviders.organizationId, user.organizationId)
+        : isNull(connectedProviders.organizationId)
     ),
   });
 
@@ -442,6 +463,7 @@ providers.get("/:id/apps", async (c) => {
 /**
  * DELETE /providers/:id - Disconnect provider
  * Requires org admin role when in organization context
+ * SECURITY: Validates provider belongs to user's current org context
  */
 providers.delete("/:id", async (c) => {
   const user = c.get("user");
@@ -453,12 +475,17 @@ providers.delete("/:id", async (c) => {
     return c.json({ error: "Only organization admins can disconnect providers" }, 403);
   }
 
+  // SECURITY: Ensure provider belongs to user's current org context
   const [deleted] = await db
     .delete(connectedProviders)
     .where(
       and(
         eq(connectedProviders.id, providerId),
-        eq(connectedProviders.userId, user.id)
+        eq(connectedProviders.userId, user.id),
+        // Validate org context to prevent cross-org deletion
+        user.organizationId
+          ? eq(connectedProviders.organizationId, user.organizationId)
+          : isNull(connectedProviders.organizationId)
       )
     )
     .returning();
@@ -530,7 +557,8 @@ providers.patch(
 
 /**
  * GET /providers/:type/token - Get valid access token (auto-refreshes if needed)
- * Used by internal services (CrewAI, MCP) to get tokens without manual refresh
+ * Used by internal services (LangGraph, MCP) to get tokens without manual refresh
+ * SECURITY: Validates provider belongs to user's current org context
  */
 providers.get(
   "/:type/token",
@@ -539,12 +567,17 @@ providers.get(
     const user = c.get("user");
     const { type } = c.req.valid("param");
 
-    // Find the provider connection
+    // Find the provider connection with org validation
+    // SECURITY: Ensure provider belongs to user's current org context
     const provider = await db.query.connectedProviders.findFirst({
       where: and(
         eq(connectedProviders.userId, user.id),
         eq(connectedProviders.provider, type),
-        eq(connectedProviders.isEnabled, true)
+        eq(connectedProviders.isEnabled, true),
+        // Validate org context
+        user.organizationId
+          ? eq(connectedProviders.organizationId, user.organizationId)
+          : isNull(connectedProviders.organizationId)
       ),
     });
 
@@ -680,6 +713,293 @@ providers.get("/internal/list", async (c) => {
 });
 
 /**
+ * GET /providers/internal/apps - Internal endpoint for fetching apps for a provider
+ * Protected by internal API key.
+ * SECURITY: Validates provider belongs to userId/org if provided
+ */
+providers.get("/internal/apps", async (c) => {
+  // Verify internal API key
+  const apiKey = c.req.header("x-internal-api-key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const providerId = c.req.query("providerId");
+  const userId = c.req.query("userId");
+  const organizationId = c.req.query("organizationId");
+
+  if (!providerId) {
+    return c.json({ error: "providerId is required" }, 400);
+  }
+
+  // Find the provider connection with ownership validation if userId provided
+  const provider = await db.query.connectedProviders.findFirst({
+    where: eq(connectedProviders.id, providerId),
+  });
+
+  if (!provider || provider.provider !== "admob") {
+    return c.json({ apps: [] });
+  }
+
+  // SECURITY: Validate provider ownership if userId provided
+  if (userId) {
+    if (provider.userId !== userId) {
+      return c.json({ apps: [], error: "Provider not owned by user" });
+    }
+    // Validate org context matches
+    const requestedOrg = organizationId || null;
+    if (provider.organizationId !== requestedOrg) {
+      return c.json({ apps: [], error: "Provider not in current org context" });
+    }
+  }
+
+  // Get valid access token (with refresh if needed)
+  const accessToken = await getValidAccessToken(provider);
+  if (!accessToken) {
+    return c.json({ apps: [], error: "Token unavailable" });
+  }
+
+  try {
+    const accountId = provider.publisherId?.startsWith("pub-")
+      ? provider.publisherId
+      : `pub-${provider.publisherId}`;
+
+    const response = await fetch(
+      `https://admob.googleapis.com/v1/accounts/${accountId}/apps?pageSize=100`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!response.ok) {
+      return c.json({ apps: [], error: "Failed to fetch apps" });
+    }
+
+    const data = (await response.json()) as {
+      apps?: Array<{
+        name?: string;
+        appId?: string;
+        platform?: string;
+        manualAppInfo?: { displayName?: string };
+        linkedAppInfo?: { appStoreId?: string; displayName?: string };
+      }>;
+    };
+
+    // Deduplicate by appId to avoid duplicates in dropdown
+    const seen = new Set<string>();
+    const apps = (data.apps || [])
+      .filter((app) => {
+        const id = app.appId || app.name?.split("/").pop() || "";
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((app) => ({
+        value: app.appId || app.name?.split("/").pop() || "",
+        label: app.linkedAppInfo?.displayName || app.manualAppInfo?.displayName || "Unnamed App",
+      }));
+
+    return c.json({ apps });
+  } catch (error) {
+    console.error("Error fetching apps:", error);
+    return c.json({ apps: [], error: "Failed to fetch apps" });
+  }
+});
+
+/**
+ * GET /providers/internal/ad-units - Internal endpoint for fetching ad units for a provider
+ * Protected by internal API key.
+ * SECURITY: Validates provider belongs to userId/org if provided
+ */
+providers.get("/internal/ad-units", async (c) => {
+  // Verify internal API key
+  const apiKey = c.req.header("x-internal-api-key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const providerId = c.req.query("providerId");
+  const userId = c.req.query("userId");
+  const organizationId = c.req.query("organizationId");
+
+  if (!providerId) {
+    return c.json({ error: "providerId is required" }, 400);
+  }
+
+  // Find the provider connection
+  const provider = await db.query.connectedProviders.findFirst({
+    where: eq(connectedProviders.id, providerId),
+  });
+
+  if (!provider || provider.provider !== "admob") {
+    return c.json({ adUnits: [] });
+  }
+
+  // SECURITY: Validate provider ownership if userId provided
+  if (userId) {
+    if (provider.userId !== userId) {
+      return c.json({ adUnits: [], error: "Provider not owned by user" });
+    }
+    // Validate org context matches
+    const requestedOrg = organizationId || null;
+    if (provider.organizationId !== requestedOrg) {
+      return c.json({ adUnits: [], error: "Provider not in current org context" });
+    }
+  }
+
+  // Get valid access token (with refresh if needed)
+  const accessToken = await getValidAccessToken(provider);
+  if (!accessToken) {
+    return c.json({ adUnits: [], error: "Token unavailable" });
+  }
+
+  try {
+    const accountId = provider.publisherId?.startsWith("pub-")
+      ? provider.publisherId
+      : `pub-${provider.publisherId}`;
+
+    const response = await fetch(
+      `https://admob.googleapis.com/v1/accounts/${accountId}/adUnits?pageSize=100`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!response.ok) {
+      return c.json({ adUnits: [], error: "Failed to fetch ad units" });
+    }
+
+    const data = (await response.json()) as {
+      adUnits?: Array<{
+        name?: string;
+        adUnitId?: string;
+        displayName?: string;
+        adFormat?: string;
+      }>;
+    };
+
+    // Use full adUnitId (ca-app-pub-xxx/yyy) to match what agent writes
+    // Deduplicate by adUnitId to avoid duplicates in dropdown
+    const seen = new Set<string>();
+    const adUnits = (data.adUnits || [])
+      .filter((unit) => {
+        const id = unit.adUnitId || "";
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((unit) => {
+        // Extract short ID suffix (last 4 digits) to differentiate same-named ad units
+        const fullId = unit.adUnitId || "";
+        const shortId = fullId.split("/").pop()?.slice(-4) || "";
+        return {
+          value: fullId,
+          label: `${unit.displayName || "Unnamed"} (${unit.adFormat || "Unknown"}) #${shortId}`,
+        };
+      });
+
+    console.log(`[ad-units] Returning ${adUnits.length} unique ad units:`, adUnits.map(u => u.value));
+    return c.json({ adUnits });
+  } catch (error) {
+    console.error("Error fetching ad units:", error);
+    return c.json({ adUnits: [], error: "Failed to fetch ad units" });
+  }
+});
+
+/**
+ * GET /providers/internal/mediation-groups - Internal endpoint for fetching mediation groups
+ * Protected by internal API key.
+ * SECURITY: Validates provider belongs to userId/org if provided
+ */
+providers.get("/internal/mediation-groups", async (c) => {
+  // Verify internal API key
+  const apiKey = c.req.header("x-internal-api-key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const providerId = c.req.query("providerId");
+  const userId = c.req.query("userId");
+  const organizationId = c.req.query("organizationId");
+
+  if (!providerId) {
+    return c.json({ error: "providerId is required" }, 400);
+  }
+
+  // Find the provider connection
+  const provider = await db.query.connectedProviders.findFirst({
+    where: eq(connectedProviders.id, providerId),
+  });
+
+  if (!provider || provider.provider !== "admob") {
+    return c.json({ mediationGroups: [] });
+  }
+
+  // SECURITY: Validate provider ownership if userId provided
+  if (userId) {
+    if (provider.userId !== userId) {
+      return c.json({ mediationGroups: [], error: "Provider not owned by user" });
+    }
+    // Validate org context matches
+    const requestedOrg = organizationId || null;
+    if (provider.organizationId !== requestedOrg) {
+      return c.json({ mediationGroups: [], error: "Provider not in current org context" });
+    }
+  }
+
+  // Get valid access token (with refresh if needed)
+  const accessToken = await getValidAccessToken(provider);
+  if (!accessToken) {
+    return c.json({ mediationGroups: [], error: "Token unavailable" });
+  }
+
+  try {
+    const accountId = provider.publisherId?.startsWith("pub-")
+      ? provider.publisherId
+      : `pub-${provider.publisherId}`;
+
+    const response = await fetch(
+      `https://admob.googleapis.com/v1/accounts/${accountId}/mediationGroups?pageSize=100`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!response.ok) {
+      return c.json({ mediationGroups: [], error: "Failed to fetch mediation groups" });
+    }
+
+    const data = (await response.json()) as {
+      mediationGroups?: Array<{
+        name?: string;
+        mediationGroupId?: string;
+        displayName?: string;
+        state?: string;
+      }>;
+    };
+
+    // Deduplicate by mediationGroupId to avoid duplicates in dropdown
+    const seen = new Set<string>();
+    const mediationGroups = (data.mediationGroups || [])
+      .filter((group) => {
+        const id = group.mediationGroupId || group.name?.split("/").pop() || "";
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((group) => ({
+        value: group.mediationGroupId || group.name?.split("/").pop() || "",
+        label: `${group.displayName || "Unnamed"} (${group.state || "Unknown"})`,
+      }));
+
+    return c.json({ mediationGroups });
+  } catch (error) {
+    console.error("Error fetching mediation groups:", error);
+    return c.json({ mediationGroups: [], error: "Failed to fetch mediation groups" });
+  }
+});
+
+/**
  * POST /providers/internal/token - Internal endpoint for services (no user auth)
  * Protected by internal API key. Supports organization filtering.
  * Respects user's enabled preferences
@@ -796,6 +1116,50 @@ providers.post("/internal/token", async (c) => {
 // ============================================================
 // Helpers
 // ============================================================
+
+/**
+ * Get a valid access token for a provider, refreshing if necessary
+ */
+async function getValidAccessToken(provider: typeof connectedProviders.$inferSelect): Promise<string | null> {
+  const decryptedAccessToken = await safeDecrypt(provider.accessToken);
+  const decryptedRefreshToken = await safeDecrypt(provider.refreshToken);
+
+  if (!decryptedAccessToken) return null;
+
+  // Check if token needs refresh (5 min before expiry)
+  const now = new Date();
+  const expiresAt = provider.tokenExpiresAt;
+  const needsRefresh = !expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000;
+
+  if (needsRefresh && decryptedRefreshToken) {
+    try {
+      const newTokens = await refreshAccessToken(decryptedRefreshToken);
+
+      // Encrypt and store new tokens
+      const encryptedAccessToken = await safeEncrypt(newTokens.access_token);
+      const encryptedRefreshToken = await safeEncrypt(newTokens.refresh_token);
+      const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
+
+      await db
+        .update(connectedProviders)
+        .set({
+          accessToken: encryptedAccessToken!,
+          refreshToken: encryptedRefreshToken || provider.refreshToken,
+          tokenExpiresAt: newExpiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(connectedProviders.id, provider.id));
+
+      return newTokens.access_token;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      // Return existing token, might still work
+      return decryptedAccessToken;
+    }
+  }
+
+  return decryptedAccessToken;
+}
 
 /**
  * Refresh an access token using a refresh token

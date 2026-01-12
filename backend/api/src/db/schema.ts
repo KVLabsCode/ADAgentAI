@@ -8,6 +8,8 @@ import {
   pgEnum,
   index,
   varchar,
+  integer,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -17,6 +19,7 @@ export const providerTypeEnum = pgEnum("provider_type", ["admob", "gam"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system"]);
 export const blogPostStatusEnum = pgEnum("blog_post_status", ["draft", "published"]);
 export const waitlistStatusEnum = pgEnum("waitlist_status", ["pending", "invited", "joined", "rejected"]);
+export const runStatusEnum = pgEnum("run_status", ["success", "error", "cancelled"]);
 
 // ============================================================
 // User Tables (legacy - Neon Auth uses neon_auth schema instead)
@@ -348,10 +351,82 @@ export const userPreferences = pgTable("user_preferences", {
   privacyAcceptedAt: timestamp("privacy_accepted_at"),
   privacyVersion: varchar("privacy_version", { length: 20 }),
   marketingOptIn: boolean("marketing_opt_in").default(false).notNull(),
+  safeMode: boolean("safe_mode").default(false).notNull(), // Read-only mode - blocks all write operations
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("user_preferences_user_id_idx").on(table.userId),
+]);
+
+// ============================================================
+// Observability Tables
+// ============================================================
+
+// Run Summaries - Stores metrics from LangSmith runs for user-facing analytics
+// This table enables billing (token tracking), usage dashboards, and debugging
+export const runSummaries = pgTable("run_summaries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(), // References neon_auth.users_sync.id
+  organizationId: text("organization_id"), // null = personal scope
+  sessionId: uuid("session_id").references(() => chatSessions.id, { onDelete: "set null" }),
+
+  // Token metrics (for billing)
+  inputTokens: integer("input_tokens").default(0).notNull(),
+  outputTokens: integer("output_tokens").default(0).notNull(),
+  totalTokens: integer("total_tokens").default(0).notNull(),
+
+  // Tool metrics
+  toolCalls: integer("tool_calls").default(0).notNull(),
+
+  // Performance
+  latencyMs: integer("latency_ms"),
+
+  // Outcome
+  status: runStatusEnum("status").default("success").notNull(),
+  errorMessage: text("error_message"),
+
+  // Routing info
+  service: varchar("service", { length: 50 }), // admob, admanager, general
+  capability: varchar("capability", { length: 50 }), // inventory, reporting, mediation, etc.
+
+  // Model info
+  model: varchar("model", { length: 100 }),
+
+  // Cost tracking
+  totalCost: doublePrecision("total_cost"),
+
+  // LangSmith reference for debugging
+  langsmithRunId: text("langsmith_run_id"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("run_summaries_user_id_idx").on(table.userId),
+  index("run_summaries_organization_id_idx").on(table.organizationId),
+  index("run_summaries_created_at_idx").on(table.createdAt),
+  index("run_summaries_langsmith_run_id_idx").on(table.langsmithRunId),
+]);
+
+// System Config - Admin-configurable settings
+export const systemConfig = pgTable("system_config", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: jsonb("value").notNull().$type<Record<string, unknown>>(),
+  updatedBy: text("updated_by"), // Admin user ID
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Admin Audit Log - Tracks admin content access for compliance
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  adminUserId: text("admin_user_id").notNull(),
+  action: varchar("action", { length: 100 }).notNull(), // view_conversation, view_logs, update_config, etc.
+  targetUserId: text("target_user_id"),
+  targetResourceId: text("target_resource_id"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("admin_audit_log_admin_user_id_idx").on(table.adminUserId),
+  index("admin_audit_log_action_idx").on(table.action),
+  index("admin_audit_log_created_at_idx").on(table.createdAt),
 ]);
 
 // Waitlist
@@ -407,3 +482,9 @@ export type CrewAgent = typeof crewAgents.$inferSelect;
 export type NewCrewAgent = typeof crewAgents.$inferInsert;
 export type CrewTask = typeof crewTasks.$inferSelect;
 export type NewCrewTask = typeof crewTasks.$inferInsert;
+export type RunSummary = typeof runSummaries.$inferSelect;
+export type NewRunSummary = typeof runSummaries.$inferInsert;
+export type SystemConfigEntry = typeof systemConfig.$inferSelect;
+export type NewSystemConfigEntry = typeof systemConfig.$inferInsert;
+export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;
+export type NewAdminAuditLogEntry = typeof adminAuditLog.$inferInsert;

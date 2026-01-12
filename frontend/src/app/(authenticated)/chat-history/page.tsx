@@ -10,6 +10,11 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import {
+  PageContainer,
+  PageHeader,
+  EmptyState,
+} from "@/components/ui/theme"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -227,21 +232,21 @@ export default function ChatHistoryPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <PageContainer size="sm">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6 max-w-3xl mx-auto">
+    <PageContainer size="sm">
       {/* Header */}
-      <div className="space-y-0.5">
-        <h1 className="text-base font-medium tracking-tight">Chat History</h1>
-        <p className="text-xs text-muted-foreground/80">
-          Browse and manage your conversations.
-        </p>
-      </div>
+      <PageHeader
+        title="Chat History"
+        description="Browse and manage your conversations."
+      />
 
       {/* Search */}
       <div className="relative">
@@ -270,24 +275,19 @@ export default function ChatHistoryPage() {
 
       {/* Chat List */}
       {filteredChats.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <p className="text-sm font-medium mb-1">
-            {searchQuery ? "No matching conversations" : "No conversations yet"}
-          </p>
-          <p className="text-xs text-muted-foreground max-w-[240px]">
-            {searchQuery
-              ? "Try adjusting your search terms."
-              : "Start a new chat to see your history here."}
-          </p>
+        <EmptyState
+          icon={MessageSquare}
+          title={searchQuery ? "No matching conversations" : "No conversations yet"}
+          description={searchQuery
+            ? "Try adjusting your search terms."
+            : "Start a new chat to see your history here."}
+        >
           {!searchQuery && (
-            <Button asChild size="sm" className="mt-4 h-7 text-xs">
+            <Button asChild size="sm" className="h-8 text-xs">
               <Link href="/chat">Start New Chat</Link>
             </Button>
           )}
-        </div>
+        </EmptyState>
       ) : (
         <div className="space-y-1">
           {filteredChats.map((chat) => {
@@ -299,7 +299,7 @@ export default function ChatHistoryPage() {
                 className={cn(
                   "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                   isSelected
-                    ? "bg-primary/5"
+                    ? "bg-muted/70"
                     : "hover:bg-muted/50"
                 )}
               >
@@ -381,20 +381,20 @@ export default function ChatHistoryPage() {
       {/* Floating action bar when items selected */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-full shadow-xl">
-            <div className="flex items-center gap-2 text-sm text-zinc-300">
-              <CheckSquare className="h-4 w-4 text-violet-400" />
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-background border border-border rounded-full shadow-xl">
+            <div className="flex items-center gap-2 text-sm text-foreground">
+              <CheckSquare className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">{selectedIds.size}</span>
-              <span className="text-zinc-500">selected</span>
+              <span className="text-muted-foreground">selected</span>
             </div>
 
-            <div className="w-px h-4 bg-zinc-700 mx-1" />
+            <div className="w-px h-4 bg-border mx-1" />
 
             <Button
               variant="ghost"
               size="sm"
               onClick={clearSelection}
-              className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200"
+              className="h-7 px-2 text-xs"
             >
               <X className="h-3 w-3 mr-1" />
               Clear
@@ -445,6 +445,6 @@ export default function ChatHistoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   )
 }

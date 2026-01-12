@@ -5,11 +5,18 @@ import { persist } from "zustand/middleware"
 
 export type DisplayMode = "detailed" | "compact"
 export type ResponseStyle = "concise" | "detailed"
+// Context mode for entity grounding:
+// - "soft": Prefer enabled entities, but allow explicit references to others
+// - "strict": ONLY use enabled entities, prompt user to enable if needed
+export type ContextMode = "soft" | "strict"
 
 interface ChatSettingsState {
   displayMode: DisplayMode
   selectedModel: string
   responseStyle: ResponseStyle
+  contextMode: ContextMode
+  // Safe mode: blocks all write operations (dangerous tools)
+  safeMode: boolean
   // Provider IDs that are enabled for context (empty = all enabled)
   enabledProviderIds: string[]
   // App IDs that are enabled for context (keyed by provider ID)
@@ -21,6 +28,8 @@ interface ChatSettingsState {
   setDisplayMode: (mode: DisplayMode) => void
   setSelectedModel: (model: string) => void
   setResponseStyle: (style: ResponseStyle) => void
+  setContextMode: (mode: ContextMode) => void
+  setSafeMode: (enabled: boolean) => void
   setEnabledProviderIds: (ids: string[]) => void
   toggleProvider: (id: string) => void
   setEnabledAppIds: (providerId: string, appIds: string[]) => void
@@ -34,12 +43,16 @@ export const useChatSettings = create<ChatSettingsState>()(
       displayMode: "detailed",
       selectedModel: "openrouter/google/gemini-2.5-flash-lite-preview-06-17",
       responseStyle: "concise",
+      contextMode: "soft", // Default to soft mode (more flexible)
+      safeMode: false, // Default: write operations allowed with approval
       enabledProviderIds: [], // Empty means all are enabled
       enabledAppIds: {}, // Empty means all apps enabled for all providers
       autoIncludeContext: true,
       setDisplayMode: (mode) => set({ displayMode: mode }),
       setSelectedModel: (model) => set({ selectedModel: model }),
       setResponseStyle: (style) => set({ responseStyle: style }),
+      setContextMode: (mode) => set({ contextMode: mode }),
+      setSafeMode: (enabled) => set({ safeMode: enabled }),
       setEnabledProviderIds: (ids) => set({ enabledProviderIds: ids }),
       toggleProvider: (id) => {
         const current = get().enabledProviderIds

@@ -20,13 +20,22 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
+  DataTableContainer,
+  DataTableHeaderRow,
+  DataTableHead,
+  DataTableRow,
+  DataTableCell,
   Table,
   TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/data-table"
+import {
+  PageContainer,
+  PageHeader,
+  StatCard,
+  FilterBar,
+  EmptyState,
+} from "@/components/ui/theme"
 import {
   Select,
   SelectContent,
@@ -290,15 +299,12 @@ export default function WaitlistAdminPage() {
   const totalPages = Math.ceil(total / limit)
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-5xl mx-auto">
+    <PageContainer>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Waitlist</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Manage waitlist entries and send invites
-          </p>
-        </div>
+      <PageHeader
+        title="Waitlist"
+        description="Manage waitlist entries and send invites"
+      >
         <Button
           variant="outline"
           size="sm"
@@ -308,36 +314,19 @@ export default function WaitlistAdminPage() {
           <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", loading && "animate-spin")} />
           Refresh
         </Button>
-      </div>
+      </PageHeader>
 
-      {/* Stats Cards - Compact */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-5 gap-3">
-        {[
-          { label: "Total", value: stats.total, icon: Users, color: "text-foreground", desc: "All signups" },
-          { label: "Awaiting", value: stats.pending, icon: Clock, color: "text-amber-500", desc: "Need to send invite" },
-          { label: "Invited", value: stats.invited, icon: Mail, color: "text-blue-500", desc: "Invite sent" },
-          { label: "Joined", value: stats.joined, icon: CheckCircle2, color: "text-emerald-500", desc: "Created account" },
-          { label: "Rejected", value: stats.rejected, icon: XCircle, color: "text-red-500", desc: "Rejected from waitlist" },
-        ].map((stat) => (
-          <Tooltip key={stat.label}>
-            <TooltipTrigger asChild>
-              <div className="p-3 rounded-md border border-border/50 bg-card/50 cursor-help">
-                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                  <stat.icon className="h-3 w-3" />
-                  <span className="text-[10px] font-medium">{stat.label}</span>
-                </div>
-                <p className={cn("text-xl font-semibold tabular-nums", stat.color)}>{stat.value}</p>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {stat.desc}
-            </TooltipContent>
-          </Tooltip>
-        ))}
+        <StatCard title="Total" value={stats.total} icon={Users} />
+        <StatCard title="Awaiting" value={stats.pending} icon={Clock} valueColor="warning" />
+        <StatCard title="Invited" value={stats.invited} icon={Mail} />
+        <StatCard title="Joined" value={stats.joined} icon={CheckCircle2} valueColor="success" />
+        <StatCard title="Rejected" value={stats.rejected} icon={XCircle} valueColor="error" />
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <FilterBar>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
@@ -359,7 +348,7 @@ export default function WaitlistAdminPage() {
             <SelectItem value="rejected" className="text-xs">Rejected</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Table */}
       {loading ? (
@@ -369,40 +358,36 @@ export default function WaitlistAdminPage() {
           ))}
         </div>
       ) : filteredEntries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-            <Users className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <h3 className="text-sm font-medium mb-1">No entries found</h3>
-          <p className="text-xs text-muted-foreground">
-            {searchQuery ? "Try adjusting your search." : "The waitlist is empty."}
-          </p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="No entries found"
+          description={searchQuery ? "Try adjusting your search." : "The waitlist is empty."}
+        />
       ) : (
         <>
-          <div className="overflow-hidden rounded-md border border-border/50">
+          <DataTableContainer>
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-10 text-xs">Email</TableHead>
-                  <TableHead className="h-10 text-xs">Role</TableHead>
-                  <TableHead className="h-10 text-xs">Status</TableHead>
-                  <TableHead className="h-10 text-xs">Date</TableHead>
-                  <TableHead className="h-10 text-xs text-right">Actions</TableHead>
-                </TableRow>
+                <DataTableHeaderRow>
+                  <DataTableHead>Email</DataTableHead>
+                  <DataTableHead>Role</DataTableHead>
+                  <DataTableHead>Status</DataTableHead>
+                  <DataTableHead>Date</DataTableHead>
+                  <DataTableHead className="text-right">Actions</DataTableHead>
+                </DataTableHeaderRow>
               </TableHeader>
               <TableBody>
                 {filteredEntries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="py-3">
+                  <DataTableRow key={entry.id}>
+                    <DataTableCell>
                       <div className="flex flex-col gap-0.5">
                         <span className="font-medium text-xs">{entry.email}</span>
                         {entry.name && (
                           <span className="text-[10px] text-muted-foreground">{entry.name}</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="py-3">
+                    </DataTableCell>
+                    <DataTableCell>
                       {entry.role ? (
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-border/50 capitalize">
                           {entry.role}
@@ -410,16 +395,16 @@ export default function WaitlistAdminPage() {
                       ) : (
                         <span className="text-[10px] text-muted-foreground">—</span>
                       )}
-                    </TableCell>
-                    <TableCell className="py-3">
+                    </DataTableCell>
+                    <DataTableCell>
                       <StatusBadge status={entry.status} />
-                    </TableCell>
-                    <TableCell className="py-3">
+                    </DataTableCell>
+                    <DataTableCell>
                       <span className="text-xs text-muted-foreground">
                         {formatDate(entry.createdAt)}
                       </span>
-                    </TableCell>
-                    <TableCell className="py-3 text-right">
+                    </DataTableCell>
+                    <DataTableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-7 w-7 p-0">
@@ -482,12 +467,12 @@ export default function WaitlistAdminPage() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </DataTableCell>
+                  </DataTableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </DataTableContainer>
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -615,6 +600,6 @@ export default function WaitlistAdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   )
 }

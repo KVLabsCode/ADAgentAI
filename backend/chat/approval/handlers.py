@@ -1,24 +1,23 @@
-"""Approval handlers - managing pending approvals and pre-approvals."""
+"""Approval handlers - managing pending approvals and pre-approvals.
+
+Uses file-based storage to share approval state across async contexts.
+The API endpoint and LangGraph interrupt handler share state via files.
+"""
 
 import json
+import time
 import uuid
 import asyncio
 import tempfile
 from pathlib import Path
-from threading import Lock
 from typing import Optional
 
-from .models import PendingApproval
-
-# File-based storage paths
+# File-based storage paths for cross-module sharing
 _TEMP_DIR = Path(tempfile.gettempdir())
 _STREAM_HANDLING_FILE = _TEMP_DIR / "adagent_stream_handling.json"
 _PRE_APPROVED_FILE = _TEMP_DIR / "adagent_pre_approved.json"
 _BLOCKED_TOOLS_FILE = _TEMP_DIR / "adagent_blocked_tools.json"
-
-# In-memory storage for pending approvals (with thread lock)
-_pending_approvals: dict[str, PendingApproval] = {}
-_approval_lock = Lock()
+_PENDING_APPROVALS_FILE = _TEMP_DIR / "adagent_pending_approvals.json"
 
 
 # =============================================================================
@@ -44,96 +43,152 @@ def _write_json_file(filepath: Path, data):
 
 
 # =============================================================================
-# Pending Approval Management
+# Pending Approval Management (File-based for cross-module sharing)
 # =============================================================================
+
+def _get_all_approvals() -> dict:
+    """Get all pending approvals from file."""
+    return _read_json_file(_PENDING_APPROVALS_FILE, {})
+
+
+def _save_all_approvals(approvals: dict) -> None:
+    """Save all pending approvals to file."""
+    _write_json_file(_PENDING_APPROVALS_FILE, approvals)
+
 
 def create_pending_approval(tool_name: str, tool_input: str) -> str:
     """Create a new pending approval and return its ID."""
     approval_id = str(uuid.uuid4())[:8]
-    with _approval_lock:
-        _pending_approvals[approval_id] = PendingApproval(
-            tool_name=tool_name,
-            tool_input=tool_input
-        )
+
+    # Store in file (shared across modules)
+    approvals = _get_all_approvals()
+    approvals[approval_id] = {
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "approved": None,  # None = pending, True = approved, False = denied
+        "modified_params": None,
+        "created_at": time.time(),
+    }
+    _save_all_approvals(approvals)
+
+    print(f"[approval] Created pending approval: {approval_id} for {tool_name}")
     return approval_id
 
 
-def resolve_approval(approval_id: str, approved: bool) -> bool:
-    """Resolve a pending approval. Returns True if found and resolved."""
-    with _approval_lock:
-        if approval_id in _pending_approvals:
-            approval = _pending_approvals[approval_id]
-            approval.approved = approved
-            approval.event.set()  # Unblock the waiting hook
-            return True
-    return False
+def resolve_approval(approval_id: str, approved: bool, modified_params: Optional[dict] = None) -> bool:
+    """Resolve a pending approval. Returns True if found and resolved.
+
+    Args:
+        approval_id: The approval request ID
+        approved: Whether to approve or deny
+        modified_params: Optional user-modified parameters (only used if approved)
+    """
+    approvals = _get_all_approvals()
+
+    if approval_id not in approvals:
+        print(f"[approval] Approval not found: {approval_id}, available: {list(approvals.keys())}")
+        return False
+
+    approvals[approval_id]["approved"] = approved
+    if approved and modified_params:
+        approvals[approval_id]["modified_params"] = modified_params
+
+    _save_all_approvals(approvals)
+    print(f"[approval] Resolved approval: {approval_id}, approved={approved}")
+    return True
 
 
-def wait_for_approval_sync(approval_id: str, timeout: float = 120.0) -> Optional[bool]:
-    """Synchronously wait for approval (for use in hooks).
+def wait_for_approval_sync(approval_id: str, timeout: float = 600.0) -> Optional[bool]:
+    """Synchronously wait for approval by polling file (for use in hooks).
 
     Returns: True if approved, False if denied, None if timeout.
     """
-    with _approval_lock:
-        approval = _pending_approvals.get(approval_id)
+    start_time = time.time()
+    poll_interval = 0.2  # 200ms
 
-    if not approval:
-        return None
-
-    # Block until approval or timeout
-    got_response = approval.event.wait(timeout=timeout)
-
-    # Clean up
-    with _approval_lock:
-        _pending_approvals.pop(approval_id, None)
-
-    if not got_response:
-        return None  # Timeout
-
-    return approval.approved
-
-
-async def wait_for_approval_async(approval_id: str, timeout: float = 120.0) -> Optional[bool]:
-    """Asynchronously wait for approval (for use in async streaming).
-
-    Returns: True if approved, False if denied, None if timeout.
-    """
-    with _approval_lock:
-        approval = _pending_approvals.get(approval_id)
-
-    if not approval:
-        return None
-
-    # Poll the event with async sleep instead of blocking
-    start_time = asyncio.get_event_loop().time()
     while True:
-        if approval.event.is_set():
-            break
-        elapsed = asyncio.get_event_loop().time() - start_time
+        approvals = _get_all_approvals()
+        approval = approvals.get(approval_id)
+
+        if not approval:
+            print(f"[approval] Approval {approval_id} not found during wait")
+            return None
+
+        if approval["approved"] is not None:
+            # Resolved - clean up and return
+            result = approval["approved"]
+            del approvals[approval_id]
+            _save_all_approvals(approvals)
+            print(f"[approval] Wait complete: {approval_id}, approved={result}")
+            return result
+
+        # Check timeout
+        elapsed = time.time() - start_time
         if elapsed >= timeout:
-            break
-        await asyncio.sleep(0.1)
+            # Timeout - clean up
+            del approvals[approval_id]
+            _save_all_approvals(approvals)
+            print(f"[approval] Timeout waiting for: {approval_id}")
+            return None
 
-    # Clean up
-    with _approval_lock:
-        _pending_approvals.pop(approval_id, None)
-
-    if not approval.event.is_set():
-        return None  # Timeout
-
-    return approval.approved
+        time.sleep(poll_interval)
 
 
-def get_pending_approval(approval_id: str) -> Optional[PendingApproval]:
+async def wait_for_approval_async(approval_id: str, timeout: float = 600.0) -> Optional[bool]:
+    """Asynchronously wait for approval by polling file.
+
+    Returns: True if approved, False if denied, None if timeout.
+    """
+    start_time = time.time()
+    poll_interval = 0.2
+
+    while True:
+        approvals = _get_all_approvals()
+        approval = approvals.get(approval_id)
+
+        if not approval:
+            return None
+
+        if approval["approved"] is not None:
+            # Resolved - clean up and return
+            result = approval["approved"]
+            del approvals[approval_id]
+            _save_all_approvals(approvals)
+            return result
+
+        # Check timeout
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            del approvals[approval_id]
+            _save_all_approvals(approvals)
+            return None
+
+        await asyncio.sleep(poll_interval)
+
+
+def get_pending_approval(approval_id: str) -> Optional[dict]:
     """Get a pending approval by ID."""
-    with _approval_lock:
-        return _pending_approvals.get(approval_id)
+    approvals = _get_all_approvals()
+    return approvals.get(approval_id)
+
+
+def get_modified_params(approval_id: str) -> Optional[dict]:
+    """Get modified params for a resolved approval (if any).
+
+    Returns the user-modified parameters, or None if not modified/not found.
+    Should be called after wait_for_approval_sync returns True.
+    """
+    approvals = _get_all_approvals()
+    approval = approvals.get(approval_id)
+    if approval and approval.get("modified_params"):
+        return approval["modified_params"]
+    return None
 
 
 def has_pending_approvals() -> bool:
     """Check if there are any pending approvals."""
-    with _approval_lock:
-        return len(_pending_approvals) > 0
+    approvals = _get_all_approvals()
+    return len(approvals) > 0
 
 
 def poll_approval_status(approval_id: str) -> Optional[bool]:
@@ -141,15 +196,20 @@ def poll_approval_status(approval_id: str) -> Optional[bool]:
 
     Returns: True if approved, False if denied, None if still pending.
     """
-    with _approval_lock:
-        approval = _pending_approvals.get(approval_id)
-        if not approval:
-            return None  # Not found (cleaned up or never existed)
-        if approval.event.is_set():
-            # Resolved - clean up and return result
-            _pending_approvals.pop(approval_id, None)
-            return approval.approved
-        return None  # Still pending
+    approvals = _get_all_approvals()
+    approval = approvals.get(approval_id)
+
+    if not approval:
+        return None  # Not found
+
+    if approval["approved"] is not None:
+        # Resolved - clean up and return
+        result = approval["approved"]
+        del approvals[approval_id]
+        _save_all_approvals(approvals)
+        return result
+
+    return None  # Still pending
 
 
 # =============================================================================
@@ -233,7 +293,7 @@ def clear_blocked_tools() -> None:
 
 def cleanup_approval_files() -> None:
     """Clean up stale approval files from previous runs."""
-    for filepath in [_STREAM_HANDLING_FILE, _PRE_APPROVED_FILE, _BLOCKED_TOOLS_FILE]:
+    for filepath in [_STREAM_HANDLING_FILE, _PRE_APPROVED_FILE, _BLOCKED_TOOLS_FILE, _PENDING_APPROVALS_FILE]:
         try:
             if filepath.exists():
                 filepath.unlink()

@@ -21,9 +21,17 @@ from .state import (
     get_event_queue,
     clear_event_queue,
     cleanup_state_files,
+    get_current_stream_id,
+    clear_current_stream,
+    create_pending_result,
+    add_pending_event,
+    set_pending_result,
+    get_pending_result,
+    consume_pending_result,
+    cleanup_old_pending_results,
 )
 
-from .processor import stream_chat_response
+from .processor import stream_chat_response, stream_resume_response
 
 __all__ = [
     # Events
@@ -45,6 +53,16 @@ __all__ = [
     "get_event_queue",
     "clear_event_queue",
     "cleanup_state_files",
+    "get_current_stream_id",
+    "clear_current_stream",
+    # Pending results
+    "create_pending_result",
+    "add_pending_event",
+    "set_pending_result",
+    "get_pending_result",
+    "consume_pending_result",
+    "cleanup_old_pending_results",
     # Processor
     "stream_chat_response",
+    "stream_resume_response",
 ]
