@@ -46,6 +46,8 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3002",
   "https://ad-agent-ai.vercel.app",
+  "https://www.internal.kovio.dev",
+  "https://www.dashboard.kovio.dev",
 ];
 
 // Add Vercel preview pattern if configured
