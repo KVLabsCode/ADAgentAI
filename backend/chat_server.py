@@ -102,8 +102,9 @@ ALLOWED_ORIGINS = [
     FRONTEND_URL,
     "http://localhost:3000",
     "http://localhost:3002",
-    "https://adagentai.com",
-    "https://www.adagentai.com",
+    "https://ad-agent-ai.vercel.app", 
+    "https://www.internal.kovio.dev",
+    "https://www.dashboard.kovio.dev",
 ]
 
 app.add_middleware(
