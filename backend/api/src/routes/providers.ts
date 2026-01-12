@@ -177,12 +177,16 @@ providers.post(
 
     const config = OAUTH_CONFIG[type];
 
-    // Encode user ID and org ID in state for the callback
-    // Format: randomUUID:userId:organizationId (orgId can be empty)
+    // Get the origin from the request to redirect back to the same domain
+    const origin = c.req.header("origin") || c.req.header("referer")?.split("/").slice(0, 3).join("/") || Bun.env.FRONTEND_URL!;
+
+    // Encode user ID, org ID, and origin in state for the callback
+    // Format: randomUUID:userId:organizationId:origin (orgId can be empty)
     const stateData = {
       nonce: crypto.randomUUID(),
       userId: user.id,
       organizationId: user.organizationId || "",
+      origin: origin,
     };
     const state = Buffer.from(JSON.stringify(stateData)).toString("base64url");
 
@@ -221,38 +225,42 @@ providers.get(
     const stateParam = c.req.query("state");
     const error = c.req.query("error");
 
-    if (error) {
-      return c.redirect(
-        `${Bun.env.FRONTEND_URL}/providers?error=${error}`
-      );
-    }
+    // Extract user info and origin from state parameter first
+    let userId: string;
+    let organizationId: string | null;
+    let origin: string;
 
-    if (!code) {
-      return c.redirect(
-        `${Bun.env.FRONTEND_URL}/providers?error=no_code`
-      );
-    }
-
-    // Extract user info from state parameter
     if (!stateParam) {
       return c.redirect(
         `${Bun.env.FRONTEND_URL}/providers?error=invalid_state`
       );
     }
 
-    let userId: string;
-    let organizationId: string | null;
     try {
       const stateData = JSON.parse(Buffer.from(stateParam, "base64url").toString()) as {
         nonce: string;
         userId: string;
         organizationId: string;
+        origin?: string;
       };
       userId = stateData.userId;
       organizationId = stateData.organizationId || null;
+      origin = stateData.origin || Bun.env.FRONTEND_URL!;
     } catch {
       return c.redirect(
         `${Bun.env.FRONTEND_URL}/providers?error=invalid_state`
+      );
+    }
+
+    if (error) {
+      return c.redirect(
+        `${origin}/providers?error=${error}`
+      );
+    }
+
+    if (!code) {
+      return c.redirect(
+        `${origin}/providers?error=no_code`
       );
     }
 
@@ -337,7 +345,7 @@ providers.get(
       trackProviderConnected(userId, type, true);
 
       return c.redirect(
-        `${Bun.env.FRONTEND_URL}/providers?success=${type}`
+        `${origin}/providers?success=${type}`
       );
     } catch (error) {
       console.error("OAuth callback error:", error);
@@ -346,7 +354,7 @@ providers.get(
       trackProviderConnected(userId, type, false);
 
       return c.redirect(
-        `${Bun.env.FRONTEND_URL}/providers?error=oauth_failed`
+        `${origin}/providers?error=oauth_failed`
       );
     }
   }
