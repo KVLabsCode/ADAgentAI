@@ -11,7 +11,7 @@ export function PlatformsSection() {
   const [enabled, setEnabled] = useState(true)
 
   return (
-    <section className="py-12 md:py-28">
+    <section className="py-14 md:py-20">
       <div className="container mx-auto px-6">
         <div className="max-w-6xl mx-auto">
           {/* Mobile Section Header - Hidden on desktop */}

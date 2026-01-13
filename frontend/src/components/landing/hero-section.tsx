@@ -11,7 +11,7 @@ interface HeroSectionProps {
 
 export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   return (
-    <section className="relative py-12 md:py-28">
+    <section className="relative py-14 md:py-20">
       <div className="container mx-auto px-6">
         <div className="max-w-4xl mx-auto text-center">
           {/* Early Access Badge */}
