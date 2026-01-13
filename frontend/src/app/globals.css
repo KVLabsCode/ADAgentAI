@@ -178,4 +178,54 @@
   .dark * {
     scrollbar-color: oklch(0.5 0.01 285 / 40%) transparent;
   }
+
+  /* Sleek shadcn-style scrollbar for JSON tree views */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(113, 113, 122, 0);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background 0.2s ease;
+  }
+
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background: rgba(113, 113, 122, 0.5);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 161, 170, 0.7);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  /* Hide scrollbar buttons/arrows */
+  .scrollbar-thin::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-thin:hover {
+    scrollbar-color: rgba(113, 113, 122, 0.5) transparent;
+  }
 }

@@ -4,11 +4,36 @@ Uses LangGraph's interrupt() mechanism for human-in-loop approval.
 When a dangerous tool is detected, execution pauses and waits for user approval.
 """
 
+import json
 import uuid
 from typing import Any
 from langgraph.types import interrupt
 from langchain_core.messages import ToolMessage
 from langsmith import traceable
+
+
+def _serialize_result(result: Any) -> str:
+    """Serialize tool result to JSON string.
+
+    Handles various result types including LangGraph ToolMessage content.
+    """
+    if result is None:
+        return "null"
+
+    if isinstance(result, str):
+        return result
+
+    if isinstance(result, (dict, list)):
+        try:
+            return json.dumps(result, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return str(result)
+
+    # For other types, try JSON first, fall back to str
+    try:
+        return json.dumps(result, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        return str(result)
 
 from ..state import GraphState, ToolCall, ApprovalRequest
 from ..validators import (
@@ -17,7 +42,7 @@ from ..validators import (
     build_detailed_validation_error,
 )
 from ...approval.models import DANGEROUS_TOOLS, is_dangerous_tool
-from ...approval.schema_extractor import get_tool_schema
+from ...approval.schema_extractor import get_tool_schema_by_mcp_name
 from ...tools import execute_tool
 
 
@@ -38,13 +63,15 @@ def _get_pending_tool_calls(state: GraphState) -> list[ToolCall]:
 def _create_approval_request(tool_call: ToolCall) -> ApprovalRequest:
     """Create an approval request for a dangerous tool."""
     approval_id = str(uuid.uuid4())[:8]
+    tool_name = tool_call.get("name", "")
 
     # Extract schema for parameter form
     param_schema = None
     try:
-        param_schema = get_tool_schema(tool_call.get("name", ""))
-    except Exception:
-        pass  # Schema extraction failed, form will use basic inputs
+        param_schema = get_tool_schema_by_mcp_name(tool_name)
+        print(f"[tool_executor] Schema for {tool_name}: {param_schema is not None}")
+    except Exception as e:
+        print(f"[tool_executor] Schema extraction failed for {tool_name}: {e}")
 
     return {
         "approval_id": approval_id,
@@ -83,8 +110,12 @@ async def tool_executor_node(state: GraphState) -> dict:
     tool_args = tool_call.get("args", {})
     tool_id = tool_call.get("id", "")
 
+    print(f"[tool_executor] Processing tool: {tool_name}")
+    is_dangerous = _is_tool_dangerous(tool_name)
+    print(f"[tool_executor] Is dangerous: {is_dangerous}")
+
     # Check if dangerous
-    if _is_tool_dangerous(tool_name):
+    if is_dangerous:
         # Check if already approved
         approval_status = tool_call.get("approval_status")
 
@@ -107,7 +138,9 @@ async def tool_executor_node(state: GraphState) -> dict:
             }
         else:
             # Needs approval - create request and interrupt
+            print(f"[tool_executor] Tool requires approval, creating interrupt...")
             approval_request = _create_approval_request(tool_call)
+            print(f"[tool_executor] Approval request created: {approval_request.get('approval_id')}")
 
             # Mark tool as dangerous and pending
             updated_call = {
@@ -120,6 +153,7 @@ async def tool_executor_node(state: GraphState) -> dict:
             # This will save state and return control to the caller
             # The caller (streaming processor) will emit approval_required event
             # When user responds, execution resumes from this checkpoint
+            print(f"[tool_executor] Calling interrupt()...")
             interrupt_result = interrupt({
                 "type": "tool_approval_required",
                 "approval_id": approval_request["approval_id"],
@@ -205,10 +239,13 @@ async def tool_executor_node(state: GraphState) -> dict:
     try:
         result = await _execute_tool(tool_name, tool_args, service, user_id)
 
+        # Serialize result to JSON (not Python str representation)
+        result_str = _serialize_result(result)
+
         # Update tool call with result
         updated_call = {
             **tool_call,
-            "result": str(result),
+            "result": result_str,
             "approval_status": "approved" if _is_tool_dangerous(tool_name) else None,
         }
 
@@ -216,7 +253,7 @@ async def tool_executor_node(state: GraphState) -> dict:
             "tool_calls": [updated_call],
             "messages": [
                 ToolMessage(
-                    content=str(result),
+                    content=result_str,
                     tool_call_id=tool_id,
                 )
             ],

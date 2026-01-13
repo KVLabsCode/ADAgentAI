@@ -4,7 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Sparkles, Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, ExternalLink, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2 } from "lucide-react"
+import { Sparkles, Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, ExternalLink, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,8 +20,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useChatSettings } from "@/lib/chat-settings"
-import type { Message, StreamEventItem, JSONSchema } from "@/lib/types"
-import { ParameterForm } from "./parameter-form"
+import type { Message, StreamEventItem, RJSFSchema } from "@/lib/types"
+import { RJSFParameterForm } from "./rjsf"
+import { JsonTreeView } from "./json-tree-view"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface AssistantMessageProps {
   message: Message
@@ -189,36 +191,135 @@ function highlightJSON(obj: unknown): React.ReactNode {
   return <span dangerouslySetInnerHTML={{ __html: highlighted }} />
 }
 
-// Compact code block with scroll and resize
-function CodeBlock({
+// Parse content - handles JSON strings, objects, and primitives
+function parseJsonContent(content: unknown): unknown {
+  if (typeof content === "string") {
+    // Try to parse JSON string
+    try {
+      return JSON.parse(content)
+    } catch {
+      // Not valid JSON, return as-is
+      return content
+    }
+  }
+  return content
+}
+
+// Unwrap common wrapper keys for cleaner tree view display
+// e.g., { params: { page_size: 20 } } → { page_size: 20 }
+// Also handles message arrays: [{ type: 'text', text: '...' }] → extracts and parses text
+function unwrapForTreeView(content: unknown): unknown {
+  // Handle message arrays like [{ type: 'text', text: '...' }]
+  if (Array.isArray(content)) {
+    // Check if it's a message array (common LLM response format)
+    if (content.length > 0 && content.every(item =>
+      item && typeof item === "object" && "type" in item && "text" in item
+    )) {
+      // Extract just the text content
+      const texts = content.map(item => (item as { text: string }).text)
+      if (texts.length === 1) {
+        // Try to parse the text as JSON (API responses are JSON strings)
+        const text = texts[0]
+        try {
+          return JSON.parse(text)
+        } catch {
+          return text // Return as string if not valid JSON
+        }
+      }
+      return texts // Return array of texts
+    }
+    // For other arrays, return as-is
+    return content
+  }
+
+  if (content && typeof content === "object") {
+    const obj = content as Record<string, unknown>
+    const keys = Object.keys(obj)
+    // Unwrap if only one key and it's a common wrapper
+    if (keys.length === 1) {
+      const key = keys[0]
+      const wrapperKeys = ["params", "parameters", "data", "result", "response", "input"]
+      if (wrapperKeys.includes(key) && typeof obj[key] === "object" && obj[key] !== null) {
+        return obj[key]
+      }
+    }
+  }
+  return content
+}
+
+// JSON Display - with inline toggle between tree and raw JSON
+function JsonDisplay({
   title,
   content,
   maxHeight = "280px",
-  resizable = false,
+  collapsed = 2,
+  defaultMode = "tree",
 }: {
   title: string
   content: unknown
   maxHeight?: string
-  resizable?: boolean
+  collapsed?: number
+  defaultMode?: "tree" | "json"
 }) {
+  const [viewMode, setViewMode] = React.useState<"tree" | "json">(defaultMode)
+
+  // Parse content if it's a JSON string
+  const parsedContent = React.useMemo(() => parseJsonContent(content), [content])
+
+  // For tree view, unwrap common wrappers like "params" and parse JSON from text arrays
+  const treeContent = React.useMemo(() => unwrapForTreeView(parsedContent), [parsedContent])
+
+  // Can show tree view if content is an object/array
+  const canShowTree = treeContent !== null && typeof treeContent === "object"
+
   return (
-    <div className="rounded-xl overflow-hidden border border-zinc-700/50">
-      <div className="bg-zinc-800/80 px-3 py-1.5 border-b border-zinc-700/50">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between px-1">
         <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
           {title}
         </span>
-      </div>
-      <div
-        className={cn(
-          "bg-zinc-900/80 overflow-auto",
-          resizable && "resize-y min-h-[60px]"
+        {canShowTree && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setViewMode(viewMode === "tree" ? "json" : "tree")}
+                  className="p-1 rounded hover:bg-zinc-700/50 transition-colors text-zinc-500 hover:text-zinc-300"
+                >
+                  {viewMode === "tree" ? (
+                    <Braces className="h-3 w-3" />
+                  ) : (
+                    <ListTree className="h-3 w-3" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {viewMode === "tree" ? "View as JSON" : "View as Tree"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
-        style={{ maxHeight: resizable ? "400px" : maxHeight }}
-      >
-        <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap break-all">
-          {highlightJSON(content)}
-        </pre>
       </div>
+      {viewMode === "tree" && canShowTree ? (
+        <JsonTreeView
+          data={treeContent}
+          maxHeight={maxHeight}
+          collapsed={collapsed}
+          displayObjectSize={false}
+          enableClipboard={true}
+        />
+      ) : (
+        <div
+          className="rounded-xl overflow-hidden border border-zinc-700/50"
+          style={{ maxHeight }}
+        >
+          <ScrollArea className="h-full bg-zinc-900/80">
+            <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap break-all">
+              {highlightJSON(typeof treeContent === "object" ? treeContent : parsedContent)}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
     </div>
   )
 }
@@ -333,13 +434,16 @@ interface ToolApprovalBlockProps {
   approvalId: string
   toolName: string
   toolInput: string
-  parameterSchema?: JSONSchema
+  parameterSchema?: RJSFSchema
   onApproval: (approved: boolean, modifiedParams?: Record<string, unknown>) => void
   isPending: boolean
 }
 
 function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending }: ToolApprovalBlockProps) {
   const [isOpen, setIsOpen] = React.useState(true) // Auto-expand for approval
+
+  // Debug: Log if schema is received
+  console.log("[ToolApprovalBlock] toolName:", toolName, "parameterSchema:", parameterSchema ? "YES" : "NO", parameterSchema)
 
   // Get tool metadata for enhanced display
   const metadata = React.useMemo(() => getToolMetadata(toolName), [toolName])
@@ -443,16 +547,16 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
               )}
             </div>
 
-            {/* Editable form when schema available, otherwise static JSON */}
+            {/* Editable form when schema available, otherwise tree/json view */}
             {parameterSchema && isPending ? (
-              <ParameterForm
-                schema={parameterSchema}
+              <RJSFParameterForm
+                rjsfSchema={parameterSchema}
                 initialValues={initialValues}
                 onChange={handleParamChange}
                 disabled={!isPending}
               />
             ) : (
-              <CodeBlock title="Request" content={initialValues} maxHeight="140px" />
+              <JsonDisplay title="Request" content={initialValues} maxHeight="140px" collapsed={1} />
             )}
 
             {/* Approval Actions */}
@@ -596,9 +700,9 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-700/50 mt-1">
-            <CodeBlock title="Request" content={params} maxHeight="140px" />
+            <JsonDisplay title="Request" content={params} maxHeight="140px" collapsed={1} />
             {hasResult && isApproved && (
-              <CodeBlock title="Response" content={result} maxHeight="160px" resizable />
+              <JsonDisplay title="Response" content={result} maxHeight="200px" collapsed={2} />
             )}
             {isDenied && (
               <div className="flex items-center gap-2 px-2.5 py-2 rounded bg-red-500/10 border border-red-500/20">
@@ -765,7 +869,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
     | { type: "routing"; service: string; capability: string; thinking?: string; key: string }
     | { type: "thinking"; content: string; key: string }
     | { type: "tool_group"; tool: { name: string; params: Record<string, unknown>; approved?: boolean }; result?: unknown; key: string }
-    | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: JSONSchema; key: string }
+    | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: RJSFSchema; key: string }
     | { type: "tool_denied"; tool_name: string; reason: string; key: string }
   > = []
 

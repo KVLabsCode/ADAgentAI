@@ -510,7 +510,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             approval_id: approvalId,
             tool_name: toolName,
             tool_input: toolInput,
-            parameter_schema: parameterSchema as import("@/lib/types").JSONSchema | undefined
+            parameter_schema: parameterSchema as import("@/lib/types").RJSFSchema | undefined
           })
           // Mark as pending in approval state
           setPendingApprovals(prev => {

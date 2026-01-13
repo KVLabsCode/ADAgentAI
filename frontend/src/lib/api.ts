@@ -239,6 +239,7 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       callbacks.onToolResult?.(event.preview || "", event.full, event.data_type);
       break;
     case "tool_approval_required":
+      console.log("[api.ts] tool_approval_required event:", event.tool_name, "parameter_schema:", event.parameter_schema ? "YES" : "NO", event.parameter_schema);
       callbacks.onToolApprovalRequired?.(
         event.approval_id || "",
         event.tool_name || "",
