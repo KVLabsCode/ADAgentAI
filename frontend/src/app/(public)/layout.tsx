@@ -95,7 +95,7 @@ export default function PublicLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild size="sm" className="hidden sm:flex h-8 text-sm ml-1">
+              <Button asChild size="sm" className="h-8 text-sm ml-1 px-3">
                 <Link href="/login">Sign in</Link>
               </Button>
             )}

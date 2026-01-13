@@ -11,11 +11,11 @@ interface HeroSectionProps {
 
 export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   return (
-    <section className="relative py-20 md:py-28">
+    <section className="relative py-12 md:py-28">
       <div className="container mx-auto px-6">
         <div className="max-w-4xl mx-auto text-center">
           {/* Early Access Badge */}
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-border/40 text-[10px] tracking-wide uppercase mb-8">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-border/40 text-[10px] tracking-wide uppercase mb-5 md:mb-8">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
@@ -29,13 +29,14 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
           </h1>
 
           {/* Description */}
-          <div className="text-muted-foreground text-sm md:text-base mb-8 space-y-1">
-            <p>Skip the dashboards. Let agents handle reports, mediation, and tests.</p>
+          <div className="text-muted-foreground text-sm md:text-base mb-6 md:mb-8 space-y-1">
+            <p>Skip the dashboards.</p>
+            <p>Let agents handle reports, mediation, and tests.</p>
             <p className="text-muted-foreground/70">You focus on strategy.</p>
           </div>
 
           {/* Agent types */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-10">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-6 md:mb-10">
             <span className="px-3 py-1.5 rounded-full border border-border/40 font-mono text-[11px] text-muted-foreground tracking-wide">
               reporting
             </span>
