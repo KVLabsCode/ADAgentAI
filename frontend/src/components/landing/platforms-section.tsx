@@ -27,7 +27,7 @@ export function PlatformsSection() {
           {/* Two-column layout: Mock UI left, Text right */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Mock Provider Cards */}
-            <div className="relative order-1 lg:order-1 lg:pr-4 lg:-ml-6 lg:w-[calc(100%+1.5rem)]">
+            <div className="relative order-1 lg:order-1 lg:pr-4">
               {/* Light theme version */}
               <div className="space-y-4 dark:hidden">
                 {/* Connected Provider - Light */}
@@ -188,9 +188,11 @@ export function PlatformsSection() {
                   Connect your ad platforms
                 </h2>
               </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Link your accounts in seconds. ADAgentAI securely connects via OAuth—your credentials are never stored.
-              </p>
+              <div className="text-muted-foreground text-sm leading-relaxed space-y-1">
+                <p>Link your accounts in seconds</p>
+                <p>ADAgentAI securely connects via OAuth</p>
+                <p className="text-muted-foreground/70">Your credentials are never stored</p>
+              </div>
 
               {/* Feature list */}
               <ul className="space-y-3 pt-2">

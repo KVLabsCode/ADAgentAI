@@ -31,9 +31,10 @@ export function TeamSection() {
                   Built for teams
                 </h2>
               </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Create organizations, invite team members, and manage access—all from one place.
-              </p>
+              <div className="text-muted-foreground text-sm leading-relaxed space-y-1">
+                <p>Create organizations, invite team members, and manage access</p>
+                <p className="text-muted-foreground/70">All from one place</p>
+              </div>
 
               {/* Feature list */}
               <ul className="space-y-3 pt-2">
@@ -57,7 +58,7 @@ export function TeamSection() {
             </div>
 
             {/* Mock Organization Card */}
-            <div className="relative order-1 lg:order-2 lg:pl-4 lg:-mr-6 lg:w-[calc(100%+1.5rem)]">
+            <div className="relative order-1 lg:order-2 lg:pl-4">
               {/* Light theme version */}
               <div className="dark:hidden rounded border border-zinc-200 bg-white shadow-sm">
                 {/* Header */}
