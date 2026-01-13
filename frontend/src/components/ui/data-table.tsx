@@ -26,7 +26,7 @@ function DataTableContainer({ children, className }: DataTableContainerProps) {
 }
 
 // Consistent table header row (non-hoverable)
-interface DataTableHeaderRowProps extends React.ComponentProps<typeof TableRow> {}
+type DataTableHeaderRowProps = React.ComponentProps<typeof TableRow>
 
 function DataTableHeaderRow({ className, ...props }: DataTableHeaderRowProps) {
   return (
@@ -38,7 +38,7 @@ function DataTableHeaderRow({ className, ...props }: DataTableHeaderRowProps) {
 }
 
 // Consistent table head cell
-interface DataTableHeadProps extends React.ComponentProps<typeof TableHead> {}
+type DataTableHeadProps = React.ComponentProps<typeof TableHead>
 
 function DataTableHead({ className, ...props }: DataTableHeadProps) {
   return (
@@ -50,7 +50,7 @@ function DataTableHead({ className, ...props }: DataTableHeadProps) {
 }
 
 // Consistent table body row
-interface DataTableRowProps extends React.ComponentProps<typeof TableRow> {}
+type DataTableRowProps = React.ComponentProps<typeof TableRow>
 
 function DataTableRow({ className, ...props }: DataTableRowProps) {
   return (
@@ -62,7 +62,7 @@ function DataTableRow({ className, ...props }: DataTableRowProps) {
 }
 
 // Consistent table cell with padding
-interface DataTableCellProps extends React.ComponentProps<typeof TableCell> {}
+type DataTableCellProps = React.ComponentProps<typeof TableCell>
 
 function DataTableCell({ className, ...props }: DataTableCellProps) {
   return (

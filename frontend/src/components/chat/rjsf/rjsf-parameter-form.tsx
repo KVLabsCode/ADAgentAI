@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Form from "@rjsf/core"
+import Form, { IChangeEvent } from "@rjsf/core"
 import validator from "@rjsf/validator-ajv8"
 import { RJSFSchema } from "@rjsf/utils"
 import type { RJSFSchema as AppRJSFSchema } from "@/lib/types"
@@ -126,11 +126,12 @@ export function RJSFParameterForm({
 
   // Handle form data change
   const handleChange = React.useCallback(
-    (data: { formData: Record<string, unknown>; errors: unknown[] }) => {
-      setFormData(data.formData)
+    (data: IChangeEvent<Record<string, unknown>>) => {
+      const newFormData = data.formData ?? {}
+      setFormData(newFormData)
       const hasErrors = data.errors && data.errors.length > 0
-      const hasChanges = JSON.stringify(data.formData) !== initialValuesJson
-      onChange?.(data.formData, hasChanges, hasErrors as boolean)
+      const hasChanges = JSON.stringify(newFormData) !== initialValuesJson
+      onChange?.(newFormData, hasChanges, hasErrors as boolean)
     },
     [onChange, initialValuesJson]
   )

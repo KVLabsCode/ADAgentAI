@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Settings2,
   Loader2,
-  Smartphone,
   Search,
   Layers,
   X,
@@ -269,8 +268,6 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
   const enabledProviderCount = enabledProviderIds.length === 0
     ? providers.length
     : enabledProviderIds.filter((id) => providers.some((p) => p.id === id)).length
-
-  const totalAppsCount = Object.values(providerApps).reduce((acc, apps) => acc + apps.length, 0)
 
   const filteredAdmobProviders = filterProviders(admobProviders)
   const filteredGamProviders = filterProviders(gamProviders)
