@@ -37,7 +37,7 @@ const tiers = [
       "Custom integrations",
     ],
     cta: "Contact Sales",
-    href: "mailto:sales@kvlabs.io",
+    href: "mailto:support@kovio.dev",
     highlighted: false,
   },
 ]
@@ -93,11 +93,10 @@ export default function PricingPage() {
               {tiers.map((tier) => (
                 <div
                   key={tier.name}
-                  className={`relative rounded-lg border p-5 flex flex-col ${
-                    tier.highlighted
-                      ? "border-foreground/20 bg-foreground/[0.02] dark:bg-foreground/[0.03]"
-                      : "border-border/50"
-                  }`}
+                  className={`relative rounded-lg border p-5 flex flex-col ${tier.highlighted
+                    ? "border-foreground/20 bg-foreground/[0.02] dark:bg-foreground/[0.03]"
+                    : "border-border/50"
+                    }`}
                 >
                   {tier.highlighted && (
                     <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
@@ -169,7 +168,7 @@ export default function PricingPage() {
             Questions about pricing?
           </p>
           <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-            <Link href="mailto:support@kvlabs.io">Contact us</Link>
+            <Link href="mailto:support@kovio.dev">Contact us</Link>
           </Button>
         </div>
       </section>

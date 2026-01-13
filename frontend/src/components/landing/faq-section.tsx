@@ -79,7 +79,7 @@ export function FAQSection() {
           <p className="text-center text-xs text-muted-foreground/50 mt-12">
             Still have questions?
             <br />
-            <a href="mailto:support@adagentai.com" className="text-foreground hover:underline">
+            <a href="mailto:support@kovio.dev" className="text-foreground hover:underline">
               Get in touch
             </a>
           </p>

@@ -279,7 +279,7 @@ export default function TermsPage() {
           </p>
           <ul className="list-none text-muted-foreground space-y-1">
             <li><strong>Email:</strong> legal@kvlabs.io</li>
-            <li><strong>Support:</strong> support@kvlabs.io</li>
+            <li><strong>Support:</strong> support@kovio.dev</li>
           </ul>
         </section>
       </div>

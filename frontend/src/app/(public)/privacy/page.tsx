@@ -108,7 +108,7 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p className="text-muted-foreground">
-            To exercise these rights, use the self-service tools in your account Settings or contact us at privacy@kvlabs.io. We will respond to your request within 30 days as required by GDPR.
+            To exercise these rights, use the self-service tools in your account Settings or contact us at support@kovio.dev. We will respond to your request within 30 days as required by GDPR.
           </p>
         </section>
 
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-medium">12. Data Protection Officer</h2>
           <p className="text-muted-foreground">
-            For GDPR-related inquiries, you can contact our Data Protection Officer at: dpo@kvlabs.io
+            For GDPR-related inquiries, you can contact our Data Protection Officer at: support@kovio.dev
           </p>
         </section>
 
@@ -169,8 +169,8 @@ export default function PrivacyPage() {
             For questions about this Privacy Policy, your data rights, or to exercise your GDPR rights, please contact us:
           </p>
           <ul className="list-none text-muted-foreground space-y-1">
-            <li>Email: privacy@kvlabs.io</li>
-            <li>Data Protection Officer: dpo@kvlabs.io</li>
+            <li>Email: support@kovio.dev</li>
+            <li>Data Protection Officer: support@kovio.dev</li>
             <li>GDPR Requests: Use the self-service tools in Settings → Account</li>
           </ul>
         </section>

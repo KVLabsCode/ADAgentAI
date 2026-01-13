@@ -560,8 +560,8 @@ function BillingContent() {
         <div>
           <p className="text-xs text-muted-foreground">
             Need help with billing? Contact{" "}
-            <a href="mailto:support@adagent.app" className="text-foreground hover:underline underline-offset-2">
-              support@adagent.app
+            <a href="mailto:support@kovio.dev" className="text-foreground hover:underline underline-offset-2">
+              support@kovio.dev
             </a>
           </p>
         </div>
