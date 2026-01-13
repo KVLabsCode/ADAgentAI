@@ -42,21 +42,21 @@ export function HowItWorksSection() {
           <div className="grid md:grid-cols-3 gap-12 md:gap-8">
             {steps.map((item, index) => (
               <div key={item.step} className="relative text-center md:text-left">
-                {/* Connector line - starts at right edge of icon (3rem) + small gap, extends through grid gap */}
+                {/* Connector line - gradient fades at edges */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-6 left-[3.5rem] w-[calc(100%-1.5rem)] h-px bg-border/30" />
+                  <div className="hidden md:block absolute top-6 left-[3rem] w-[calc(100%-1rem)] h-px bg-gradient-to-r from-transparent via-zinc-300 to-transparent dark:via-zinc-700" />
                 )}
 
                 <div className="space-y-4">
                   {/* Icon */}
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border/50 text-muted-foreground">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-zinc-500 dark:text-zinc-400">
                     <item.icon className="h-5 w-5" />
                   </div>
 
                   {/* Content */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 justify-center md:justify-start">
-                      <span className="hidden md:inline text-[10px] font-mono text-muted-foreground/40">
+                      <span className="hidden md:inline text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
                         {item.step}
                       </span>
                       <h3 className="text-lg font-medium">{item.title}</h3>

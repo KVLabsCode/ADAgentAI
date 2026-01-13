@@ -24,7 +24,7 @@ export default function PublicLayout({
   const { user, isAuthenticated, isLoading, signOut } = useUser()
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
+    <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-14 items-center justify-between px-6">
@@ -99,7 +99,7 @@ export default function PublicLayout({
       </header>
 
       {/* Content */}
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 overflow-x-hidden">{children}</main>
 
       {/* Footer */}
       <footer className="border-t border-border/40 py-8">
