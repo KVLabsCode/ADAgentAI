@@ -77,7 +77,7 @@ function ProvidersContent() {
         return
       }
 
-      const response = await authFetch(`${API_URL}/api/providers`, accessToken, {}, selectedOrganizationId)
+      const response = await authFetch(`${API_URL}/api/providers`, accessToken, { cache: 'no-store' }, selectedOrganizationId)
 
       if (response.ok) {
         const data = await response.json()
