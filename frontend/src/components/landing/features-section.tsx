@@ -51,16 +51,18 @@ export function FeaturesSection() {
           </div>
 
           {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {features.map((feature) => (
-              <div key={feature.title} className="space-y-3">
-                <div className="h-10 w-10 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground">
+              <div key={feature.title} className="flex gap-4">
+                <div className="h-9 w-9 shrink-0 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground">
                   <feature.icon className="h-4 w-4" />
                 </div>
-                <h3 className="font-medium">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
+                <div className="space-y-1">
+                  <h3 className="font-medium text-sm">{feature.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

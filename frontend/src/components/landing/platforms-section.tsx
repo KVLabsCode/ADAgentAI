@@ -14,6 +14,16 @@ export function PlatformsSection() {
     <section className="py-20 md:py-28">
       <div className="container mx-auto px-6">
         <div className="max-w-6xl mx-auto">
+          {/* Mobile Section Header - Hidden on desktop */}
+          <div className="lg:hidden text-center mb-10">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
+              Platforms
+            </p>
+            <h2 className="text-2xl font-light tracking-tight">
+              Connect your ad platforms
+            </h2>
+          </div>
+
           {/* Two-column layout: Mock UI left, Text right */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Mock Provider Cards */}
@@ -169,17 +179,18 @@ export function PlatformsSection() {
 
             {/* Text content */}
             <div className="space-y-6 order-2 lg:order-2">
-              <div className="space-y-3">
+              {/* Desktop header - Hidden on mobile */}
+              <div className="space-y-3 hidden lg:block">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground/50">
                   Platforms
                 </p>
                 <h2 className="text-2xl md:text-3xl font-light tracking-tight">
                   Connect your ad platforms
                 </h2>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Link your accounts in seconds. ADAgentAI securely connects via OAuth—your credentials are never stored.
-                </p>
               </div>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Link your accounts in seconds. ADAgentAI securely connects via OAuth—your credentials are never stored.
+              </p>
 
               {/* Feature list */}
               <ul className="space-y-3 pt-2">

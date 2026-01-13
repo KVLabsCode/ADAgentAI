@@ -42,9 +42,9 @@ export function HowItWorksSection() {
           <div className="grid md:grid-cols-3 gap-12 md:gap-8">
             {steps.map((item, index) => (
               <div key={item.step} className="relative text-center md:text-left">
-                {/* Connector line */}
+                {/* Connector line - starts at right edge of icon (3rem) + small gap, extends through grid gap */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-6 left-[calc(50%+2rem)] w-[calc(100%-4rem)] h-px bg-border/30" />
+                  <div className="hidden md:block absolute top-6 left-[3.5rem] w-[calc(100%-1.5rem)] h-px bg-border/30" />
                 )}
 
                 <div className="space-y-4">
@@ -56,7 +56,7 @@ export function HowItWorksSection() {
                   {/* Content */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 justify-center md:justify-start">
-                      <span className="text-[10px] font-mono text-muted-foreground/40">
+                      <span className="hidden md:inline text-[10px] font-mono text-muted-foreground/40">
                         {item.step}
                       </span>
                       <h3 className="text-lg font-medium">{item.title}</h3>

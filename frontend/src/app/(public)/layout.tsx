@@ -24,7 +24,7 @@ export default function PublicLayout({
   const { user, isAuthenticated, isLoading, signOut } = useUser()
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Navigation */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-14 items-center justify-between px-6">

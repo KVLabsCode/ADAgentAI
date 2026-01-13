@@ -28,10 +28,10 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
             AI agents for your AD ops
           </h1>
 
-          {/* Description - formatted as separate lines */}
+          {/* Description */}
           <div className="text-muted-foreground text-sm md:text-base mb-8 space-y-1">
-            <p>Skip the dashboards.</p>
-            <p className="text-muted-foreground/70">Let agents handle reports, mediation, and tests—you focus on strategy.</p>
+            <p>Skip the dashboards. Let agents handle reports, mediation, and tests.</p>
+            <p className="text-muted-foreground/70">You focus on strategy.</p>
           </div>
 
           {/* Agent types */}
@@ -64,7 +64,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
                 <WaitlistDialog
                   trigger={
                     <Button size="lg" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90">
-                      Get Early Access
+                      Join the Waitlist
                       <ArrowRight className="ml-2 h-3.5 w-3.5" />
                     </Button>
                   }
