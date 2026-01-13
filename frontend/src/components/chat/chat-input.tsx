@@ -86,7 +86,7 @@ export function ChatInput({
           }
         }}
         className={cn(
-          "absolute right-2.5 bottom-2.5 h-9 w-9 rounded-full",
+          "absolute right-2.5 bottom-2.5 h-9 w-9 rounded-full cursor-pointer",
           "transition-all duration-150",
           (value.trim() || isLoading) && !disabled
             ? "opacity-100 bg-zinc-900 dark:bg-white text-zinc-50 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-sm"

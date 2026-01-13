@@ -8,6 +8,7 @@ Supports token-level streaming via asyncio.Queue passed in config.
 import os
 import re
 import asyncio
+from datetime import datetime, timezone
 from typing import Any
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
@@ -110,6 +111,34 @@ def _build_system_prompt(
     # Get entity grounding section
     entity_section = build_entity_system_prompt(user_context)
 
+    # Get current date/time for temporal context
+    now = datetime.now(timezone.utc)
+    current_date = now.strftime("%Y-%m-%d")
+    current_datetime = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    # Calculate example date ranges
+    from datetime import timedelta
+    seven_days_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    thirty_days_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    month_start = now.strftime("%Y-%m") + "-01"
+    
+    # Build temporal context section
+    temporal_section = f"""
+## Current Date and Time
+Today's date: {current_date}
+Current time: {current_datetime}
+
+When the user asks about date ranges like "last 7 days", "this month", "yesterday", etc., 
+calculate the appropriate dates based on today's date ({current_date}).
+
+For example:
+- "last 7 days" = {seven_days_ago} to {current_date}
+- "last 30 days" = {thirty_days_ago} to {current_date}
+- "yesterday" = {yesterday}
+- "this month" = {month_start} to {current_date}
+"""
+
     # Build conversation context
     context_section = ""
     if conversation_history:
@@ -130,6 +159,8 @@ Reference previous context when relevant (e.g., if user says "that app" or "the 
     return f"""You are {role_info['role']}.
 
 Goal: {role_info['goal']}
+
+{temporal_section}
 
 {entity_section}
 
