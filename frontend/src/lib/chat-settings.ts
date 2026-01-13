@@ -5,6 +5,10 @@ import { persist } from "zustand/middleware"
 
 export type DisplayMode = "detailed" | "compact"
 export type ResponseStyle = "concise" | "detailed"
+// JSON display mode for tool results:
+// - "tree": Collapsible tree view with syntax highlighting
+// - "json": Raw JSON code block (original behavior)
+export type JsonViewMode = "tree" | "json"
 // Context mode for entity grounding:
 // - "soft": Prefer enabled entities, but allow explicit references to others
 // - "strict": ONLY use enabled entities, prompt user to enable if needed
@@ -15,6 +19,8 @@ interface ChatSettingsState {
   selectedModel: string
   responseStyle: ResponseStyle
   contextMode: ContextMode
+  // JSON view mode for tool results (tree or raw json)
+  jsonViewMode: JsonViewMode
   // Safe mode: blocks all write operations (dangerous tools)
   safeMode: boolean
   // Provider IDs that are enabled for context (empty = all enabled)
@@ -29,6 +35,7 @@ interface ChatSettingsState {
   setSelectedModel: (model: string) => void
   setResponseStyle: (style: ResponseStyle) => void
   setContextMode: (mode: ContextMode) => void
+  setJsonViewMode: (mode: JsonViewMode) => void
   setSafeMode: (enabled: boolean) => void
   setEnabledProviderIds: (ids: string[]) => void
   toggleProvider: (id: string) => void
@@ -44,6 +51,7 @@ export const useChatSettings = create<ChatSettingsState>()(
       selectedModel: "openrouter/google/gemini-2.5-flash-lite",
       responseStyle: "concise",
       contextMode: "soft", // Default to soft mode (more flexible)
+      jsonViewMode: "tree", // Default to tree view for better readability
       safeMode: false, // Default: write operations allowed with approval
       enabledProviderIds: [], // Empty means all are enabled
       enabledAppIds: {}, // Empty means all apps enabled for all providers
@@ -52,6 +60,7 @@ export const useChatSettings = create<ChatSettingsState>()(
       setSelectedModel: (model) => set({ selectedModel: model }),
       setResponseStyle: (style) => set({ responseStyle: style }),
       setContextMode: (mode) => set({ contextMode: mode }),
+      setJsonViewMode: (mode) => set({ jsonViewMode: mode }),
       setSafeMode: (enabled) => set({ safeMode: enabled }),
       setEnabledProviderIds: (ids) => set({ enabledProviderIds: ids }),
       toggleProvider: (id) => {

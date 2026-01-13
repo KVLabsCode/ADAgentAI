@@ -162,6 +162,25 @@ async def stream_chat_response(
             context_mode=context_mode,
             enabled_accounts=enabled_accounts or [],
         ):
+            # Check for LangGraph interrupt events (tool approval required)
+            if "__interrupt__" in event:
+                interrupt_data_list = event["__interrupt__"]
+                for interrupt_item in interrupt_data_list:
+                    # Extract interrupt value (LangGraph wraps it in Interrupt object)
+                    interrupt_value = getattr(interrupt_item, 'value', interrupt_item)
+                    if isinstance(interrupt_value, dict) and interrupt_value.get("type") == "tool_approval_required":
+                        # Format tool_input as JSON string for frontend
+                        tool_args = interrupt_value.get("tool_args", {})
+                        tool_input_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
+
+                        yield format_sse(ToolApprovalRequiredEvent(
+                            approval_id=interrupt_value.get("approval_id", ""),
+                            tool_name=interrupt_value.get("tool_name", ""),
+                            tool_input=tool_input_str,
+                            parameter_schema=interrupt_value.get("param_schema"),
+                        ).model_dump(mode='json'))
+                continue  # Don't process as regular node update
+
             # Process each node's state update
             for node_name, state_update in event.items():
                 # Extract metrics from state updates

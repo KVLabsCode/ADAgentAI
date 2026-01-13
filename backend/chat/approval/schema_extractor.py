@@ -2,11 +2,23 @@
 
 Maps tool names to JSON schemas for frontend parameter editing.
 Schemas are auto-generated from Pydantic models for Ad Manager tools
-and manually defined for AdMob tools (which have custom x-dynamic hints).
+and manually defined for AdMob tools.
+
+Output format for RJSF (React JSON Schema Form):
+{
+    "schema": { ... },      # Standard JSON Schema
+    "uiSchema": { ... }     # RJSF UI hints (widgets, options, dependencies)
+}
 """
 
-from typing import Optional, Type
+from typing import Optional, Type, TypedDict
 from pydantic import BaseModel
+
+
+class RJSFSchema(TypedDict):
+    """RJSF-compatible schema output with separate schema and uiSchema."""
+    schema: dict
+    uiSchema: dict
 
 # Import all Ad Manager Pydantic models for schema extraction
 from admanager_mcp.models import (
@@ -168,23 +180,32 @@ AD_MANAGER_TOOL_MODELS: dict[str, Type[BaseModel]] = {
 }
 
 
-def _enhance_ad_manager_schema(schema: dict) -> dict:
-    """Enhance Ad Manager schema with x-dynamic hints for frontend.
+def _pydantic_to_rjsf(model: Type[BaseModel]) -> RJSFSchema:
+    """Convert Pydantic model to RJSF format with schema and uiSchema.
 
-    Adds x-dynamic: "networks" to network_code field so the frontend
-    can fetch available networks from connected providers.
+    For Ad Manager tools, adds uiSchema hints for network_code field.
     """
-    if "properties" in schema and "network_code" in schema["properties"]:
-        schema["properties"]["network_code"]["x-dynamic"] = "networks"
-    return schema
+    schema = model.model_json_schema()
+    ui_schema: dict = {}
+
+    if "properties" in schema:
+        # Add async select for network_code field
+        if "network_code" in schema["properties"]:
+            ui_schema["network_code"] = {
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "networks"}
+            }
+
+    return {"schema": schema, "uiSchema": ui_schema}
 
 
 def get_tool_schema(tool_name: str) -> Optional[dict]:
-    """Get JSON Schema for a dangerous tool's input parameters.
+    """Get JSON Schema for a dangerous tool's input parameters (legacy).
+
+    DEPRECATED: Use get_tool_schema_by_mcp_name() instead for RJSF format.
 
     Args:
-        tool_name: Either the MCP tool name (e.g., "admanager_create_networks_ad_units")
-                   or display name (e.g., "Create Mediation Group") for backward compat
+        tool_name: Either the MCP tool name or display name
 
     Returns:
         JSON Schema dict or None if not found/supported
@@ -192,283 +213,346 @@ def get_tool_schema(tool_name: str) -> Optional[dict]:
     # First check if it's an Ad Manager MCP tool name
     if tool_name in AD_MANAGER_TOOL_MODELS:
         model = AD_MANAGER_TOOL_MODELS[tool_name]
-        schema = model.model_json_schema()
-        return _enhance_ad_manager_schema(schema)
+        return model.model_json_schema()
 
-    # Fall back to manually defined schemas (AdMob tools, display name lookups)
+    # Fall back to manually defined schemas (legacy Ad Manager display names)
     return TOOL_SCHEMAS.get(tool_name)
 
 
-def get_tool_schema_by_mcp_name(mcp_tool_name: str) -> Optional[dict]:
-    """Get JSON Schema for a tool by its MCP name.
+def get_tool_schema_by_mcp_name(mcp_tool_name: str) -> Optional[RJSFSchema]:
+    """Get RJSF-compatible schema for a tool by its MCP name.
 
     Args:
         mcp_tool_name: The MCP tool name (e.g., "admob_create_app")
 
     Returns:
-        JSON Schema dict or None if not found
+        RJSFSchema with schema and uiSchema, or None if not found
     """
-    # Check Ad Manager tools first
+    # Check Ad Manager tools first (auto-generated from Pydantic models)
     if mcp_tool_name in AD_MANAGER_TOOL_MODELS:
         model = AD_MANAGER_TOOL_MODELS[mcp_tool_name]
-        schema = model.model_json_schema()
-        return _enhance_ad_manager_schema(schema)
+        return _pydantic_to_rjsf(model)
 
-    # Map AdMob MCP names to display names for manual schemas
-    admob_mcp_to_display = {
-        "admob_create_app": "Create AdMob App",
-        "admob_create_ad_unit": "Create AdMob Ad Unit",
-        "admob_create_ad_unit_mapping": "Create Ad Unit Mapping",
-        "admob_batch_create_ad_unit_mappings": "Batch Create Ad Unit Mappings",
-        "admob_create_mediation_group": "Create Mediation Group",
-        "admob_update_mediation_group": "Update Mediation Group",
-        "admob_create_mediation_ab_experiment": "Create Mediation A/B Experiment",
-        "admob_stop_mediation_ab_experiment": "Stop Mediation A/B Experiment",
-    }
-
-    display_name = admob_mcp_to_display.get(mcp_tool_name)
-    if display_name:
-        return TOOL_SCHEMAS.get(display_name)
+    # Check AdMob tools (manually defined RJSF schemas)
+    if mcp_tool_name in ADMOB_TOOL_SCHEMAS:
+        return ADMOB_TOOL_SCHEMAS[mcp_tool_name]
 
     return None
 
 
 # =============================================================================
-# Tool-specific JSON Schemas
+# AdMob Tool RJSF Schemas (keyed by MCP tool name)
 # =============================================================================
-# These match the MCP tool function signatures for the approval UI.
+# Proper RJSF format with separate schema and uiSchema.
+# uiSchema uses standard RJSF conventions:
+#   - "ui:widget": "AsyncSelectWidget" for dynamic dropdowns
+#   - "ui:options": { "fetchType": "accounts|apps|ad_units|..." }
+#   - "ui:options": { "dependsOn": "field_name" } for cascading fields
 
-# Dynamic field types for frontend to fetch options
-# x-dynamic: "accounts" - Fetch from connected AdMob providers
-# x-dynamic: "apps" - Fetch apps for selected account
-# x-dynamic: "ad_units" - Fetch ad units for selected account
-# x-dynamic: "ad_sources" - Fetch ad sources
-# x-dynamic: "mediation_groups" - Fetch mediation groups for account
-# x-depends-on: field name that must be selected first
-
-TOOL_SCHEMAS: dict[str, dict] = {
-    "Create AdMob App": {
-        "type": "object",
-        "properties": {
-            "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
+    "admob_create_app": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "app_store_id": {
+                    "type": "string",
+                    "description": "App store ID (e.g., 'com.example.app' for Android, '123456789' for iOS)"
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Optional display name for the app"
+                }
             },
-            "app_store_id": {
-                "type": "string",
-                "description": "App store ID (e.g., 'com.example.app' for Android, '123456789' for iOS)"
-            },
-            "display_name": {
-                "type": "string",
-                "description": "Optional display name for the app"
-            }
+            "required": ["account_id", "app_store_id"]
         },
-        "required": ["account_id", "app_store_id"]
+        "uiSchema": {
+            "account_id": {
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
+            }
+        }
     },
 
-    "Create AdMob Ad Unit": {
-        "type": "object",
-        "properties": {
+    "admob_create_ad_unit": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "app_id": {
+                    "type": "string",
+                    "description": "App ID this ad unit belongs to"
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Display name for the ad unit (max 80 chars)",
+                    "maxLength": 80
+                },
+                "ad_format": {
+                    "type": "string",
+                    "enum": ["BANNER", "INTERSTITIAL", "REWARDED", "REWARDED_INTERSTITIAL", "NATIVE", "APP_OPEN"],
+                    "description": "Ad format type"
+                },
+                "ad_types": {
+                    "type": "string",
+                    "description": "Comma-separated ad types (RICH_MEDIA, VIDEO)"
+                }
+            },
+            "required": ["account_id", "app_id", "display_name", "ad_format"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "app_id": {
-                "type": "string",
-                "description": "App ID this ad unit belongs to",
-                "x-dynamic": "apps",
-                "x-depends-on": "account_id"
-            },
-            "display_name": {
-                "type": "string",
-                "description": "Display name for the ad unit (max 80 chars)",
-                "maxLength": 80
-            },
-            "ad_format": {
-                "type": "string",
-                "enum": ["BANNER", "INTERSTITIAL", "REWARDED", "REWARDED_INTERSTITIAL", "NATIVE", "APP_OPEN"],
-                "description": "Ad format type"
-            },
-            "ad_types": {
-                "type": "string",
-                "description": "Comma-separated ad types (RICH_MEDIA, VIDEO)"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "apps", "dependsOn": "account_id"}
             }
-        },
-        "required": ["account_id", "app_id", "display_name", "ad_format"]
+        }
     },
 
-    "Create Ad Unit Mapping": {
-        "type": "object",
-        "properties": {
+    "admob_create_ad_unit_mapping": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "ad_unit_id": {
+                    "type": "string",
+                    "description": "Ad unit ID"
+                },
+                "ad_source_id": {
+                    "type": "string",
+                    "description": "Ad source ID"
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Display name for the mapping"
+                }
+            },
+            "required": ["account_id", "ad_unit_id", "ad_source_id", "display_name"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "ad_unit_id": {
-                "type": "string",
-                "description": "Ad unit ID",
-                "x-dynamic": "ad_units",
-                "x-depends-on": "account_id"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id"}
             },
             "ad_source_id": {
-                "type": "string",
-                "description": "Ad source ID",
-                "x-dynamic": "ad_sources",
-                "x-depends-on": "account_id"
-            },
-            "display_name": {
-                "type": "string",
-                "description": "Display name for the mapping"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
             }
-        },
-        "required": ["account_id", "ad_unit_id", "ad_source_id", "display_name"]
+        }
     },
 
-    "Batch Create Ad Unit Mappings": {
-        "type": "object",
-        "properties": {
+    "admob_batch_create_ad_unit_mappings": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "mappings_json": {
+                    "type": "string",
+                    "description": "JSON array of mappings with ad_unit_id, ad_source_id, display_name"
+                }
+            },
+            "required": ["account_id", "mappings_json"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "mappings_json": {
-                "type": "string",
-                "description": "JSON array of mappings with ad_unit_id, ad_source_id, display_name"
+                "ui:widget": "textarea"
             }
-        },
-        "required": ["account_id", "mappings_json"]
+        }
     },
 
-    "Create Mediation Group": {
-        "type": "object",
-        "properties": {
+    "admob_create_mediation_group": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Display name for the mediation group (max 120 chars)",
+                    "maxLength": 120
+                },
+                "platform": {
+                    "type": "string",
+                    "enum": ["IOS", "ANDROID"],
+                    "description": "Target platform"
+                },
+                "ad_format": {
+                    "type": "string",
+                    "enum": ["APP_OPEN", "BANNER", "INTERSTITIAL", "NATIVE", "REWARDED", "REWARDED_INTERSTITIAL"],
+                    "description": "Ad format type"
+                },
+                "ad_unit_ids": {
+                    "type": "string",
+                    "description": "Comma-separated list of ad unit IDs"
+                },
+                "state": {
+                    "type": "string",
+                    "enum": ["ENABLED", "DISABLED"],
+                    "default": "ENABLED",
+                    "description": "Mediation group state"
+                }
+            },
+            "required": ["account_id", "display_name", "platform", "ad_format", "ad_unit_ids"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
-            },
-            "display_name": {
-                "type": "string",
-                "description": "Display name for the mediation group (max 120 chars)",
-                "maxLength": 120
-            },
-            "platform": {
-                "type": "string",
-                "enum": ["IOS", "ANDROID"],
-                "description": "Target platform"
-            },
-            "ad_format": {
-                "type": "string",
-                "enum": ["APP_OPEN", "BANNER", "INTERSTITIAL", "NATIVE", "REWARDED", "REWARDED_INTERSTITIAL"],
-                "description": "Ad format type"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "ad_unit_ids": {
-                "type": "string",
-                "description": "Comma-separated list of ad unit IDs",
-                "x-dynamic": "ad_units",
-                "x-depends-on": "account_id",
-                "x-multi-select": True
-            },
-            "state": {
-                "type": "string",
-                "enum": ["ENABLED", "DISABLED"],
-                "default": "ENABLED",
-                "description": "Mediation group state"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id", "multiSelect": True}
             }
-        },
-        "required": ["account_id", "display_name", "platform", "ad_format", "ad_unit_ids"]
+        }
     },
 
-    "Update Mediation Group": {
-        "type": "object",
-        "properties": {
+    "admob_update_mediation_group": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "mediation_group_id": {
+                    "type": "string",
+                    "description": "Mediation group ID to update"
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "New display name (optional)"
+                },
+                "state": {
+                    "type": "string",
+                    "enum": ["ENABLED", "DISABLED"],
+                    "description": "New state (optional)"
+                },
+                "ad_unit_ids": {
+                    "type": "string",
+                    "description": "Comma-separated list of updated ad unit IDs"
+                }
+            },
+            "required": ["account_id", "mediation_group_id"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
-                "type": "string",
-                "description": "Mediation group ID to update",
-                "x-dynamic": "mediation_groups",
-                "x-depends-on": "account_id"
-            },
-            "display_name": {
-                "type": "string",
-                "description": "New display name (optional)"
-            },
-            "state": {
-                "type": "string",
-                "enum": ["ENABLED", "DISABLED"],
-                "description": "New state (optional)"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
             },
             "ad_unit_ids": {
-                "type": "string",
-                "description": "Comma-separated list of updated ad unit IDs",
-                "x-dynamic": "ad_units",
-                "x-depends-on": "account_id",
-                "x-multi-select": True
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id", "multiSelect": True}
             }
-        },
-        "required": ["account_id", "mediation_group_id"]
+        }
     },
 
-    "Create Mediation A/B Experiment": {
-        "type": "object",
-        "properties": {
+    "admob_create_mediation_ab_experiment": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "mediation_group_id": {
+                    "type": "string",
+                    "description": "Mediation group ID to experiment on"
+                },
+                "display_name": {
+                    "type": "string",
+                    "description": "Experiment name"
+                },
+                "traffic_percentage": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 50,
+                    "description": "Traffic percentage for experiment variant (1-99)"
+                }
+            },
+            "required": ["account_id", "mediation_group_id", "display_name"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
-                "type": "string",
-                "description": "Mediation group ID to experiment on",
-                "x-dynamic": "mediation_groups",
-                "x-depends-on": "account_id"
-            },
-            "display_name": {
-                "type": "string",
-                "description": "Experiment name"
-            },
-            "traffic_percentage": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 99,
-                "default": 50,
-                "description": "Traffic percentage for experiment variant (1-99)"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
             }
-        },
-        "required": ["account_id", "mediation_group_id", "display_name"]
+        }
     },
 
-    "Stop Mediation A/B Experiment": {
-        "type": "object",
-        "properties": {
+    "admob_stop_mediation_ab_experiment": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "description": "Publisher account ID"
+                },
+                "mediation_group_id": {
+                    "type": "string",
+                    "description": "Mediation group ID with the experiment"
+                },
+                "variant_choice": {
+                    "type": "string",
+                    "enum": ["ORIGINAL", "EXPERIMENT"],
+                    "description": "Which variant to keep"
+                }
+            },
+            "required": ["account_id", "mediation_group_id", "variant_choice"]
+        },
+        "uiSchema": {
             "account_id": {
-                "type": "string",
-                "description": "Publisher account ID",
-                "x-dynamic": "accounts"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
-                "type": "string",
-                "description": "Mediation group ID with the experiment",
-                "x-dynamic": "mediation_groups",
-                "x-depends-on": "account_id"
-            },
-            "variant_choice": {
-                "type": "string",
-                "enum": ["ORIGINAL", "EXPERIMENT"],
-                "description": "Which variant to keep"
+                "ui:widget": "AsyncSelectWidget",
+                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
             }
-        },
-        "required": ["account_id", "mediation_group_id", "variant_choice"]
+        }
     },
+}
 
+
+# =============================================================================
+# Legacy Tool Schemas (display name keyed, for backward compatibility)
+# =============================================================================
+# NOTE: These are deprecated. Use get_tool_schema_by_mcp_name() for new code.
+
+TOOL_SCHEMAS: dict[str, dict] = {
     # Ad Manager tools - these use generic data dict, less useful for editing
     "Create Ad Unit": {
         "type": "object",

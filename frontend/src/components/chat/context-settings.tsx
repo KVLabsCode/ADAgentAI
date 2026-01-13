@@ -32,6 +32,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useChatSettings } from "@/lib/chat-settings"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useUser } from "@/hooks/use-user"
@@ -624,8 +625,9 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto bg-background">
-          <div className="py-2">
+        <div className="flex-1 min-h-0 bg-background">
+          <ScrollArea type="hover" style={{ maxHeight: "calc(65vh - 180px)" }}>
+            <div className="py-2">
             {/* AdMob Section */}
             {admobProviders.length > 0 &&
               renderSection(
@@ -693,7 +695,8 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
                 )}
               </>
             )}
-          </div>
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Footer - solid background with z-index to stay above scroll content */}

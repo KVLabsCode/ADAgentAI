@@ -22,8 +22,8 @@ class ResponseFormat(str, Enum):
 class BaseInput(BaseModel):
     """Base input with common fields."""
     response_format: ResponseFormat = Field(
-        default=ResponseFormat.MARKDOWN,
-        description="Output format: 'markdown' for human-readable, 'json' for structured data"
+        default=ResponseFormat.JSON,
+        description="Output format: 'json' for structured data, 'markdown' for human-readable"
     )
 
 

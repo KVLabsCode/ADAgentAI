@@ -82,7 +82,7 @@ class ListAccountsInput(BaseModel):
 
     page_size: Optional[int] = Field(default=20, description="Max accounts to return (1-100)", ge=1, le=100)
     page_token: Optional[str] = Field(default=None, description="Pagination token")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
 
 class GetAccountInput(BaseModel):
@@ -90,7 +90,7 @@ class GetAccountInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
 
     account_id: str = Field(..., description="Publisher account ID (e.g., 'pub-1234567890123456')", min_length=1)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -109,7 +109,7 @@ class ListAppsInput(BaseModel):
     account_id: str = Field(..., description="Publisher account ID", min_length=1)
     page_size: Optional[int] = Field(default=100, ge=1, le=20000)
     page_token: Optional[str] = Field(default=None)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -125,7 +125,7 @@ class CreateAppInput(BaseModel):
     platform: Platform = Field(..., description="Platform: IOS or ANDROID")
     display_name: str = Field(..., description="Display name of the app", min_length=1, max_length=80)
     app_store_id: Optional[str] = Field(default=None, description="App store ID (bundle ID for iOS, package name for Android)")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -144,7 +144,7 @@ class ListAdUnitsInput(BaseModel):
     account_id: str = Field(..., description="Publisher account ID", min_length=1)
     page_size: Optional[int] = Field(default=100, ge=1, le=20000)
     page_token: Optional[str] = Field(default=None)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -161,7 +161,7 @@ class CreateAdUnitInput(BaseModel):
     display_name: str = Field(..., description="Display name", min_length=1, max_length=80)
     ad_format: AdFormat = Field(..., description="Ad format type")
     ad_types: Optional[List[str]] = Field(default=None, description="Ad types: RICH_MEDIA, VIDEO")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -182,7 +182,7 @@ class ListAdUnitMappingsInput(BaseModel):
     page_size: Optional[int] = Field(default=100, ge=1, le=20000)
     page_token: Optional[str] = Field(default=None)
     filter: Optional[str] = Field(default=None, description="Filter by DISPLAY_NAME")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -199,7 +199,7 @@ class CreateAdUnitMappingInput(BaseModel):
     ad_source_id: str = Field(..., description="Ad source ID")
     display_name: str = Field(..., description="Display name")
     ad_unit_configurations: Optional[dict] = Field(default=None, description="Ad source specific configurations")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -223,7 +223,7 @@ class BatchCreateAdUnitMappingsInput(BaseModel):
 
     account_id: str = Field(..., description="Publisher account ID", min_length=1)
     mappings: List[AdUnitMappingRequest] = Field(..., description="List of mappings to create (max 100)", max_length=100)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -242,7 +242,7 @@ class ListAdSourcesInput(BaseModel):
     account_id: str = Field(..., description="Publisher account ID", min_length=1)
     page_size: Optional[int] = Field(default=100, ge=1, le=20000)
     page_token: Optional[str] = Field(default=None)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -258,7 +258,7 @@ class ListAdaptersInput(BaseModel):
     ad_source_id: str = Field(..., description="Ad source ID", min_length=1)
     page_size: Optional[int] = Field(default=100, ge=1, le=20000)
     page_token: Optional[str] = Field(default=None)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -278,7 +278,7 @@ class ListMediationGroupsInput(BaseModel):
     page_size: Optional[int] = Field(default=100, ge=1, le=20000)
     page_token: Optional[str] = Field(default=None)
     filter: Optional[str] = Field(default=None, description="Filter expression (EBNF syntax)")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -304,7 +304,7 @@ class CreateMediationGroupInput(BaseModel):
     display_name: str = Field(..., description="Display name", min_length=1, max_length=120)
     targeting: MediationGroupTargeting = Field(..., description="Targeting configuration")
     state: MediationGroupState = Field(default=MediationGroupState.ENABLED)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -321,7 +321,7 @@ class UpdateMediationGroupInput(BaseModel):
     display_name: Optional[str] = Field(default=None, description="New display name")
     state: Optional[MediationGroupState] = Field(default=None, description="New state")
     targeting_ad_unit_ids: Optional[List[str]] = Field(default=None, description="Updated ad unit IDs")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -341,7 +341,7 @@ class CreateMediationAbExperimentInput(BaseModel):
     mediation_group_id: str = Field(..., description="Mediation group ID", min_length=1)
     display_name: str = Field(..., description="Experiment display name", min_length=1)
     traffic_percentage: int = Field(default=50, description="Traffic percentage for experiment variant (1-99)", ge=1, le=99)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -356,7 +356,7 @@ class StopMediationAbExperimentInput(BaseModel):
     account_id: str = Field(..., description="Publisher account ID", min_length=1)
     mediation_group_id: str = Field(..., description="Mediation group ID", min_length=1)
     variant_choice: ExperimentVariant = Field(..., description="Which variant to keep: ORIGINAL or EXPERIMENT")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -378,7 +378,7 @@ class GenerateMediationReportInput(BaseModel):
     dimensions: List[str] = Field(default=["DATE"], description="Report dimensions")
     metrics: List[str] = Field(default=["IMPRESSIONS", "ESTIMATED_EARNINGS"], description="Report metrics")
     max_report_rows: Optional[int] = Field(default=1000, ge=1, le=100000)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -396,7 +396,7 @@ class GenerateNetworkReportInput(BaseModel):
     dimensions: List[str] = Field(default=["DATE"], description="Report dimensions")
     metrics: List[str] = Field(default=["IMPRESSIONS", "ESTIMATED_EARNINGS"], description="Report metrics")
     max_report_rows: Optional[int] = Field(default=1000, ge=1, le=100000)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod
@@ -414,7 +414,7 @@ class GenerateCampaignReportInput(BaseModel):
     dimensions: List[str] = Field(default=["DATE", "CAMPAIGN_ID"], description="Report dimensions")
     metrics: List[str] = Field(default=["IMPRESSIONS", "CLICKS"], description="Report metrics")
     language_code: Optional[str] = Field(default="en-US", description="Language code for localized text")
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+    response_format: ResponseFormat = Field(default=ResponseFormat.JSON)
 
     @field_validator('account_id')
     @classmethod

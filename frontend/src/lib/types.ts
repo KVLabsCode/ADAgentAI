@@ -17,13 +17,36 @@ export interface JSONSchema {
   required?: string[]
 }
 
+// RJSF UI Schema types
+export interface UISchemaField {
+  "ui:widget"?: string
+  "ui:options"?: {
+    fetchType?: "accounts" | "apps" | "ad_units" | "ad_sources" | "mediation_groups" | "networks"
+    dependsOn?: string
+    multiSelect?: boolean
+  }
+  "ui:help"?: string
+  "ui:placeholder"?: string
+  "ui:disabled"?: boolean
+}
+
+export interface UISchema {
+  [fieldName: string]: UISchemaField
+}
+
+// RJSF-compatible schema format from backend
+export interface RJSFSchema {
+  schema: JSONSchema
+  uiSchema: UISchema
+}
+
 // Sequential event types for streaming
 export type StreamEventItem =
   | { type: "routing"; service: string; capability: string; thinking?: string }
   | { type: "thinking"; content: string }
   | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean }
   | { type: "tool_result"; name: string; result: unknown }
-  | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: JSONSchema }
+  | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: RJSFSchema }
   | { type: "tool_denied"; tool_name: string; reason: string }
 
 export interface Message {

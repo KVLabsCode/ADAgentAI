@@ -8,17 +8,31 @@ import { cn } from "@/lib/utils"
 function ScrollArea({
   className,
   children,
+  style,
+  viewportClassName,
+  type = "hover",
+  scrollHideDelay = 400,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  style?: React.CSSProperties
+  viewportClassName?: string
+}) {
+  // Extract maxHeight to apply to viewport for proper scroll behavior
+  const { maxHeight, ...restStyle } = style || {}
+
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
       className={cn("relative overflow-hidden", className)}
+      style={restStyle}
+      type={type}
+      scrollHideDelay={scrollHideDelay}
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1 overflow-y-auto overflow-x-hidden"
+        className={cn("!block w-full h-full rounded-[inherit]", viewportClassName)}
+        style={maxHeight ? { maxHeight, overflowY: 'scroll' } : { overflowY: 'scroll' }}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
@@ -38,18 +52,18 @@ function ScrollBar({
       data-slot="scroll-area-scrollbar"
       orientation={orientation}
       className={cn(
-        "flex touch-none select-none transition-opacity duration-150",
+        "flex touch-none select-none transition-colors duration-150",
         orientation === "vertical" &&
-          "h-full w-2 border-l border-l-transparent p-px",
+          "h-full w-3 py-2 pr-1.5",
         orientation === "horizontal" &&
-          "h-2 flex-col border-t border-t-transparent p-px",
+          "w-full h-3 px-2 pb-1.5 flex-col",
         className
       )}
       {...props}
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
-        className="relative flex-1 rounded-full bg-foreground/15 hover:bg-foreground/25 transition-colors"
+        className="relative flex-1 rounded-lg bg-zinc-500 hover:bg-zinc-400 transition-colors duration-150"
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   )
