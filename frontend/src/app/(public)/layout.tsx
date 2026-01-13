@@ -128,8 +128,8 @@ export default function PublicLayout({
 
             {/* Mobile sign in - after hamburger */}
             {!isAuthenticated && !isLoading && (
-              <Button asChild size="icon" className="sm:hidden h-8 w-8 ml-1 bg-foreground text-background hover:bg-foreground/90">
-                <Link href="/login" className="text-xs font-medium">in</Link>
+              <Button asChild size="sm" className="sm:hidden h-8 ml-1 px-3 bg-foreground text-background hover:bg-foreground/90 text-xs">
+                <Link href="/login">Sign in</Link>
               </Button>
             )}
           </nav>
