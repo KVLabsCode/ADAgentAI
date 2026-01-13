@@ -33,10 +33,10 @@ import {
   EmptyState,
   StatusMessage,
 } from "@/components/ui/theme"
+import { AdMobLogo, ProviderLogoBadge } from "@/components/icons/provider-logos"
 import { AccountSelectionModal } from "@/components/providers/account-selection-modal"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
-import { cn } from "@/lib/utils"
 import type { Provider, OAuthAccount } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -288,9 +288,7 @@ function ProvidersContent() {
                   {connectingType === 'admob' ? (
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : (
-                    <div className="h-5 w-5 rounded bg-emerald-600 flex items-center justify-center text-white text-[9px] font-semibold">
-                      A
-                    </div>
+                    <AdMobLogo size="sm" />
                   )}
                   <span>{connectingType === 'admob' ? 'Connecting...' : 'AdMob'}</span>
                 </div>
@@ -301,9 +299,7 @@ function ProvidersContent() {
                 className="text-xs"
               >
                 <div className="flex items-center gap-2">
-                  <div className="h-5 w-5 rounded bg-muted flex items-center justify-center text-muted-foreground text-[9px] font-semibold">
-                    G
-                  </div>
+                  <ProviderLogoBadge type="gam" size="sm" disabled />
                   <span className="flex-1 text-muted-foreground">Google Ad Manager</span>
                   <Badge variant="outline" className="text-[8px] h-3 px-1 border-border/40 text-muted-foreground/60 leading-none">
                     Soon
@@ -372,16 +368,7 @@ function ProvidersContent() {
                 <div key={provider.id} className="px-4 py-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "h-8 w-8 rounded flex items-center justify-center text-white text-xs font-semibold",
-                          provider.type === "admob"
-                            ? "bg-emerald-600"
-                            : "bg-muted"
-                        )}
-                      >
-                        {provider.type === "admob" ? "A" : "G"}
-                      </div>
+                      <ProviderLogoBadge type={provider.type} size="sm" />
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">
@@ -462,22 +449,18 @@ function ProvidersContent() {
           description="ADAgentAI currently supports these ad platforms."
         />
         <SectionCardContent>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex items-center gap-3 p-3 rounded border border-border/30">
-              <div className="h-8 w-8 rounded bg-emerald-600 flex items-center justify-center text-white text-xs font-semibold">
-                A
-              </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center gap-3 p-3 rounded border border-border/50 bg-card">
+              <AdMobLogo size="sm" />
               <div>
-                <p className="text-xs font-medium">AdMob</p>
+                <p className="text-sm font-medium">AdMob</p>
                 <p className="text-[10px] text-muted-foreground">Available</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded border border-border/30">
-              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs font-semibold">
-                G
-              </div>
+            <div className="flex items-center gap-3 p-3 rounded border border-border/50 bg-card">
+              <ProviderLogoBadge type="gam" size="sm" disabled />
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Google Ad Manager</p>
+                <p className="text-sm font-medium text-muted-foreground">Google Ad Manager</p>
                 <p className="text-[10px] text-muted-foreground">Coming soon</p>
               </div>
             </div>

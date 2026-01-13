@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ArrowRight, Sparkles, Shield, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { WaitlistDialog } from "@/components/waitlist-dialog"
+import { AdMobLogo, ProviderLogoBadge } from "@/components/icons/provider-logos"
 import { useUser } from "@/hooks/use-user"
 
 export default function LandingPage() {
@@ -101,19 +102,14 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto">
             <p className="text-xs text-center text-muted-foreground mb-6">Supported Platforms</p>
             <div className="flex items-center justify-center gap-8">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white text-xs font-semibold">
-                  A
-                </div>
+              <div className="flex items-center gap-2.5">
+                <AdMobLogo />
                 <span className="text-sm font-medium">AdMob</span>
               </div>
-              <div className="flex items-center gap-2 grayscale brightness-75 opacity-70">
-                <div className="h-8 w-8 rounded bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-semibold relative overflow-hidden">
-                  G
-                  <div className="absolute inset-0 bg-black/20" />
-                </div>
+              <div className="flex items-center gap-2.5">
+                <ProviderLogoBadge type="gam" disabled />
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium">Google Ad Manager</span>
+                  <span className="text-sm font-medium text-muted-foreground">Google Ad Manager</span>
                   <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Coming Soon</span>
                 </div>
               </div>
