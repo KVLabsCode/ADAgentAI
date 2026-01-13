@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { SendHorizonal, Loader2 } from "lucide-react"
+import { SendHorizonal, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -10,6 +10,7 @@ import type { Provider } from "@/lib/types"
 
 interface ChatInputProps {
   onSend: (message: string) => void
+  onStop?: () => void
   disabled?: boolean
   isLoading?: boolean
   placeholder?: string
@@ -18,6 +19,7 @@ interface ChatInputProps {
 
 export function ChatInput({
   onSend,
+  onStop,
   disabled = false,
   isLoading = false,
   placeholder = "Type your message...",
@@ -57,7 +59,7 @@ export function ChatInput({
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        disabled={disabled || isLoading}
+        disabled={disabled || (isLoading && !onStop)}
         rows={1}
         className={cn(
           "min-h-[54px] max-h-[200px] resize-none pl-12 pr-8 py-4 text-base",
@@ -65,7 +67,7 @@ export function ChatInput({
           "text-zinc-900 dark:text-zinc-100",
           "focus-visible:ring-1 focus-visible:ring-zinc-300 dark:focus-visible:ring-zinc-600/60 focus-visible:border-zinc-300 dark:focus-visible:border-zinc-600/60",
           "placeholder:text-zinc-400 dark:placeholder:text-zinc-500",
-          disabled && "opacity-50 cursor-not-allowed"
+          (disabled || (isLoading && !onStop)) && "opacity-50 cursor-not-allowed"
         )}
       />
       {/* Context settings icon - bottom left */}
@@ -74,23 +76,29 @@ export function ChatInput({
       </div>
       {/* Send button - bottom right */}
       <Button
-        type="submit"
+        type={isLoading ? "button" : "submit"}
         size="icon"
-        disabled={disabled || isLoading || !value.trim()}
+        disabled={disabled || (!isLoading && !value.trim())}
+        onClick={(e) => {
+          if (isLoading && onStop) {
+            e.preventDefault()
+            onStop()
+          }
+        }}
         className={cn(
           "absolute right-2.5 bottom-2.5 h-9 w-9 rounded-full",
           "transition-all duration-150",
-          value.trim() && !disabled && !isLoading
+          (value.trim() || isLoading) && !disabled
             ? "opacity-100 bg-zinc-900 dark:bg-white text-zinc-50 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-sm"
             : "opacity-40 bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
         )}
       >
         {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Square className="h-3.5 w-3.5 fill-current" />
         ) : (
           <SendHorizonal className="h-4 w-4" />
         )}
-        <span className="sr-only">Send message</span>
+        <span className="sr-only">{isLoading ? "Stop generating" : "Send message"}</span>
       </Button>
     </form>
   )

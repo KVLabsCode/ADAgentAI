@@ -600,6 +600,14 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     handleSendMessage(prompt)
   }
 
+  const handleStop = React.useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setIsLoading(false)
+  }, [])
+
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
@@ -633,6 +641,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             <div className="w-full">
               <ChatInput
                 onSend={handleSendMessage}
+                onStop={handleStop}
                 disabled={!hasProviders}
                 isLoading={isLoading}
                 placeholder={hasProviders ? "Ask anything about your ads..." : "Connect a provider first"}
@@ -658,6 +667,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
             <div className="max-w-3xl mx-auto w-full">
               <ChatInput
                 onSend={handleSendMessage}
+                onStop={handleStop}
                 disabled={!hasProviders}
                 isLoading={isLoading}
                 providers={providers}
