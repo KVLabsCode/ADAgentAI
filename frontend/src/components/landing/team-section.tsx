@@ -31,9 +31,10 @@ export function TeamSection() {
                   Built for teams
                 </h2>
               </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Create organizations, invite team members, and manage access—all from one place.
-              </p>
+              <div className="text-muted-foreground text-sm leading-relaxed space-y-1">
+                <p>Create organizations, invite team members, and manage access</p>
+                <p className="text-muted-foreground/70">All from one place</p>
+              </div>
 
               {/* Feature list */}
               <ul className="space-y-3 pt-2">
@@ -57,7 +58,7 @@ export function TeamSection() {
             </div>
 
             {/* Mock Organization Card */}
-            <div className="relative order-1 lg:order-2 lg:pl-4 lg:-mr-6 lg:w-[calc(100%+1.5rem)]">
+            <div className="relative order-1 lg:order-2 lg:pl-4">
               {/* Light theme version */}
               <div className="dark:hidden rounded border border-zinc-200 bg-white shadow-sm">
                 {/* Header */}
@@ -90,21 +91,19 @@ export function TeamSection() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
+                          <button
+                            type="button"
+                            className="h-7 px-2 text-xs text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 rounded flex items-center transition-colors"
                           >
                             <RotateCw className="h-3 w-3 mr-1" />
                             Resend
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          </button>
+                          <button
+                            type="button"
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 active:bg-red-100 rounded flex items-center justify-center transition-colors"
                           >
                             <X className="h-3 w-3" />
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -187,21 +186,19 @@ export function TeamSection() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                          <button
+                            type="button"
+                            className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 active:bg-zinc-700 rounded flex items-center transition-colors"
                           >
                             <RotateCw className="h-3 w-3 mr-1" />
                             Resend
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                          </button>
+                          <button
+                            type="button"
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 rounded flex items-center justify-center transition-colors"
                           >
                             <X className="h-3 w-3" />
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     </div>

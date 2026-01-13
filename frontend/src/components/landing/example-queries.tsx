@@ -72,21 +72,24 @@ export function ExampleQueriesSection() {
           </div>
 
           {/* Tab buttons */}
-          <div className="flex justify-center gap-1 mb-10">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveTab(cat.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors ${
-                  activeTab === cat.id
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <cat.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{cat.label}</span>
-              </button>
-            ))}
+          <div className="flex flex-col items-center mb-10">
+            <div className="flex justify-center gap-1">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveTab(cat.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors ${
+                    activeTab === cat.id
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <cat.icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+            <span className="sm:hidden text-xs text-muted-foreground/60 mt-3">{activeCategory.label}</span>
           </div>
 
           {/* Queries */}

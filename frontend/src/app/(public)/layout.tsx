@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import { Moon, Sun, LayoutDashboard, LogOut, Menu } from "lucide-react"
+import { Moon, Sun, LayoutDashboard, LogOut, Menu, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -128,8 +128,11 @@ export default function PublicLayout({
 
             {/* Mobile sign in - after hamburger */}
             {!isAuthenticated && !isLoading && (
-              <Button asChild size="sm" className="sm:hidden h-8 ml-1 px-3 bg-foreground text-background hover:bg-foreground/90 text-xs">
-                <Link href="/login">Sign in</Link>
+              <Button asChild size="icon" className="sm:hidden h-8 w-8 ml-1 bg-foreground text-background hover:bg-foreground/90">
+                <Link href="/login">
+                  <LogIn className="h-4 w-4" />
+                  <span className="sr-only">Sign in</span>
+                </Link>
               </Button>
             )}
           </nav>

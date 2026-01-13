@@ -11,7 +11,7 @@ interface HeroSectionProps {
 
 export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   return (
-    <section className="relative py-12 md:py-28">
+    <section className="relative py-20 md:py-20">
       <div className="container mx-auto px-6">
         <div className="max-w-4xl mx-auto text-center">
           {/* Early Access Badge */}
@@ -30,9 +30,9 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
 
           {/* Description */}
           <div className="text-muted-foreground text-sm md:text-base mb-6 md:mb-8 space-y-1">
-            <p>Skip the dashboards.</p>
-            <p>Let agents handle reports, mediation, and tests.</p>
-            <p className="text-muted-foreground/70">You focus on strategy.</p>
+            <p>Skip the dashboards</p>
+            <p>Let agents handle reports, mediation, and tests</p>
+            <p className="text-muted-foreground/70">You focus on strategy</p>
           </div>
 
           {/* Agent types */}

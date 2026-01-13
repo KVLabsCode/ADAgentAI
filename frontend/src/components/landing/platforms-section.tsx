@@ -11,7 +11,7 @@ export function PlatformsSection() {
   const [enabled, setEnabled] = useState(true)
 
   return (
-    <section className="py-12 md:py-28">
+    <section className="py-14 md:py-20">
       <div className="container mx-auto px-6">
         <div className="max-w-6xl mx-auto">
           {/* Mobile Section Header - Hidden on desktop */}
@@ -27,7 +27,7 @@ export function PlatformsSection() {
           {/* Two-column layout: Mock UI left, Text right */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Mock Provider Cards */}
-            <div className="relative order-1 lg:order-1 lg:pr-4 lg:-ml-6 lg:w-[calc(100%+1.5rem)]">
+            <div className="relative order-1 lg:order-1 lg:pr-4">
               {/* Light theme version */}
               <div className="space-y-4 dark:hidden">
                 {/* Connected Provider - Light */}
@@ -62,9 +62,12 @@ export function PlatformsSection() {
                           <span className="text-[10px] text-zinc-500 hidden sm:inline">{enabled ? "Enabled" : "Disabled"}</span>
                           <Switch checked={enabled} onCheckedChange={setEnabled} className="scale-75" />
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-rose-500 hover:bg-zinc-100">
+                        <button
+                          type="button"
+                          className="h-8 w-8 text-zinc-400 hover:text-rose-500 hover:bg-zinc-100 active:bg-zinc-200 rounded flex items-center justify-center transition-colors"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -136,9 +139,12 @@ export function PlatformsSection() {
                           <span className="text-[10px] text-zinc-500 hidden sm:inline">{enabled ? "Enabled" : "Disabled"}</span>
                           <Switch checked={enabled} onCheckedChange={setEnabled} className="scale-75" />
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-rose-500 hover:bg-zinc-800">
+                        <button
+                          type="button"
+                          className="h-8 w-8 text-zinc-500 hover:text-rose-500 hover:bg-zinc-800 active:bg-zinc-700 rounded flex items-center justify-center transition-colors"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -188,9 +194,11 @@ export function PlatformsSection() {
                   Connect your ad platforms
                 </h2>
               </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Link your accounts in seconds. ADAgentAI securely connects via OAuth—your credentials are never stored.
-              </p>
+              <div className="text-muted-foreground text-sm leading-relaxed space-y-1">
+                <p>Link your accounts in seconds</p>
+                <p>ADAgentAI securely connects via OAuth</p>
+                <p className="text-muted-foreground/70">Your credentials are never stored</p>
+              </div>
 
               {/* Feature list */}
               <ul className="space-y-3 pt-2">
