@@ -60,15 +60,15 @@ export function ChatInput({
         disabled={disabled || isLoading}
         rows={1}
         className={cn(
-          "min-h-[48px] max-h-[200px] resize-none pl-12 pr-14 py-3 text-sm",
-          "rounded-lg border-border/50 bg-zinc-800/40",
+          "min-h-[54px] max-h-[200px] resize-none pl-12 pr-8 py-4 text-base",
+          "rounded-3xl border-border/50 bg-zinc-800/40",
           "focus-visible:ring-1 focus-visible:ring-zinc-600/60 focus-visible:border-zinc-600/60",
           "placeholder:text-muted-foreground/50",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       />
       {/* Context settings icon - bottom left */}
-      <div className="absolute left-2.5 bottom-2.5">
+      <div className="absolute left-3.5 bottom-3.5">
         <ContextSettings providers={providers} />
       </div>
       {/* Send button - bottom right */}
@@ -77,7 +77,7 @@ export function ChatInput({
         size="icon"
         disabled={disabled || isLoading || !value.trim()}
         className={cn(
-          "absolute right-2.5 bottom-2.5 h-8 w-8 rounded-md",
+          "absolute right-2.5 bottom-2.5 h-9 w-9 rounded-full",
           "transition-all duration-150",
           value.trim() && !disabled && !isLoading
             ? "opacity-100 bg-zinc-600 hover:bg-zinc-500"

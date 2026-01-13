@@ -7,7 +7,11 @@ This module wires up all nodes into a compilable graph with:
 """
 
 import os
-from typing import Literal
+import asyncio
+from typing import Literal, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -179,6 +183,7 @@ async def run_graph(
     selected_model: str | None = None,
     context_mode: str = "soft",
     enabled_accounts: list[str] | None = None,
+    content_queue: "asyncio.Queue[str | None] | None" = None,
 ):
     """Run the graph for a user query.
 
@@ -191,6 +196,7 @@ async def run_graph(
         selected_model: Model preference from frontend
         context_mode: Entity grounding mode ("soft" or "strict")
         enabled_accounts: Account IDs enabled for context (empty = all)
+        content_queue: Optional asyncio.Queue for streaming content chunks
 
     Yields:
         State updates as the graph executes (for streaming)
@@ -229,10 +235,11 @@ async def run_graph(
         "conversation_history": conversation_history or [],
     }
 
-    # Config with thread ID for checkpointing
+    # Config with thread ID for checkpointing and content queue for streaming
     config = {
         "configurable": {
             "thread_id": thread_id,
+            "content_queue": content_queue,  # For token-level streaming
         },
         "recursion_limit": 25,  # Prevent infinite loops
     }

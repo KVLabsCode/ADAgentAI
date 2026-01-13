@@ -22,9 +22,9 @@ export function ChatMessages({
 }: ChatMessagesProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null)
 
-  // Check if last message is an empty assistant message (streaming in progress)
+  // Check if last message is an assistant message currently streaming
   const lastMessage = messages[messages.length - 1]
-  const isStreaming = lastMessage?.role === "assistant" && !lastMessage.content && isLoading
+  const isStreamingMessage = lastMessage?.role === "assistant" && isLoading
 
   // Track last message content/events for scroll trigger during streaming
   const lastMessageContent = lastMessage?.content
@@ -37,7 +37,7 @@ export function ChatMessages({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="max-w-6xl mx-auto py-6 px-4 space-y-5">
+      <div className="max-w-3xl mx-auto py-6 px-4 md:px-0 space-y-6">
         {messages.map((message) => (
           <div key={message.id}>
             {message.role === "user" ? (
@@ -47,17 +47,16 @@ export function ChatMessages({
                 message={message}
                 onToolApproval={onToolApproval}
                 pendingApprovals={pendingApprovals}
+                isStreaming={message.id === lastMessage?.id && isStreamingMessage}
               />
             ) : null}
           </div>
         ))}
 
-        {/* Show typing indicator only when loading and no streaming message */}
-        {isLoading && !isStreaming && messages.length > 0 && (
+        {/* Show typing indicator only when loading and no streaming message with content */}
+        {isLoading && !isStreamingMessage && messages.length > 0 && (
           <div className="flex gap-3">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-white" />
-            </div>
+            {/* Bot icon hidden */}
             <div className="flex items-center gap-2 py-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Thinking...</span>

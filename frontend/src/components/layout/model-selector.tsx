@@ -31,12 +31,12 @@ export function ModelSelector() {
   React.useEffect(() => {
     if (!selectedModel) {
       // No model selected (initial state), set default
-      console.log("[ModelSelector] No model selected, setting default Gemini 2.5 Flash Lite")
-      setSelectedModel("openrouter/google/gemini-2.5-flash-lite")
+      console.log("[ModelSelector] No model selected, setting default Gemini 2.5 Flash")
+      setSelectedModel("openrouter/google/gemini-2.5-flash")
     } else if (!selectedModelInfo) {
       // Stored model ID doesn't exist in available models (e.g., old ID after update)
       console.log(`[ModelSelector] Stored model ID "${selectedModel}" not found in available models, resetting to default`)
-      setSelectedModel("openrouter/google/gemini-2.5-flash-lite")
+      setSelectedModel("openrouter/google/gemini-2.5-flash")
     }
   }, [selectedModel, selectedModelInfo, setSelectedModel])
 
@@ -49,7 +49,7 @@ export function ModelSelector() {
           className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-zinc-800/60 gap-1.5 rounded-md border border-transparent hover:border-zinc-700/50 transition-colors"
         >
           <Sparkles className="h-3 w-3 text-zinc-400" />
-          <span className="font-medium">{selectedModelInfo?.name || "Gemini 2.5 Flash Lite"}</span>
+          <span className="font-medium">{selectedModelInfo?.name || "Gemini 2.5 Flash"}</span>
           <ChevronDown className="h-3 w-3 text-zinc-500" />
         </Button>
       </PopoverTrigger>

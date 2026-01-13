@@ -29,6 +29,7 @@ interface AssistantMessageProps {
   message: Message
   onToolApproval?: (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => void
   pendingApprovals?: Map<string, boolean | null>
+  isStreaming?: boolean
 }
 
 // Extract short tool name from full MCP tool path
@@ -839,7 +840,7 @@ function getEventsFromMessage(message: Message): StreamEventItem[] {
   return events
 }
 
-export function AssistantMessage({ message, onToolApproval, pendingApprovals = new Map() }: AssistantMessageProps) {
+export function AssistantMessage({ message, onToolApproval, pendingApprovals = new Map(), isStreaming = false }: AssistantMessageProps) {
   const events = getEventsFromMessage(message)
   const { displayMode } = useChatSettings()
 
@@ -902,9 +903,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
   return (
     <div className="flex gap-2.5 group">
       {/* Agent Avatar - matches h-10 message height */}
-      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center">
-        <Sparkles className="h-5 w-5 text-white" />
-      </div>
+      {/* Agent Avatar hidden */}
 
       {/* Content - limited width for chat bubble feel */}
       <div className="flex-1 min-w-0 max-w-[85%] space-y-2">
@@ -919,9 +918,9 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
         {/* Events */}
         {displayMode === "compact" ? (
           <>
-            {processedEvents.filter(e => e.type !== "tool_group").map((event) => {
-              if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={event.thinking} />
-              if (event.type === "thinking") return <ThinkingBlock key={event.key} content={event.content} />
+            {/* Compact mode: Hide thinking blocks, hide routing reasoning, only show essential events */}
+            {processedEvents.filter(e => e.type !== "tool_group" && e.type !== "thinking").map((event) => {
+              if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={undefined} />
               if (event.type === "tool_approval_required") {
                 const approvalState = pendingApprovals.get(event.approval_id)
                 const isPending = approvalState === undefined || approvalState === null
@@ -953,19 +952,19 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           })
         )}
 
-        {/* Final Content - Markdown rendered */}
-        {message.content && (
+        {/* Final Content - Markdown rendered (show while streaming with cursor) */}
+        {(message.content || isStreaming) && (
           <div className="space-y-2">
-            <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
-              <div className="px-4 py-3">
+            <div>
+              <div className="pl-1">
                 <div className={cn(
-                  "prose prose-sm prose-invert max-w-none",
-                  "text-[13px] leading-relaxed text-zinc-200",
+                  "prose prose-invert max-w-none",
+                  "text-base leading-relaxed text-zinc-200",
                   // Headings - clear hierarchy
                   "prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
-                  "prose-h1:text-lg prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",
-                  "prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2",
-                  "prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1.5",
+                  "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",
+                  "prose-h2:text-lg prose-h2:mt-4 prose-h2:mb-2",
+                  "prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1.5",
                   // Paragraphs
                   "prose-p:my-2 prose-p:leading-relaxed",
                   // Lists
@@ -973,7 +972,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
                   "prose-ol:my-2 prose-ol:pl-4",
                   "prose-li:my-0.5 prose-li:marker:text-zinc-500",
                   // Code
-                  "prose-code:bg-zinc-700/60 prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:font-normal",
+                  "prose-code:bg-zinc-700/60 prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-normal",
                   "prose-code:before:content-none prose-code:after:content-none",
                   "prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-700/50 prose-pre:rounded-xl prose-pre:text-zinc-300",
                   // Strong/emphasis
@@ -988,13 +987,33 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
                   "prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-200 prose-th:font-medium",
                   "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-700/50"
                 )}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                    {message.content}
-                  </ReactMarkdown>
+                  {message.content ? (
+                    <>
+                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                        {message.content}
+                      </ReactMarkdown>
+                      {/* Streaming cursor - shown after content */}
+                      {isStreaming && (
+                        <span className="inline-block w-2 h-4 ml-0.5 bg-violet-400 animate-pulse rounded-sm" aria-label="Streaming response" />
+                      )}
+                    </>
+                  ) : isStreaming ? (
+                    /* Shimmering thinking indicator - shown before any content arrives */
+                    <div className="flex items-center gap-2 py-1">
+                      <div className="flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                      <span className="text-xs text-zinc-400 animate-pulse">Thinking...</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
-            <MessageActions content={message.content} messageId={message.id} />
+            {!isStreaming && message.content && (
+              <MessageActions content={message.content} messageId={message.id} />
+            )}
           </div>
         )}
       </div>

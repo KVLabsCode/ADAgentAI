@@ -96,7 +96,7 @@ export interface ChatContext {
   enabledAppIds: Record<string, string[]>;
   responseStyle: "concise" | "detailed";
   autoIncludeContext: boolean;
-  // Selected LLM model (e.g., "anthropic/claude-sonnet-4-20250514" or "openrouter/google/gemini-2.5-flash-lite")
+  // Selected LLM model (e.g., "anthropic/claude-sonnet-4-20250514" or "openrouter/google/gemini-2.5-flash")
   selectedModel?: string;
   // Context mode for entity grounding:
   // - "soft": Prefer enabled entities, allow explicit references to others

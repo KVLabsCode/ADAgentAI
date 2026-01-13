@@ -47,8 +47,8 @@ interface ChatSettingsState {
 export const useChatSettings = create<ChatSettingsState>()(
   persist(
     (set, get) => ({
-      displayMode: "detailed",
-      selectedModel: "openrouter/google/gemini-2.5-flash-lite",
+      displayMode: "compact",
+      selectedModel: "openrouter/google/gemini-2.5-flash",
       responseStyle: "concise",
       contextMode: "soft", // Default to soft mode (more flexible)
       jsonViewMode: "tree", // Default to tree view for better readability
@@ -115,7 +115,7 @@ export const AVAILABLE_MODELS = [
   {
     provider: "Google",
     models: [
-      { id: "openrouter/google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", description: "Fast and cost-effective" },
+      { id: "openrouter/google/gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Fast and cost-effective" },
       { id: "openrouter/google/gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Latest free Gemini model" },
     ],
   },

@@ -42,6 +42,13 @@ class ThinkingEvent(BaseModel):
     content: str
 
 
+class ContentEvent(BaseModel):
+    """Event sent for streaming content chunks during LLM response."""
+    type: str = EventType.CONTENT
+    content: str
+    is_final: bool = False  # True when this is the last chunk
+
+
 class ResultEvent(BaseModel):
     """Event sent for final result."""
     type: str = EventType.RESULT

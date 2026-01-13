@@ -113,12 +113,14 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
   const {
     responseStyle,
     contextMode,
+    displayMode,
     safeMode,
     enabledProviderIds,
     enabledAppIds,
     autoIncludeContext,
     setResponseStyle,
     setContextMode,
+    setDisplayMode,
     setSafeMode,
     toggleProvider,
     toggleApp,
@@ -728,6 +730,37 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
                   )}
                 >
                   Detailed
+                </button>
+              </div>
+            </div>
+
+            {/* Display Mode */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <span className="text-[9px] lg:text-[10px] text-muted-foreground shrink-0">Display:</span>
+              <div className="flex gap-0.5 p-0.5 rounded border border-border/50 bg-muted">
+                <button
+                  onClick={() => setDisplayMode("detailed")}
+                  title="Show all agent reasoning and tool details"
+                  className={cn(
+                    "px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium rounded transition-all",
+                    displayMode === "detailed"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Full
+                </button>
+                <button
+                  onClick={() => setDisplayMode("compact")}
+                  title="Hide reasoning, collapse tool calls"
+                  className={cn(
+                    "px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium rounded transition-all",
+                    displayMode === "compact"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Compact
                 </button>
               </div>
             </div>

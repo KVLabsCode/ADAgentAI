@@ -2,16 +2,19 @@
 
 Uses LangGraph's ReAct agent pattern for multi-step tool use.
 The specialist is configured based on the routing result (service/capability).
+Supports token-level streaming via asyncio.Queue passed in config.
 """
 
 import os
 import re
+import asyncio
 from typing import Any
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, AIMessageChunk
 from langsmith import traceable
+from langgraph.types import RunnableConfig
 
 from ..state import GraphState
 from .entity_loader import build_entity_system_prompt
@@ -149,14 +152,14 @@ def _get_model_from_selection(selected_model: str | None, enable_thinking: bool 
     Args:
         selected_model: Model selection from frontend
             - Anthropic: "anthropic/claude-sonnet-4-20250514" or "claude-sonnet-4-20250514"
-            - OpenRouter: "openrouter/google/gemini-2.5-flash-lite"
+            - OpenRouter: "openrouter/google/gemini-2.5-flash"
         enable_thinking: Enable extended thinking for complex reasoning (only for Claude)
 
     Returns:
         Configured LLM instance (ChatAnthropic or ChatOpenAI)
     """
     # Default to Gemini 2.5 Flash Lite via OpenRouter
-    default_model = "openrouter/google/gemini-2.5-flash-lite"
+    default_model = "openrouter/google/gemini-2.5-flash"
 
     # Use selected model or default
     model_id = selected_model or default_model
@@ -281,17 +284,21 @@ def _sanitize_tools_for_gemini(tools: list) -> list:
 
 
 @traceable(name="specialist_node", run_type="llm")
-async def specialist_node(state: GraphState) -> dict:
+async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     """Invoke the specialist LLM to generate a response or tool calls.
 
     This node:
     1. Builds the system prompt with entity grounding
     2. Loads MCP tools for the service
-    3. Invokes the LLM with tools bound
+    3. Streams the LLM response with tools bound (token-by-token)
     4. Returns either a response or tool calls for execution
+
+    Token-level streaming is achieved by putting content chunks into
+    the asyncio.Queue passed via config["configurable"]["content_queue"].
 
     Args:
         state: Current graph state
+        config: LangGraph config with content_queue for streaming
 
     Returns:
         Updated state with response or tool_calls
@@ -308,12 +315,30 @@ async def specialist_node(state: GraphState) -> dict:
     user_id = user_context.get("user_id")
 
     # Build system prompt
+    # Debug: log user_context to verify entity loading
+    accounts = user_context.get("accounts", [])
+    apps = user_context.get("apps", [])
+    print(f"[specialist] User context has {len(accounts)} accounts and {len(apps)} apps")
+    if accounts:
+        for acc in accounts[:3]:  # Log first 3 accounts
+            print(f"[specialist]   Account: {acc.get('name')} ({acc.get('type')}) - {acc.get('identifier')}")
+
     system_prompt = _build_system_prompt(
         service=service,
         capability=capability,
         user_context=user_context,
         conversation_history=conversation_history,
     )
+
+    # Debug: log system prompt length and preview
+    print(f"[specialist] System prompt length: {len(system_prompt)} chars")
+    # Log entity section if present
+    if "Available Entities" in system_prompt:
+        entity_start = system_prompt.find("## Available Entities")
+        entity_end = system_prompt.find("##", entity_start + 10) if entity_start >= 0 else -1
+        if entity_end == -1:
+            entity_end = min(entity_start + 500, len(system_prompt))
+        print(f"[specialist] Entity section preview: {system_prompt[entity_start:entity_end][:300]}...")
 
     # Get appropriate LLM
     llm = _get_model_from_selection(selected_model)
@@ -348,60 +373,142 @@ async def specialist_node(state: GraphState) -> dict:
     for msg in messages:
         llm_messages.append(msg)
 
+    # For OpenRouter/Gemini models, inject entity context as a user message
+    # This ensures the model "sees" the account info prominently
+    # Gemini models sometimes don't weight system prompts as heavily as Claude/GPT
+    if is_openrouter:
+        print(f"[specialist] OpenRouter model detected, injecting entity context into conversation")
+        accounts = user_context.get("accounts", [])
+        if accounts:
+            print(f"[specialist] Injecting {len(accounts)} accounts as context reminder")
+            account_summary = []
+            for acc in accounts[:5]:  # Top 5 accounts
+                acc_name = acc.get("name", "Unknown")
+                acc_type = acc.get("type", "unknown")
+                acc_id = acc.get("identifier", "N/A")
+                account_summary.append(f"- {acc_name} ({acc_type}): {acc_id}")
+
+            context_reminder = f"""CONTEXT REMINDER - User's connected accounts:
+{chr(10).join(account_summary)}
+
+Use these account IDs when calling tools. If the user asks about "my account" or revenue, use their actual account ID from above."""
+
+            llm_messages.append(HumanMessage(content=context_reminder))
+            # Add a brief assistant acknowledgment to complete the pair
+            llm_messages.append(AIMessage(content="I understand. I'll use your connected AdMob account for this request."))
+
     # Add current query if not already in messages
     if not messages or messages[-1].content != user_query:
         llm_messages.append(HumanMessage(content=user_query))
 
+    # Get content queue from config for token-level streaming
+    content_queue: asyncio.Queue[str | None] | None = config.get("configurable", {}).get("content_queue")
+
     try:
-        # Invoke LLM with tools
-        response = await llm_with_tools.ainvoke(llm_messages)
-
-        # Extract token usage from response metadata (works for both Claude and OpenRouter)
-        token_usage = {}
-        if hasattr(response, "response_metadata"):
-            usage = response.response_metadata.get("usage", {})
-            # Handle both Anthropic and OpenAI token format
-            token_usage = {
-                "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens", 0),
-                "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens", 0),
-            }
-
-        # Get model name from response
-        model_name = getattr(llm, "model", "unknown")
-
-        # Extract thinking content from response (extended thinking - Claude only)
-        thinking_content = None
+        # Stream LLM response with tools (token-by-token)
+        # Accumulate full response while streaming chunks to frontend
         response_text = ""
+        thinking_content = None
+        token_usage = {}
+        tool_calls_accumulated = []
+        response_chunks: list[AIMessageChunk] = []
 
-        # Handle AIMessage with content blocks (extended thinking response)
-        if hasattr(response, "content"):
-            content = response.content
-            if isinstance(content, list):
-                # Content is a list of blocks (thinking + text for Claude)
-                for block in content:
-                    if isinstance(block, dict):
-                        if block.get("type") == "thinking":
-                            thinking_content = block.get("thinking", "")
-                        elif block.get("type") == "text":
-                            response_text = block.get("text", "")
-                    elif hasattr(block, "type"):
-                        if block.type == "thinking":
-                            thinking_content = getattr(block, "thinking", "")
-                        elif block.type == "text":
-                            response_text = getattr(block, "text", "")
-            else:
-                # Simple string content (OpenRouter models)
-                response_text = str(content)
+        print(f"[specialist] Starting streaming response (queue={'enabled' if content_queue else 'disabled'})")
+
+        async for chunk in llm_with_tools.astream(llm_messages):
+            response_chunks.append(chunk)
+
+            # Extract and stream text content
+            if hasattr(chunk, "content"):
+                chunk_content = chunk.content
+
+                # Handle list of content blocks (Claude with thinking)
+                if isinstance(chunk_content, list):
+                    for block in chunk_content:
+                        if isinstance(block, dict):
+                            if block.get("type") == "thinking":
+                                # Accumulate thinking (don't stream it)
+                                thinking_text = block.get("thinking", "")
+                                if thinking_text:
+                                    thinking_content = (thinking_content or "") + thinking_text
+                            elif block.get("type") == "text":
+                                text = block.get("text", "")
+                                if text:
+                                    response_text += text
+                                    # Stream text chunks to frontend
+                                    if content_queue:
+                                        await content_queue.put(text)
+                        elif hasattr(block, "type"):
+                            if block.type == "thinking":
+                                thinking_text = getattr(block, "thinking", "")
+                                if thinking_text:
+                                    thinking_content = (thinking_content or "") + thinking_text
+                            elif block.type == "text":
+                                text = getattr(block, "text", "")
+                                if text:
+                                    response_text += text
+                                    if content_queue:
+                                        await content_queue.put(text)
+                elif isinstance(chunk_content, str) and chunk_content:
+                    # Simple string content (OpenRouter models)
+                    response_text += chunk_content
+                    # Stream text chunks to frontend
+                    if content_queue:
+                        await content_queue.put(chunk_content)
+
+            # Accumulate tool calls from chunks
+            if hasattr(chunk, "tool_call_chunks") and chunk.tool_call_chunks:
+                for tc_chunk in chunk.tool_call_chunks:
+                    # Find or create tool call entry
+                    tc_id = tc_chunk.get("id") or tc_chunk.get("index", 0)
+                    existing = next((tc for tc in tool_calls_accumulated if tc.get("id") == tc_id), None)
+                    if existing:
+                        # Append args
+                        if tc_chunk.get("args"):
+                            existing["args_str"] = existing.get("args_str", "") + tc_chunk["args"]
+                    else:
+                        tool_calls_accumulated.append({
+                            "id": tc_id,
+                            "name": tc_chunk.get("name", ""),
+                            "args_str": tc_chunk.get("args", ""),
+                        })
+
+        # Merge all chunks to get final response with metadata
+        if response_chunks:
+            final_response = response_chunks[0]
+            for chunk in response_chunks[1:]:
+                final_response = final_response + chunk
+
+            # Extract token usage from final response metadata
+            if hasattr(final_response, "response_metadata"):
+                usage = final_response.response_metadata.get("usage", {})
+                token_usage = {
+                    "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens", 0),
+                    "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens", 0),
+                }
+
+            # Get tool calls from final merged response
+            if hasattr(final_response, "tool_calls") and final_response.tool_calls:
+                tool_calls_accumulated = []
+                for tc in final_response.tool_calls:
+                    tool_calls_accumulated.append({
+                        "id": tc.get("id", ""),
+                        "name": tc.get("name", ""),
+                        "args": tc.get("args", {}),
+                    })
+
+        # Get model name
+        model_name = getattr(llm, "model", "unknown")
 
         print(f"[specialist] Model: {model_name}")
         print(f"[specialist] Thinking: {thinking_content[:100] if thinking_content else 'None'}...")
         print(f"[specialist] Response: {response_text[:100] if response_text else 'None'}...")
 
-        # Check if response has tool calls
-        if hasattr(response, "tool_calls") and response.tool_calls:
+        # Check if we have accumulated tool calls
+        if tool_calls_accumulated:
             # Return tool calls for tool_executor to handle
             tool_calls = []
-            for tc in response.tool_calls:
+            for tc in tool_calls_accumulated:
                 tool_calls.append({
                     "id": tc.get("id", ""),
                     "name": tc.get("name", ""),
@@ -412,7 +519,7 @@ async def specialist_node(state: GraphState) -> dict:
                 })
 
             result = {
-                "messages": [response],
+                "messages": [final_response] if final_response else [],
                 "tool_calls": tool_calls,
                 "token_usage": token_usage,
                 "model": model_name,
@@ -425,9 +532,21 @@ async def specialist_node(state: GraphState) -> dict:
             return result
 
         # No tool calls - return final response
+        final_content = response_text
+        if not final_content and final_response:
+            # Extract content from final response if not accumulated
+            content = getattr(final_response, "content", "")
+            if isinstance(content, str):
+                final_content = content
+            elif isinstance(content, list):
+                final_content = "".join(
+                    getattr(block, "text", "") for block in content
+                    if hasattr(block, "type") and block.type == "text"
+                )
+
         result = {
-            "messages": [response],
-            "response": response_text or str(response.content),
+            "messages": [final_response] if final_response else [],
+            "response": final_content or "",
             "token_usage": token_usage,
             "model": model_name,
         }

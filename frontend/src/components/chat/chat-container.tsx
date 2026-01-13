@@ -655,8 +655,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
           </div>
 
           {/* Sticky Input at bottom - content scrolls behind it */}
-          <div className="sticky bottom-0 z-50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-t border-border/30 px-8 sm:px-12 py-3">
-            <div className="max-w-4xl mx-auto w-full">
+          <div className="sticky bottom-0 z-50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-t border-border/30 px-4 py-4">
+            <div className="max-w-3xl mx-auto w-full">
               <ChatInput
                 onSend={handleSendMessage}
                 disabled={!hasProviders}

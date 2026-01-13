@@ -26,6 +26,7 @@ from .events import (
     RoutingEvent,
     AgentEvent,
     ThinkingEvent,
+    ContentEvent,
     ResultEvent,
     ErrorEvent,
     DoneEvent,
@@ -115,6 +116,7 @@ async def stream_chat_response(
     - tool_result: Tool execution results
     - tool_approval_required: Dangerous tool awaiting user approval
     - tool_denied: Tool execution was denied
+    - content: Streaming content chunks (token-level streaming)
     - result: Final response
     - error: Error messages
     - done: Stream complete
@@ -150,49 +152,110 @@ async def stream_chat_response(
     # Send stream_id to frontend for potential reconnection
     yield format_sse({"type": "stream_id", "stream_id": stream_id})
 
+    # Create queues for streaming
+    # content_queue: tokens from LLM -> processor
+    # output_queue: SSE events -> HTTP response
+    content_queue: asyncio.Queue[str | None] = asyncio.Queue()
+    output_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    # Track accumulated content for final result
+    accumulated_content: list[str] = []
+
+    # Event to signal when content streaming is done
+    content_done = asyncio.Event()
+
+    async def run_graph_and_emit():
+        """Run LangGraph and emit SSE events to output queue."""
+        try:
+            async for event in run_graph(
+                user_query=user_query,
+                user_id=user_id,
+                organization_id=organization_id,
+                thread_id=stream_id,
+                conversation_history=conversation_history,
+                selected_model=selected_model,
+                context_mode=context_mode,
+                enabled_accounts=enabled_accounts or [],
+                content_queue=content_queue,
+            ):
+                # Check for LangGraph interrupt events (tool approval required)
+                if "__interrupt__" in event:
+                    interrupt_data_list = event["__interrupt__"]
+                    for interrupt_item in interrupt_data_list:
+                        interrupt_value = getattr(interrupt_item, 'value', interrupt_item)
+                        if isinstance(interrupt_value, dict) and interrupt_value.get("type") == "tool_approval_required":
+                            tool_args = interrupt_value.get("tool_args", {})
+                            tool_input_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
+                            await output_queue.put(format_sse(ToolApprovalRequiredEvent(
+                                approval_id=interrupt_value.get("approval_id", ""),
+                                tool_name=interrupt_value.get("tool_name", ""),
+                                tool_input=tool_input_str,
+                                parameter_schema=interrupt_value.get("param_schema"),
+                            ).model_dump(mode='json')))
+                    continue
+
+                # Process each node's state update
+                for node_name, state_update in event.items():
+                    _update_metrics(metrics, node_name, state_update)
+                    sse_events = _convert_state_to_sse(node_name, state_update)
+                    for sse_event in sse_events:
+                        await output_queue.put(format_sse(sse_event))
+                        if sse_event.get("type") == "result":
+                            set_pending_result(stream_id, sse_event.get("content"))
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            metrics.status = "error"
+            metrics.error_message = str(e)[:500]
+            await output_queue.put(format_sse(ErrorEvent(content=str(e)).model_dump(mode='json')))
+            set_pending_result(stream_id, None, error=str(e))
+        finally:
+            # Signal content queue consumer to stop
+            await content_queue.put(None)
+            # Wait for content task to finish processing all chunks
+            await content_done.wait()
+            # Now signal output queue consumer to stop
+            await output_queue.put(None)
+
+    async def stream_content_chunks():
+        """Read content chunks from LLM and emit as SSE events."""
+        try:
+            while True:
+                try:
+                    chunk = await content_queue.get()
+                    if chunk is None:  # Stop signal
+                        break
+                    accumulated_content.append(chunk)
+                    await output_queue.put(format_sse(ContentEvent(content=chunk).model_dump(mode='json')))
+                except Exception:
+                    break
+        finally:
+            content_done.set()
+
+    # Start content streaming task first
+    content_task = asyncio.create_task(stream_content_chunks())
+    # Then start graph task
+    graph_task = asyncio.create_task(run_graph_and_emit())
+
     try:
-        # Run the LangGraph and stream state updates
-        async for event in run_graph(
-            user_query=user_query,
-            user_id=user_id,
-            organization_id=organization_id,
-            thread_id=stream_id,
-            conversation_history=conversation_history,
-            selected_model=selected_model,
-            context_mode=context_mode,
-            enabled_accounts=enabled_accounts or [],
-        ):
-            # Check for LangGraph interrupt events (tool approval required)
-            if "__interrupt__" in event:
-                interrupt_data_list = event["__interrupt__"]
-                for interrupt_item in interrupt_data_list:
-                    # Extract interrupt value (LangGraph wraps it in Interrupt object)
-                    interrupt_value = getattr(interrupt_item, 'value', interrupt_item)
-                    if isinstance(interrupt_value, dict) and interrupt_value.get("type") == "tool_approval_required":
-                        # Format tool_input as JSON string for frontend
-                        tool_args = interrupt_value.get("tool_args", {})
-                        tool_input_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
-
-                        yield format_sse(ToolApprovalRequiredEvent(
-                            approval_id=interrupt_value.get("approval_id", ""),
-                            tool_name=interrupt_value.get("tool_name", ""),
-                            tool_input=tool_input_str,
-                            parameter_schema=interrupt_value.get("param_schema"),
-                        ).model_dump(mode='json'))
-                continue  # Don't process as regular node update
-
-            # Process each node's state update
-            for node_name, state_update in event.items():
-                # Extract metrics from state updates
-                _update_metrics(metrics, node_name, state_update)
-
-                sse_events = _convert_state_to_sse(node_name, state_update)
-                for sse_event in sse_events:
-                    yield format_sse(sse_event)
-
-                    # Store result for potential reconnection
-                    if sse_event.get("type") == "result":
-                        set_pending_result(stream_id, sse_event.get("content"))
+        # Yield SSE events from output queue as they arrive
+        while True:
+            try:
+                sse_event = await asyncio.wait_for(output_queue.get(), timeout=0.1)
+                if sse_event is None:  # Stop signal
+                    break
+                yield sse_event
+            except asyncio.TimeoutError:
+                # Check if tasks are done
+                if graph_task.done() and content_task.done():
+                    # Drain remaining items
+                    while not output_queue.empty():
+                        item = await output_queue.get()
+                        if item is not None:
+                            yield item
+                    break
+                continue
 
     except Exception as e:
         import traceback
@@ -203,6 +266,18 @@ async def stream_chat_response(
         set_pending_result(stream_id, None, error=str(e))
 
     finally:
+        # Ensure tasks are cancelled/completed
+        if not graph_task.done():
+            graph_task.cancel()
+        if not content_task.done():
+            content_task.cancel()
+
+        # Wait for tasks to complete
+        try:
+            await asyncio.gather(graph_task, content_task, return_exceptions=True)
+        except Exception:
+            pass
+
         end_stream(stream_id)
         clear_current_stream()
 
