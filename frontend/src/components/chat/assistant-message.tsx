@@ -276,7 +276,7 @@ function JsonDisplay({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+        <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
           {title}
         </span>
         {canShowTree && (
@@ -285,7 +285,7 @@ function JsonDisplay({
               <TooltipTrigger asChild>
                 <button
                   onClick={() => setViewMode(viewMode === "tree" ? "json" : "tree")}
-                  className="p-1 rounded hover:bg-zinc-700/50 transition-colors text-zinc-500 hover:text-zinc-300"
+                  className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                 >
                   {viewMode === "tree" ? (
                     <Braces className="h-3 w-3" />
@@ -311,11 +311,11 @@ function JsonDisplay({
         />
       ) : (
         <div
-          className="rounded-xl overflow-hidden border border-zinc-700/50"
+          className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/50"
           style={{ maxHeight }}
         >
-          <ScrollArea className="h-full bg-zinc-900/80">
-            <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap break-all">
+          <ScrollArea className="h-full bg-zinc-50 dark:bg-zinc-900/80">
+            <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-900 dark:text-zinc-300 whitespace-pre-wrap break-all">
               {highlightJSON(typeof treeContent === "object" ? treeContent : parsedContent)}
             </pre>
           </ScrollArea>
@@ -351,15 +351,15 @@ function RoutingBlock({ service, capability, thinking }: { service: string; capa
 
   if (!thinking) {
     return (
-      <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5 rounded-2xl bg-zinc-800/50 border border-zinc-700/50")}>
+      <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5 rounded-2xl bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50")}>
         <IconBox color="violet">
-          <Route className="h-3.5 w-3.5 text-violet-400" />
+          <Route className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
         </IconBox>
-        <span className="text-xs text-zinc-200">
-          <span className="text-zinc-400">Routing to</span>{" "}
-          <span className="font-medium text-zinc-100">{service}</span>
-          <span className="mx-1.5 text-zinc-500">→</span>
-          <span className="font-medium text-zinc-100">{capability}</span>
+        <span className="text-xs text-zinc-900 dark:text-zinc-200">
+          <span className="text-zinc-500 dark:text-zinc-400">Routing to</span>{" "}
+          <span className="font-medium text-zinc-950 dark:text-zinc-100">{service}</span>
+          <span className="mx-1.5 text-zinc-400 dark:text-zinc-500">→</span>
+          <span className="font-medium text-zinc-950 dark:text-zinc-100">{capability}</span>
         </span>
       </div>
     )
@@ -367,21 +367,21 @@ function RoutingBlock({ service, capability, thinking }: { service: string; capa
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
         <CollapsibleTrigger asChild>
-          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
               <IconBox color="violet">
-                <Route className="h-3.5 w-3.5 text-violet-400" />
+                <Route className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
               </IconBox>
-              <span className="text-xs text-zinc-200 truncate">
-                <span className="text-zinc-400">Routing to</span>{" "}
-                <span className="font-medium text-zinc-100">{service}</span>
-                <span className="mx-1.5 text-zinc-500">→</span>
-                <span className="font-medium text-zinc-100">{capability}</span>
+              <span className="text-xs text-zinc-900 dark:text-zinc-200 truncate">
+                <span className="text-zinc-500 dark:text-zinc-400">Routing to</span>{" "}
+                <span className="font-medium text-zinc-950 dark:text-zinc-100">{service}</span>
+                <span className="mx-1.5 text-zinc-400 dark:text-zinc-500">→</span>
+                <span className="font-medium text-zinc-950 dark:text-zinc-100">{capability}</span>
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-zinc-400 shrink-0 h-full">
+            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 shrink-0 h-full">
               <Brain className="h-3 w-3" />
               <span className="text-[10px]">reasoning</span>
               <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", isOpen && "rotate-180")} />
@@ -390,7 +390,7 @@ function RoutingBlock({ service, capability, thinking }: { service: string; capa
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 pb-3 pt-2">
-            <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">
+            <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
               {thinking}
             </p>
           </div>
@@ -406,14 +406,14 @@ function ThinkingBlock({ content }: { content: string }) {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
         <CollapsibleTrigger asChild>
-          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5">
               <IconBox color="amber">
-                <Brain className="h-3.5 w-3.5 text-amber-400" />
+                <Brain className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
               </IconBox>
-              <span className="text-xs font-medium text-zinc-200">Thinking...</span>
+              <span className="text-xs font-medium text-zinc-900 dark:text-zinc-200">Thinking...</span>
             </div>
             <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
           </button>
@@ -497,16 +497,16 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className={cn(
-        "rounded-2xl overflow-hidden bg-zinc-800/50 border",
-        metadata.riskLevel === "high" ? "border-red-500/30" : "border-zinc-700/50"
+        "rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border",
+        metadata.riskLevel === "high" ? "border-red-500/30" : "border-zinc-200 dark:border-zinc-700/50"
       )}>
         <CollapsibleTrigger asChild>
-          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
               <IconBox color={metadata.riskLevel === "high" ? "red" : metadata.riskLevel === "medium" ? "amber" : "emerald"}>
-                <ToolIconComponent className={cn("h-3.5 w-3.5", metadata.riskLevel === "high" ? "text-red-400" : metadata.riskLevel === "medium" ? "text-amber-400" : "text-emerald-400")} />
+                <ToolIconComponent className={cn("h-3.5 w-3.5", metadata.riskLevel === "high" ? "text-red-600 dark:text-red-400" : metadata.riskLevel === "medium" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")} />
               </IconBox>
-              <span className="text-xs font-medium text-zinc-100 truncate">{metadata.displayName}</span>
+              <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">{metadata.displayName}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {/* Operation Type Badge */}
@@ -522,7 +522,7 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-700/50 mt-1">
+          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-200 dark:border-zinc-700/50 mt-1">
             {/* Metadata Header */}
             <div className="flex items-center justify-between text-[10px]">
               <div className="flex items-center gap-3">
@@ -619,12 +619,12 @@ function ToolDeniedBlock({ toolName, reason }: { toolName: string; reason: strin
   const shortName = getShortToolName(toolName)
 
   return (
-    <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2 rounded-2xl bg-zinc-800/50 border border-zinc-700/50")}>
+    <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2 rounded-2xl bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50")}>
       <div className="flex items-center gap-2.5 min-w-0">
         <IconBox color="red">
-          <X className="h-3.5 w-3.5 text-red-400" />
+          <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
         </IconBox>
-        <code className="text-xs font-medium text-zinc-300 font-mono truncate">{shortName}</code>
+        <code className="text-xs font-medium text-zinc-900 dark:text-zinc-300 font-mono truncate">{shortName}</code>
         <span className="text-[10px] text-zinc-500 truncate">{reason}</span>
       </div>
       <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-red-500/20 text-red-400 shrink-0">
@@ -672,14 +672,14 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50">
+      <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
         <CollapsibleTrigger asChild>
-          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 min-w-0 h-full">
               <IconBox color={iconColor}>
                 <ToolIconComponent className={cn("h-3.5 w-3.5", iconTextColor)} />
               </IconBox>
-              <code className="text-xs font-medium text-zinc-100 font-mono truncate">{shortName}</code>
+              <code className="text-xs font-medium text-zinc-900 dark:text-zinc-100 font-mono truncate">{shortName}</code>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {needsApproval && (
@@ -700,7 +700,7 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-700/50 mt-1">
+          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-200 dark:border-zinc-700/50 mt-1">
             <JsonDisplay title="Request" content={params} maxHeight="140px" collapsed={1} />
             {hasResult && isApproved && (
               <JsonDisplay title="Response" content={result} maxHeight="200px" collapsed={2} />
@@ -752,23 +752,23 @@ function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[],
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl bg-zinc-800/50 border border-zinc-700/50 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 overflow-hidden">
         <CollapsibleTrigger asChild>
-          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-700/50 transition-colors")}>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
             <div className="flex items-center gap-2.5 h-full">
               <IconBox color="zinc">
-                <Terminal className="h-3.5 w-3.5 text-zinc-300" />
+                <Terminal className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
               </IconBox>
-              <span className="text-xs text-zinc-200">
+              <span className="text-xs text-zinc-900 dark:text-zinc-200">
                 <span className="font-medium">{stepCount}</span>
-                <span className="text-zinc-400 ml-1">{stepCount === 1 ? 'tool call' : 'tool calls'}</span>
+                <span className="text-zinc-500 dark:text-zinc-400 ml-1">{stepCount === 1 ? 'tool call' : 'tool calls'}</span>
               </span>
             </div>
             <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-500 transition-transform duration-200", isOpen && "rotate-180")} />
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-3 pb-3 pt-2 space-y-2 border-t border-zinc-700/50 mt-1">
+          <div className="px-3 pb-3 pt-2 space-y-2 border-t border-zinc-200 dark:border-zinc-700/50 mt-1">
             {children}
           </div>
         </CollapsibleContent>
@@ -909,8 +909,8 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
       <div className="flex-1 min-w-0 max-w-[85%] space-y-2">
         {/* Agent Name */}
         {message.agentName && (
-          <Badge className="gap-1.5 bg-violet-500/20 text-violet-300 border border-violet-500/30 text-[10px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+          <Badge className="gap-1.5 bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-[10px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500 dark:bg-violet-400 animate-pulse" />
             {message.agentName}
           </Badge>
         )}
@@ -958,11 +958,11 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
             <div>
               <div className="pl-1">
                 <div className={cn(
-                  "prose prose-invert max-w-none",
-                  "text-sm leading-relaxed text-zinc-200",
+                  "prose dark:prose-invert max-w-none",
+                  "text-sm leading-relaxed text-zinc-900 dark:text-zinc-200",
                   // Headings - clear hierarchy
-                  "prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
-                  "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",
+                  "prose-headings:text-zinc-950 dark:prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
+                  "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-200 dark:prose-h1:border-zinc-700/50 prose-h1:pb-2",
                   "prose-h2:text-lg prose-h2:mt-4 prose-h2:mb-2",
                   "prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1.5",
                   // Paragraphs
@@ -972,20 +972,20 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
                   "prose-ol:my-2 prose-ol:pl-4",
                   "prose-li:my-0.5 prose-li:marker:text-zinc-500",
                   // Code
-                  "prose-code:bg-zinc-700/60 prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-normal",
+                  "prose-code:bg-zinc-100 dark:prose-code:bg-zinc-700/60 prose-code:text-emerald-600 dark:prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-normal",
                   "prose-code:before:content-none prose-code:after:content-none",
-                  "prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-700/50 prose-pre:rounded-xl prose-pre:text-zinc-300",
+                  "prose-pre:bg-zinc-50 dark:prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-200 dark:prose-pre:border-zinc-700/50 prose-pre:rounded-xl prose-pre:text-zinc-900 dark:prose-pre:text-zinc-300",
                   // Strong/emphasis
-                  "prose-strong:text-zinc-100 prose-strong:font-semibold",
-                  "prose-em:text-zinc-300",
+                  "prose-strong:text-zinc-950 dark:prose-strong:text-zinc-100 prose-strong:font-semibold",
+                  "prose-em:text-zinc-800 dark:prose-em:text-zinc-300",
                   // Links
-                  "prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
+                  "prose-a:text-violet-600 dark:prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
                   // Blockquotes
-                  "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-300",
+                  "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-white dark:prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-700 dark:prose-blockquote:text-zinc-300",
                   // Tables
-                  "prose-table:border prose-table:border-zinc-700/50",
-                  "prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-200 prose-th:font-medium",
-                  "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-700/50"
+                  "prose-table:border prose-table:border-zinc-200 dark:prose-table:border-zinc-700/50",
+                  "prose-th:bg-zinc-50 dark:prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-900 dark:prose-th:text-zinc-200 prose-th:font-medium",
+                  "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-200 dark:prose-td:border-zinc-700/50"
                 )}>
                   {message.content ? (
                     <>

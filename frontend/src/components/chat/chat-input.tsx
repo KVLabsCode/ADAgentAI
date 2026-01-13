@@ -61,9 +61,10 @@ export function ChatInput({
         rows={1}
         className={cn(
           "min-h-[54px] max-h-[200px] resize-none pl-12 pr-8 py-4 text-base",
-          "rounded-3xl border-border/50 bg-zinc-800/40",
-          "focus-visible:ring-1 focus-visible:ring-zinc-600/60 focus-visible:border-zinc-600/60",
-          "placeholder:text-muted-foreground/50",
+          "rounded-3xl border-zinc-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-800/40",
+          "text-zinc-900 dark:text-zinc-100",
+          "focus-visible:ring-1 focus-visible:ring-zinc-300 dark:focus-visible:ring-zinc-600/60 focus-visible:border-zinc-300 dark:focus-visible:border-zinc-600/60",
+          "placeholder:text-zinc-400 dark:placeholder:text-zinc-500",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       />
@@ -80,8 +81,8 @@ export function ChatInput({
           "absolute right-2.5 bottom-2.5 h-9 w-9 rounded-full",
           "transition-all duration-150",
           value.trim() && !disabled && !isLoading
-            ? "opacity-100 bg-white text-zinc-900 hover:bg-zinc-200 shadow-sm"
-            : "opacity-40 bg-zinc-800 text-zinc-500"
+            ? "opacity-100 bg-zinc-900 dark:bg-white text-zinc-50 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-sm"
+            : "opacity-40 bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
         )}
       >
         {isLoading ? (
