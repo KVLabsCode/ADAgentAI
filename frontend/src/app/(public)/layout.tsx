@@ -95,7 +95,7 @@ export default function PublicLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild size="sm" className="h-8 text-sm ml-1 px-3">
+              <Button asChild size="sm" className="hidden sm:flex h-8 text-sm ml-1 px-3">
                 <Link href="/login">Sign in</Link>
               </Button>
             )}
@@ -115,18 +115,23 @@ export default function PublicLayout({
                 <DropdownMenuItem asChild>
                   <Link href="/blog" className="cursor-pointer">Blog</Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {isAuthenticated ? (
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard" className="cursor-pointer">Dashboard</Link>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem asChild>
-                    <Link href="/login" className="cursor-pointer">Sign in</Link>
-                  </DropdownMenuItem>
+                {isAuthenticated && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard" className="cursor-pointer">Dashboard</Link>
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Mobile sign in - after hamburger */}
+            {!isAuthenticated && !isLoading && (
+              <Button asChild size="icon" className="sm:hidden h-8 w-8 ml-1 bg-foreground text-background hover:bg-foreground/90">
+                <Link href="/login" className="text-xs font-medium">in</Link>
+              </Button>
+            )}
           </nav>
         </div>
       </header>
