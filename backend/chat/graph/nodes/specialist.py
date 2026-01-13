@@ -5,8 +5,11 @@ The specialist is configured based on the routing result (service/capability).
 """
 
 import os
+import re
 from typing import Any
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langsmith import traceable
 
@@ -140,31 +143,75 @@ Goal: {role_info['goal']}
 """
 
 
-def _get_model_from_selection(selected_model: str | None, enable_thinking: bool = True) -> ChatAnthropic:
+def _get_model_from_selection(selected_model: str | None, enable_thinking: bool = True) -> BaseChatModel:
     """Create LLM instance based on user's model selection.
 
     Args:
-        selected_model: Model selection from frontend (e.g., "anthropic/claude-sonnet-4-20250514")
-        enable_thinking: Enable extended thinking for complex reasoning
+        selected_model: Model selection from frontend
+            - Anthropic: "anthropic/claude-sonnet-4-20250514" or "claude-sonnet-4-20250514"
+            - OpenRouter: "openrouter/google/gemini-2.5-flash-lite"
+        enable_thinking: Enable extended thinking for complex reasoning (only for Claude)
 
     Returns:
-        Configured ChatAnthropic instance
+        Configured LLM instance (ChatAnthropic or ChatOpenAI)
     """
-    # Determine model name
-    model_name = "claude-sonnet-4-20250514"  # Default
-    if selected_model:
-        if selected_model.startswith("anthropic/"):
-            model_name = selected_model.replace("anthropic/", "")
-        elif selected_model.startswith("claude-"):
-            model_name = selected_model
+    # Default to Gemini 2.5 Flash Lite via OpenRouter
+    default_model = "openrouter/google/gemini-2.5-flash-lite"
 
-    # Base LLM config
+    # Use selected model or default
+    model_id = selected_model or default_model
+
+    # Check if it's an OpenRouter model
+    if model_id.startswith("openrouter/"):
+        # OpenRouter models via ChatOpenAI with OpenRouter base URL
+        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        if not openrouter_api_key:
+            print("[specialist] Warning: OPENROUTER_API_KEY not set, falling back to Claude")
+            # Fallback to Claude
+            return ChatAnthropic(
+                model="claude-sonnet-4-20250514",
+                max_tokens=16000,
+                temperature=0.1,
+            )
+
+        # Extract model name (remove "openrouter/" prefix)
+        model_name = model_id.replace("openrouter/", "")
+
+        print(f"[specialist] Using OpenRouter model: {model_name}")
+
+        # OpenRouter configuration
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=openrouter_api_key,
+            openai_api_base="https://openrouter.ai/api/v1",
+            max_tokens=16000,
+            temperature=0.1,
+            model_kwargs={
+                "extra_headers": {
+                    "HTTP-Referer": "https://adagentai.com",  # Optional but recommended
+                    "X-Title": "ADAgentAI",  # Optional but recommended
+                }
+            }
+        )
+
+    # Anthropic Claude models
+    if model_id.startswith("anthropic/"):
+        model_name = model_id.replace("anthropic/", "")
+    elif model_id.startswith("claude-"):
+        model_name = model_id
+    else:
+        # Unknown format, fallback to default
+        model_name = "claude-sonnet-4-20250514"
+
+    print(f"[specialist] Using Anthropic model: {model_name}")
+
+    # Base LLM config for Claude
     llm_kwargs: dict[str, Any] = {
         "model": model_name,
         "max_tokens": 16000,
     }
 
-    # Enable extended thinking for deeper reasoning
+    # Enable extended thinking for deeper reasoning (Claude-specific feature)
     if enable_thinking:
         llm_kwargs["thinking"] = {
             "type": "enabled",
@@ -175,6 +222,62 @@ def _get_model_from_selection(selected_model: str | None, enable_thinking: bool 
         llm_kwargs["temperature"] = 0.1
 
     return ChatAnthropic(**llm_kwargs)
+
+
+def _sanitize_tool_name(name: str) -> str:
+    """Sanitize tool name to meet Gemini's requirements.
+
+    Gemini requires:
+    - Must start with a letter or underscore
+    - Must be alphanumeric (a-z, A-Z, 0-9), underscores (_), dots (.), colons (:), or dashes (-)
+    - Maximum length of 64 characters
+
+    Args:
+        name: Original tool name
+
+    Returns:
+        Sanitized tool name
+    """
+    # Replace invalid characters with underscores
+    # Keep only: letters, numbers, _, ., :, -
+    # Note: Forward slashes (/) are NOT allowed by Gemini
+    sanitized = re.sub(r'[^a-zA-Z0-9_.\:\-]', '_', name)
+
+    # Ensure it starts with letter or underscore
+    if sanitized and not (sanitized[0].isalpha() or sanitized[0] == '_'):
+        sanitized = '_' + sanitized
+
+    # Truncate to 64 characters
+    if len(sanitized) > 64:
+        sanitized = sanitized[:64]
+
+    return sanitized
+
+
+def _sanitize_tools_for_gemini(tools: list) -> list:
+    """Sanitize tool names for Gemini compatibility.
+
+    Args:
+        tools: List of LangChain tools
+
+    Returns:
+        List of tools with sanitized names
+    """
+    sanitized_tools = []
+    for tool in tools:
+        # Create a copy to avoid modifying original
+        if hasattr(tool, 'name'):
+            original_name = tool.name
+            sanitized_name = _sanitize_tool_name(original_name)
+
+            if original_name != sanitized_name:
+                print(f"[specialist] Sanitized tool name: {original_name} -> {sanitized_name}")
+                # Update tool name
+                tool.name = sanitized_name
+
+        sanitized_tools.append(tool)
+
+    return sanitized_tools
 
 
 @traceable(name="specialist_node", run_type="llm")
@@ -215,6 +318,9 @@ async def specialist_node(state: GraphState) -> dict:
     # Get appropriate LLM
     llm = _get_model_from_selection(selected_model)
 
+    # Check if we're using an OpenRouter model (needs tool name sanitization)
+    is_openrouter = selected_model and selected_model.startswith("openrouter/")
+
     # Load MCP tools for this service
     try:
         tools = await get_tools_for_service(service, user_id)
@@ -222,6 +328,11 @@ async def specialist_node(state: GraphState) -> dict:
 
         # Bind tools to LLM
         if tools:
+            # Sanitize tool names for OpenRouter/Gemini compatibility
+            if is_openrouter:
+                print(f"[specialist] Sanitizing {len(tools)} tool names for OpenRouter/Gemini")
+                tools = _sanitize_tools_for_gemini(tools)
+
             llm_with_tools = llm.bind_tools(tools)
         else:
             llm_with_tools = llm
@@ -245,16 +356,20 @@ async def specialist_node(state: GraphState) -> dict:
         # Invoke LLM with tools
         response = await llm_with_tools.ainvoke(llm_messages)
 
-        # Extract token usage from response metadata
+        # Extract token usage from response metadata (works for both Claude and OpenRouter)
         token_usage = {}
         if hasattr(response, "response_metadata"):
             usage = response.response_metadata.get("usage", {})
+            # Handle both Anthropic and OpenAI token format
             token_usage = {
-                "input_tokens": usage.get("input_tokens", 0),
-                "output_tokens": usage.get("output_tokens", 0),
+                "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens", 0),
             }
 
-        # Extract thinking content from response (extended thinking)
+        # Get model name from response
+        model_name = getattr(llm, "model", "unknown")
+
+        # Extract thinking content from response (extended thinking - Claude only)
         thinking_content = None
         response_text = ""
 
@@ -262,7 +377,7 @@ async def specialist_node(state: GraphState) -> dict:
         if hasattr(response, "content"):
             content = response.content
             if isinstance(content, list):
-                # Content is a list of blocks (thinking + text)
+                # Content is a list of blocks (thinking + text for Claude)
                 for block in content:
                     if isinstance(block, dict):
                         if block.get("type") == "thinking":
@@ -275,9 +390,10 @@ async def specialist_node(state: GraphState) -> dict:
                         elif block.type == "text":
                             response_text = getattr(block, "text", "")
             else:
-                # Simple string content
+                # Simple string content (OpenRouter models)
                 response_text = str(content)
 
+        print(f"[specialist] Model: {model_name}")
         print(f"[specialist] Thinking: {thinking_content[:100] if thinking_content else 'None'}...")
         print(f"[specialist] Response: {response_text[:100] if response_text else 'None'}...")
 
@@ -299,7 +415,7 @@ async def specialist_node(state: GraphState) -> dict:
                 "messages": [response],
                 "tool_calls": tool_calls,
                 "token_usage": token_usage,
-                "model": llm.model,
+                "model": model_name,
             }
 
             # Include thinking if present
@@ -313,7 +429,7 @@ async def specialist_node(state: GraphState) -> dict:
             "messages": [response],
             "response": response_text or str(response.content),
             "token_usage": token_usage,
-            "model": llm.model,
+            "model": model_name,
         }
 
         # Include thinking if present
