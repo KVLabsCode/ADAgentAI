@@ -6,37 +6,19 @@ import { Button } from "@/components/ui/button"
 
 const tiers = [
   {
-    name: "Free",
+    name: "Trial",
     price: "$0",
     period: "forever",
-    description: "Perfect for getting started",
+    description: "Try Ad Agent AI with limited queries",
     features: [
       "1 connected account",
-      "50 queries per month",
+      "25 queries total",
       "Basic reporting",
       "7-day chat history",
       "Community support",
     ],
     cta: "Get Started",
     href: "/login?redirect=/dashboard",
-    highlighted: false,
-  },
-  {
-    name: "Pro",
-    price: "$29",
-    period: "per month",
-    description: "For power users and small teams",
-    features: [
-      "5 connected accounts",
-      "Unlimited queries",
-      "Advanced analytics",
-      "Unlimited chat history",
-      "Export to PDF/CSV",
-      "Priority support",
-      "Custom reports",
-    ],
-    cta: "Start Free Trial",
-    href: "/login?redirect=/billing",
     highlighted: true,
   },
   {
@@ -55,23 +37,23 @@ const tiers = [
       "Custom integrations",
     ],
     cta: "Contact Sales",
-    href: "mailto:sales@adagent.ai",
+    href: "mailto:sales@kvlabs.io",
     highlighted: false,
   },
 ]
 
 const faqs = [
   {
-    question: "What happens after the free trial?",
-    answer: "After your 14-day free trial, you can continue using the Free plan or upgrade to Pro for more features. No credit card required to start.",
+    question: "What happens after I use my 25 queries?",
+    answer: "Once you've used your trial queries, you can contact us to discuss an Enterprise plan tailored to your needs.",
   },
   {
-    question: "Can I change plans later?",
-    answer: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately and are prorated.",
+    question: "What counts as a query?",
+    answer: "Each message you send to the AI assistant counts as one query. Viewing reports or navigating the dashboard does not count.",
   },
   {
     question: "What payment methods do you accept?",
-    answer: "We accept all major credit cards through our payment processor, Polar. Enterprise customers can also pay via invoice.",
+    answer: "Enterprise customers can pay via credit card through Polar or via invoice. We'll work with you to find the best option.",
   },
   {
     question: "Is my data secure?",
@@ -89,7 +71,7 @@ export default function PricingPage() {
             {/* Early Access Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-xs">
               <Sparkles className="h-3 w-3 text-emerald-500" />
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Free during Early Access</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Early Access</span>
             </div>
 
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
@@ -97,7 +79,7 @@ export default function PricingPage() {
             </h1>
 
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Start for free, upgrade when you need more. All plans include core AI features.
+              Try Ad Agent AI for free. Need more? Let&apos;s talk about Enterprise.
             </p>
           </div>
         </div>
@@ -106,8 +88,8 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <section className="pb-16">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="grid md:grid-cols-3 gap-4">
+          <div className="max-w-2xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-4">
               {tiers.map((tier) => (
                 <div
                   key={tier.name}
@@ -120,7 +102,7 @@ export default function PricingPage() {
                   {tier.highlighted && (
                     <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
                       <span className="px-2 py-0.5 rounded-full bg-foreground text-background text-[10px] font-medium">
-                        Most Popular
+                        Start Here
                       </span>
                     </div>
                   )}
@@ -187,7 +169,7 @@ export default function PricingPage() {
             Questions about pricing?
           </p>
           <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-            <Link href="mailto:support@adagent.ai">Contact us</Link>
+            <Link href="mailto:support@kvlabs.io">Contact us</Link>
           </Button>
         </div>
       </section>
