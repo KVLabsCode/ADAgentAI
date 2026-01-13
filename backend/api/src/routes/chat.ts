@@ -58,7 +58,7 @@ chat.use("*", async (c, next) => {
 // ============================================================
 
 const createSessionSchema = z.object({
-  title: z.string().min(1).max(255).optional(),
+  title: z.string().min(1).max(2000).optional(),
 });
 
 const sendMessageSchema = z.object({

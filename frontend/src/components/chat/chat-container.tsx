@@ -361,9 +361,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     // Create a session if this is the first message
     let sessionId = currentSessionId
     if (!sessionId) {
-      // Use first ~50 chars of message as title
-      const title = content.slice(0, 50) + (content.length > 50 ? '...' : '')
-      sessionId = await createSession(title)
+      // Use message as title (up to 2000 chars, UI handles display truncation)
+      sessionId = await createSession(content.slice(0, 2000))
       if (sessionId) {
         // Update URL first using history API to avoid component remount during streaming
         // This must happen BEFORE setCurrentSessionId to prevent the pathname effect from triggering a reset

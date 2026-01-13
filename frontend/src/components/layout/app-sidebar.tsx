@@ -264,10 +264,10 @@ export function AppSidebar() {
                     className="h-8 text-xs"
                   >
                     {item.title === "New Chat" ? (
-                      <a href="/chat" onClick={handleNewChat}>
+                      <Link href="/chat" onClick={handleNewChat}>
                         <item.icon className="h-3.5 w-3.5" />
                         <span>{item.title}</span>
-                      </a>
+                      </Link>
                     ) : (
                       <Link href={item.url}>
                         <item.icon className="h-3.5 w-3.5" />

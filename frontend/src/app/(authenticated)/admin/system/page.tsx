@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import {
   Save, RotateCcw, AlertTriangle, Check, Clock,
-  MessageSquare, Shield, Zap, Terminal, User
+  MessageSquare, Shield, Zap
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
