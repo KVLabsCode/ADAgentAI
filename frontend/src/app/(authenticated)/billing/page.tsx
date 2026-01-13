@@ -80,38 +80,26 @@ const tiers: PricingTier[] = [
     description: "For individuals getting started",
     features: [
       "1 connected provider",
-      "50 AI queries per month",
+      "25 AI queries per month",
       "Basic analytics",
       "Community support",
     ],
-  },
-  {
-    name: "Pro",
-    price: "$29",
-    priceId: process.env.NEXT_PUBLIC_POLAR_PRO_PRICE_ID,
-    description: "For growing publishers",
-    features: [
-      "Unlimited providers",
-      "Unlimited AI queries",
-      "Advanced analytics",
-      "Priority support",
-      "Export reports",
-      "Custom agents",
-    ],
-    popular: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
     description: "For large organizations",
     features: [
-      "Everything in Pro",
+      "Unlimited providers",
+      "Unlimited AI queries",
+      "Advanced analytics",
       "Dedicated support",
       "SLA guarantees",
       "Custom integrations",
       "Team management",
       "Audit logs",
     ],
+    popular: true,
   },
 ]
 
@@ -386,10 +374,10 @@ function BillingContent() {
       {/* Available Plans */}
       <div>
         <h2 className="text-sm font-medium mb-3">Available Plans</h2>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           {tiers.map((tier) => {
-            const isCurrent = (tier.name === 'Trial' && !isPro) || (tier.name === 'Pro' && isPro)
-            const canUpgrade = tier.name === 'Pro' && !isPro && tier.priceId
+            const isCurrent = (tier.name === 'Trial' && !isPro) || (tier.name !== 'Trial' && isPro)
+            const canUpgrade = false // No automatic upgrades available
             const isUpgradingThis = isUpgrading === tier.priceId
 
             return (
