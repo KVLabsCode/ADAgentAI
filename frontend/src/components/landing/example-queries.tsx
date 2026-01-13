@@ -63,7 +63,7 @@ export function ExampleQueriesSection() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
               Capabilities
             </p>
-            <h2 className="text-2xl md:text-3xl font-light tracking-tight mb-3">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-light tracking-tight mb-3">
               Ask anything about your ad business
             </h2>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">

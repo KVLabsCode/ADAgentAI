@@ -24,7 +24,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
           </div>
 
           {/* Headline */}
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-medium tracking-tight leading-[1.15] mb-5">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-medium tracking-tight leading-[1.15] mb-5 whitespace-nowrap">
             AI agents for your AD ops
           </h1>
 
@@ -35,7 +35,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
           </div>
 
           {/* Agent types */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-10">
             <span className="px-3 py-1.5 rounded-full border border-border/40 font-mono text-[11px] text-muted-foreground tracking-wide">
               reporting
             </span>

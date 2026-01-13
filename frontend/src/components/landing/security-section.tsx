@@ -35,7 +35,7 @@ export function SecuritySection() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
               Security
             </p>
-            <h2 className="text-2xl md:text-3xl font-light tracking-tight mb-3">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-light tracking-tight mb-3">
               Your ad revenue, protected
             </h2>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">

@@ -52,7 +52,7 @@ export function FAQSection() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
               FAQ
             </p>
-            <h2 className="text-2xl md:text-3xl font-light tracking-tight">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-light tracking-tight">
               Common questions
             </h2>
           </div>

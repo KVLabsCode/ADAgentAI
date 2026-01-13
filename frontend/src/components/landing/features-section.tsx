@@ -45,8 +45,9 @@ export function FeaturesSection() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
               Features
             </p>
-            <h2 className="text-2xl md:text-3xl font-light tracking-tight">
-              Everything you need, nothing you don&apos;t
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-light tracking-tight">
+              <span className="sm:hidden">Everything you need<br />Nothing you don&apos;t</span>
+              <span className="hidden sm:inline">Everything you need, nothing you don&apos;t</span>
             </h2>
           </div>
 

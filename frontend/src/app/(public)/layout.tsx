@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import { Moon, Sun, LayoutDashboard, LogOut } from "lucide-react"
+import { Moon, Sun, LayoutDashboard, LogOut, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -33,19 +33,22 @@ export default function PublicLayout({
           </Link>
 
           <nav className="flex items-center gap-2">
+            {/* Desktop nav links */}
             <Link
               href="/pricing"
-              className="px-3 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors"
+              className="hidden sm:block px-3 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors"
             >
               Pricing
             </Link>
             <Link
               href="/blog"
-              className="px-3 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors"
+              className="hidden sm:block px-3 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors"
             >
               Blog
             </Link>
-            <div className="w-px h-4 bg-border/50 mx-2" />
+            <div className="hidden sm:block w-px h-4 bg-border/50 mx-2" />
+
+            {/* Theme toggle */}
             <Button
               variant="ghost"
               size="icon"
@@ -56,6 +59,8 @@ export default function PublicLayout({
               <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Toggle theme</span>
             </Button>
+
+            {/* User menu or sign in */}
             {isLoading ? (
               <div className="h-8 w-8 rounded-full bg-muted animate-pulse ml-1" />
             ) : isAuthenticated && user ? (
@@ -90,10 +95,38 @@ export default function PublicLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild size="sm" className="h-8 text-sm ml-1">
+              <Button asChild size="sm" className="hidden sm:flex h-8 text-sm ml-1">
                 <Link href="/login">Sign in</Link>
               </Button>
             )}
+
+            {/* Mobile menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden h-8 w-8 ml-1">
+                  <Menu className="h-4 w-4" />
+                  <span className="sr-only">Menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem asChild>
+                  <Link href="/pricing" className="cursor-pointer">Pricing</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/blog" className="cursor-pointer">Blog</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {isAuthenticated ? (
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="cursor-pointer">Dashboard</Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" className="cursor-pointer">Sign in</Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
         </div>
       </header>
