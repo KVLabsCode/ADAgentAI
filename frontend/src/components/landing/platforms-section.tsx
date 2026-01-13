@@ -62,9 +62,12 @@ export function PlatformsSection() {
                           <span className="text-[10px] text-zinc-500 hidden sm:inline">{enabled ? "Enabled" : "Disabled"}</span>
                           <Switch checked={enabled} onCheckedChange={setEnabled} className="scale-75" />
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-rose-500 hover:bg-zinc-100">
+                        <button
+                          type="button"
+                          className="h-8 w-8 text-zinc-400 hover:text-rose-500 hover:bg-zinc-100 active:bg-zinc-200 rounded flex items-center justify-center transition-colors"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -136,9 +139,12 @@ export function PlatformsSection() {
                           <span className="text-[10px] text-zinc-500 hidden sm:inline">{enabled ? "Enabled" : "Disabled"}</span>
                           <Switch checked={enabled} onCheckedChange={setEnabled} className="scale-75" />
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-rose-500 hover:bg-zinc-800">
+                        <button
+                          type="button"
+                          className="h-8 w-8 text-zinc-500 hover:text-rose-500 hover:bg-zinc-800 active:bg-zinc-700 rounded flex items-center justify-center transition-colors"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>

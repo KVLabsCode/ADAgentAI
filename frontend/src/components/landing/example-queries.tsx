@@ -72,7 +72,7 @@ export function ExampleQueriesSection() {
           </div>
 
           {/* Tab buttons */}
-          <div className="flex flex-col items-center gap-2 mb-10">
+          <div className="flex flex-col items-center mb-10">
             <div className="flex justify-center gap-1">
               {categories.map((cat) => (
                 <button
@@ -89,7 +89,7 @@ export function ExampleQueriesSection() {
                 </button>
               ))}
             </div>
-            <span className="sm:hidden text-xs text-muted-foreground">{activeCategory.label}</span>
+            <span className="sm:hidden text-xs text-muted-foreground/60 mt-3">{activeCategory.label}</span>
           </div>
 
           {/* Queries */}
