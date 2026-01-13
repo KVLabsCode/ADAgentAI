@@ -1,0 +1,8 @@
+export { HeroSection } from "./hero-section"
+export { HowItWorksSection } from "./how-it-works"
+export { ExampleQueriesSection } from "./example-queries"
+export { FeaturesSection } from "./features-section"
+export { SecuritySection } from "./security-section"
+export { TeamSection } from "./team-section"
+export { PlatformsSection } from "./platforms-section"
+export { FAQSection } from "./faq-section"

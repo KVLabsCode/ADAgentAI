@@ -59,6 +59,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Logo } from "@/components/brand/logo"
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -141,14 +142,9 @@ export function AppSidebar() {
       <SidebarHeader className="h-14 flex flex-row items-center justify-between border-b border-border/40 px-2">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2.5 pl-2 group-data-[collapsible=icon]:hidden"
+          className="pl-2 group-data-[collapsible=icon]:hidden"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-background text-xs font-bold shrink-0">
-            AD
-          </div>
-          <span className="text-[15px] font-semibold tracking-tight">
-            ADAgentAI
-          </span>
+          <Logo size="md" />
         </Link>
         {/* Desktop: show tooltip, Mobile: no tooltip to prevent it staying open */}
         <div className="hidden md:block">
