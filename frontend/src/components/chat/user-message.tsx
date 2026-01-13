@@ -27,7 +27,7 @@ export function UserMessage({ content }: UserMessageProps) {
         )}
       >
         <p className={cn(
-          "text-base leading-relaxed whitespace-pre-wrap text-zinc-100",
+          "text-sm leading-relaxed whitespace-pre-wrap text-zinc-100",
           isShort && "truncate"
         )}>
           {content}

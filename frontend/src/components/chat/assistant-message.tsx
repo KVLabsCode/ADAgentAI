@@ -744,7 +744,7 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
 
 // Activity summary block
 function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[], children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = React.useState(true)
+  const [isOpen, setIsOpen] = React.useState(false)
   const toolEvents = events.filter(e => e.type === "tool")
   const stepCount = toolEvents.length
 
@@ -954,12 +954,12 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
 
         {/* Final Content - Markdown rendered (show while streaming with cursor) */}
         {(message.content || isStreaming) && (
-          <div className="space-y-2">
+          <div className="space-y-2 mt-4">
             <div>
               <div className="pl-1">
                 <div className={cn(
                   "prose prose-invert max-w-none",
-                  "text-base leading-relaxed text-zinc-200",
+                  "text-sm leading-relaxed text-zinc-200",
                   // Headings - clear hierarchy
                   "prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
                   "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-700/50 prose-h1:pb-2",

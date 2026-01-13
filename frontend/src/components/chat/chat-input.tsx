@@ -80,8 +80,8 @@ export function ChatInput({
           "absolute right-2.5 bottom-2.5 h-9 w-9 rounded-full",
           "transition-all duration-150",
           value.trim() && !disabled && !isLoading
-            ? "opacity-100 bg-zinc-600 hover:bg-zinc-500"
-            : "opacity-30 bg-zinc-700"
+            ? "opacity-100 bg-white text-zinc-900 hover:bg-zinc-200 shadow-sm"
+            : "opacity-40 bg-zinc-800 text-zinc-500"
         )}
       >
         {isLoading ? (
