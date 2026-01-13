@@ -450,6 +450,39 @@ export const waitlist = pgTable("waitlist", {
   index("waitlist_referral_code_idx").on(table.referralCode),
 ]);
 
+// Deleted Users - GDPR-compliant analytics tracking
+// Stores only aggregate, non-personal data about deleted accounts
+export const deletedUsers = pgTable("deleted_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  // Anonymized identifier (NOT the original user ID - use a hash or random ID)
+  anonymousId: text("anonymous_id").notNull().unique(),
+
+  // Aggregate usage data (non-personal)
+  accountCreatedAt: timestamp("account_created_at"), // When account was created
+  accountDeletedAt: timestamp("account_deleted_at").defaultNow().notNull(), // When deleted
+  accountLifetimeDays: integer("account_lifetime_days"), // How long they used the product
+
+  // Aggregate metrics (no PII)
+  totalChatSessions: integer("total_chat_sessions").default(0).notNull(),
+  totalMessages: integer("total_messages").default(0).notNull(),
+  totalTokensUsed: integer("total_tokens_used").default(0).notNull(),
+  totalApiCalls: integer("total_api_calls").default(0).notNull(),
+
+  // Product engagement (non-personal)
+  hadConnectedProviders: boolean("had_connected_providers").default(false).notNull(),
+  wasOrgMember: boolean("was_org_member").default(false).notNull(),
+  acceptedTos: boolean("accepted_tos").default(false).notNull(),
+
+  // Deletion metadata
+  deletionReason: varchar("deletion_reason", { length: 50 }), // e.g., "user_requested", "gdpr_request"
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("deleted_users_deleted_at_idx").on(table.accountDeletedAt),
+  index("deleted_users_created_at_idx").on(table.accountCreatedAt),
+]);
+
 // ============================================================
 // Type Exports
 // ============================================================
@@ -488,3 +521,5 @@ export type SystemConfigEntry = typeof systemConfig.$inferSelect;
 export type NewSystemConfigEntry = typeof systemConfig.$inferInsert;
 export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;
 export type NewAdminAuditLogEntry = typeof adminAuditLog.$inferInsert;
+export type DeletedUser = typeof deletedUsers.$inferSelect;
+export type NewDeletedUser = typeof deletedUsers.$inferInsert;

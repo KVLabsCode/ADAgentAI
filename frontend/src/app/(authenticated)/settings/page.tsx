@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Moon, Sun, Monitor, Bell, Shield, User, MessageSquare, Building2, UserPlus, Trash2, Crown, ShieldCheck, Users, Loader2, Send, Mail, X, RotateCw, Pencil, AlertTriangle } from "lucide-react"
+import { Moon, Sun, Monitor, Bell, Shield, User, MessageSquare, Building2, UserPlus, Trash2, Crown, ShieldCheck, Users, Loader2, Send, Mail, X, RotateCw, Pencil, AlertTriangle, Download } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -80,6 +80,13 @@ export default function SettingsPage() {
   const [deleteAccountConfirmEmail, setDeleteAccountConfirmEmail] = React.useState("")
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false)
   const [deleteAccountError, setDeleteAccountError] = React.useState<string | null>(null)
+
+  // Data export state
+  const [isExportingData, setIsExportingData] = React.useState(false)
+
+  // Chat history deletion state
+  const [isDeletingChatHistory, setIsDeletingChatHistory] = React.useState(false)
+  const [chatHistoryDeleteSuccess, setChatHistoryDeleteSuccess] = React.useState(false)
 
   React.useEffect(() => {
     setMounted(true)
@@ -292,6 +299,62 @@ export default function SettingsPage() {
       console.error("Failed to change member role:", error)
     } finally {
       setChangingRoleMemberId(null)
+    }
+  }
+
+  // Data export handler (GDPR Article 20: Right to Data Portability)
+  const handleExportData = async () => {
+    setIsExportingData(true)
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${apiUrl}/api/account/export`, accessToken)
+
+      if (!response.ok) {
+        throw new Error('Failed to export data')
+      }
+
+      const data = await response.json()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `adagent-data-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Failed to export data:", error)
+    } finally {
+      setIsExportingData(false)
+    }
+  }
+
+  // Chat history deletion handler
+  const handleDeleteChatHistory = async () => {
+    setIsDeletingChatHistory(true)
+    setChatHistoryDeleteSuccess(false)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${apiUrl}/api/account/chat-history`, accessToken, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to delete chat history')
+      }
+
+      setChatHistoryDeleteSuccess(true)
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setChatHistoryDeleteSuccess(false), 3000)
+    } catch (error) {
+      console.error("Failed to delete chat history:", error)
+    } finally {
+      setIsDeletingChatHistory(false)
     }
   }
 
@@ -815,14 +878,114 @@ export default function SettingsPage() {
         <SectionCardHeader
           icon={User}
           title="Account"
-          description="Manage your account settings."
+          description="Manage your account and data."
         />
-        <SectionCardContent>
+        <SectionCardContent className="space-y-3">
+          {/* Data Export - GDPR Article 20 */}
+          <div className="flex items-center justify-between py-2 px-2 rounded bg-muted/30 border border-border/20">
+            <div>
+              <p className="text-xs font-medium">Export Your Data</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Download a copy of all your personal data in JSON format.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportData}
+              disabled={isExportingData}
+              className="h-7 text-[11px] shrink-0"
+            >
+              {isExportingData ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <>
+                  <Download className="h-3 w-3 mr-1" />
+                  Export
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Clear Chat History */}
+          <div className="flex items-center justify-between py-2 px-2 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-amber-900 dark:text-amber-100">Clear Chat History</p>
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
+                Delete all chat conversations while keeping your account and connected providers.
+              </p>
+              {chatHistoryDeleteSuccess && (
+                <p className="text-[10px] text-green-600 dark:text-green-500 mt-1">
+                  ✓ Chat history deleted successfully
+                </p>
+              )}
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDeletingChatHistory}
+                  className="h-7 text-[11px] shrink-0 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                >
+                  {isDeletingChatHistory ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Clear
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    Clear Chat History
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3">
+                      <p>
+                        Are you sure you want to clear all your chat history? This will permanently delete:
+                      </p>
+                      <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-4">
+                        <li>All chat conversations and messages</li>
+                        <li>AI conversation state (checkpoints)</li>
+                      </ul>
+                      <div className="text-xs text-muted-foreground bg-muted px-3 py-2 rounded">
+                        <strong>Note:</strong> Your account, connected providers, settings, and all other data will remain unchanged.
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteChatHistory}
+                    disabled={isDeletingChatHistory}
+                    className="bg-amber-600 text-white hover:bg-amber-700"
+                  >
+                    {isDeletingChatHistory ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Clearing...
+                      </>
+                    ) : (
+                      "Clear Chat History"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
+          {/* Delete Account */}
           <div className="flex items-center justify-between py-2 px-2 rounded bg-destructive/5 border border-destructive/20">
             <div>
               <p className="text-xs font-medium text-destructive">Delete Account</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Permanently delete your account and all associated data including chat history, connected providers, and settings.
+                Permanently delete your account and all personal data.
               </p>
             </div>
             <AlertDialog onOpenChange={(open) => {
@@ -849,10 +1012,17 @@ export default function SettingsPage() {
                         Are you sure you want to delete your account? This action <strong>cannot be undone</strong>. The following data will be permanently deleted:
                       </p>
                       <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-4">
-                        <li>All chat conversations and history</li>
+                        <li>All chat conversations and messages</li>
                         <li>Connected AdMob and Ad Manager accounts</li>
+                        <li>OAuth tokens and credentials</li>
+                        <li>Usage analytics and billing metrics</li>
+                        <li>Organization memberships</li>
                         <li>Your preferences and settings</li>
+                        <li>AI conversation state (checkpoints)</li>
                       </ul>
+                      <div className="text-[10px] text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950/30 px-2 py-1.5 rounded">
+                        <strong>Tip:</strong> Export your data before deleting using the button above.
+                      </div>
                       <div className="space-y-2 pt-2">
                         <p className="text-xs font-medium text-foreground">
                           Type your email <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">{user?.email}</span> to confirm:
