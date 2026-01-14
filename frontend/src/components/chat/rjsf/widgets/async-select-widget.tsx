@@ -50,7 +50,7 @@ function AsyncSelectWidgetInner(props: WidgetProps) {
   const dependsOn = explicitDependsOn ?? (fetchType ? getParentField(fetchType) : null)
 
   const formData = formContext?.formData || {}
-  const dependencyValue = dependsOn ? formData[dependsOn] : undefined
+  const dependencyValue = dependsOn ? (formData[dependsOn] as string | undefined) : undefined
 
   // Get friendly name for dependency field
   const dependencyDisplayName = dependsOn ? getParamDisplayName(dependsOn) : ""
