@@ -5,7 +5,6 @@ When a dangerous tool is detected, execution pauses and waits for user approval.
 """
 
 import json
-import uuid
 from typing import Any
 from langgraph.types import interrupt
 from langchain_core.messages import ToolMessage
@@ -43,6 +42,7 @@ from ..validators import (
 )
 from ...approval.models import DANGEROUS_TOOLS, is_dangerous_tool
 from ...approval.schema_extractor import get_tool_schema_by_mcp_name
+from ...approval.handlers import create_pending_approval
 from ...tools import execute_tool
 
 
@@ -61,9 +61,23 @@ def _get_pending_tool_calls(state: GraphState) -> list[ToolCall]:
 
 
 def _create_approval_request(tool_call: ToolCall) -> ApprovalRequest:
-    """Create an approval request for a dangerous tool."""
-    approval_id = str(uuid.uuid4())[:8]
+    """Create an approval request for a dangerous tool.
+
+    This stores the approval in the file-based system so the /chat/approve-tool
+    endpoint can find and resolve it when the user clicks approve/deny.
+    """
     tool_name = tool_call.get("name", "")
+    tool_args = tool_call.get("args", {})
+
+    # Debug: Log the tool args to verify they contain LLM's chosen values
+    print(f"[tool_executor] Creating approval request for {tool_name}")
+    print(f"[tool_executor] tool_args from LLM: {tool_args}")
+
+    # Store approval in file-based system (shared with /chat/approve-tool endpoint)
+    # This is critical - without this, the approval endpoint returns 404
+    tool_input_str = json.dumps(tool_args)
+    approval_id = create_pending_approval(tool_name, tool_input_str)
+    print(f"[tool_executor] Stored pending approval: {approval_id}")
 
     # Extract schema for parameter form
     param_schema = None
