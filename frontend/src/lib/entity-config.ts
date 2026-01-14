@@ -141,7 +141,7 @@ export function getDependentEntities(parentType: string): EntityType[] {
  * Validate an ID against the expected pattern for an entity type
  */
 export function validateEntityId(fetchType: string, id: string): boolean {
-  const config = ENTITY_RELATIONSHIPS[fetchType as EntityType]
+  const config = ENTITY_RELATIONSHIPS[fetchType as EntityType] as EntityConfig | undefined
   if (!config?.idPattern) return true
   return config.idPattern.test(id)
 }
