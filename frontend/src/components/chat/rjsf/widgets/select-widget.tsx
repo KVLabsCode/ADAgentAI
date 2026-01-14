@@ -22,7 +22,9 @@ export function SelectWidget(props: WidgetProps) {
       return options.enumOptions as { value: string; label: string }[]
     }
     if (schema?.enum && Array.isArray(schema.enum)) {
-      return schema.enum.map((val: string) => ({ value: val, label: val }))
+      return schema.enum
+        .filter((val): val is string => typeof val === "string")
+        .map((val) => ({ value: val, label: val }))
     }
     return []
   }, [options?.enumOptions, schema?.enum])
