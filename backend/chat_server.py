@@ -144,6 +144,13 @@ class DynamicFieldRequest(BaseModel):
     account_id: Optional[str] = None  # Required for dependent fields
 
 
+class ResumeRequest(BaseModel):
+    """Request body for resuming graph after tool approval."""
+    stream_id: str
+    approved: bool
+    modified_params: Optional[dict] = None
+
+
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -208,6 +215,40 @@ async def approve_tool(body: ToolApprovalRequest):
         "approved": body.approved,
         "has_modifications": body.modified_params is not None
     }
+
+
+@app.post("/chat/resume")
+async def resume_stream(request: Request, body: ResumeRequest):
+    """Resume a paused graph after tool approval.
+
+    This continues the LangGraph execution from where it was interrupted.
+    The frontend should call this after successfully calling /chat/approve-tool.
+    """
+    print(f"[resume_endpoint] Called with stream_id={body.stream_id}, approved={body.approved}", flush=True)
+
+    # Validate session
+    user_id = await validate_user_session(request)
+    if not user_id:
+        print(f"[resume_endpoint] Unauthorized - no user_id", flush=True)
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Unauthorized - please log in"}
+        )
+
+    print(f"[resume_endpoint] User validated: {user_id}, returning StreamingResponse", flush=True)
+    return StreamingResponse(
+        stream_resume_response(
+            stream_id=body.stream_id,
+            approved=body.approved,
+            modified_params=body.modified_params,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @app.post("/chat/field-options")

@@ -4,7 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree } from "lucide-react"
+import { Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree, Loader2, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -270,8 +270,9 @@ function JsonDisplay({
   // For tree view, unwrap common wrappers like "params" and parse JSON from text arrays
   const treeContent = React.useMemo(() => unwrapForTreeView(parsedContent), [parsedContent])
 
-  // Can show tree view if content is an object/array
-  const canShowTree = treeContent !== null && typeof treeContent === "object"
+  // Can show tree view if either parsed or unwrapped content is an object/array
+  const canShowTree = (parsedContent !== null && typeof parsedContent === "object") ||
+                      (treeContent !== null && typeof treeContent === "object")
 
   return (
     <div className="space-y-1">
@@ -303,18 +304,15 @@ function JsonDisplay({
       </div>
       {viewMode === "tree" && canShowTree ? (
         <JsonTreeView
-          data={treeContent}
+          data={typeof treeContent === "object" ? treeContent : parsedContent}
           maxHeight={maxHeight}
           collapsed={collapsed}
           displayObjectSize={false}
           enableClipboard={true}
         />
       ) : (
-        <div
-          className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/50"
-          style={{ maxHeight }}
-        >
-          <ScrollArea className="h-full bg-zinc-50 dark:bg-zinc-900/80">
+        <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/50">
+          <ScrollArea type="hover" className="w-full bg-zinc-50 dark:bg-zinc-900/80" style={{ maxHeight }}>
             <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-900 dark:text-zinc-300 whitespace-pre-wrap break-all">
               {highlightJSON(typeof treeContent === "object" ? treeContent : parsedContent)}
             </pre>
@@ -430,6 +428,72 @@ function ThinkingBlock({ content }: { content: string }) {
   )
 }
 
+// Agent Response Block - styled container for agent's text responses
+function AgentResponseBlock({ content, isStreaming, messageId }: { content: string; isStreaming?: boolean; messageId: string }) {
+  const [isOpen, setIsOpen] = React.useState(true) // Expanded by default
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
+        <CollapsibleTrigger asChild>
+          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
+            <div className="flex items-center gap-2.5">
+              <IconBox color="violet">
+                <Bot className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              </IconBox>
+              <span className="text-xs font-medium text-zinc-900 dark:text-zinc-200">
+                {isStreaming ? "Responding..." : "Response"}
+              </span>
+              {isStreaming && (
+                <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-pulse" />
+              )}
+            </div>
+            <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-3 pb-3 pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
+            <div className={cn(
+              "prose dark:prose-invert max-w-none",
+              "text-sm leading-relaxed text-zinc-900 dark:text-zinc-200",
+              "prose-headings:text-zinc-950 dark:prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
+              "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-200 dark:prose-h1:border-zinc-700/50 prose-h1:pb-2",
+              "prose-h2:text-lg prose-h2:mt-4 prose-h2:mb-2",
+              "prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1.5",
+              "prose-p:my-2 prose-p:leading-relaxed",
+              "prose-ul:my-2 prose-ul:pl-4",
+              "prose-ol:my-2 prose-ol:pl-4",
+              "prose-li:my-0.5 prose-li:marker:text-zinc-500",
+              "prose-code:bg-zinc-100 dark:prose-code:bg-zinc-700/60 prose-code:text-emerald-600 dark:prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-normal",
+              "prose-code:before:content-none prose-code:after:content-none",
+              "prose-pre:bg-zinc-50 dark:prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-200 dark:prose-pre:border-zinc-700/50 prose-pre:rounded-xl prose-pre:text-zinc-900 dark:prose-pre:text-zinc-300",
+              "prose-strong:text-zinc-950 dark:prose-strong:text-zinc-100 prose-strong:font-semibold",
+              "prose-em:text-zinc-800 dark:prose-em:text-zinc-300",
+              "prose-a:text-violet-600 dark:prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
+              "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-white dark:prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-700 dark:prose-blockquote:text-zinc-300",
+              "prose-table:border prose-table:border-zinc-200 dark:prose-table:border-zinc-700/50",
+              "prose-th:bg-zinc-50 dark:prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-900 dark:prose-th:text-zinc-200 prose-th:font-medium",
+              "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-200 dark:prose-td:border-zinc-700/50"
+            )}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                {content}
+              </ReactMarkdown>
+              {isStreaming && (
+                <span className="inline-block w-2 h-4 ml-0.5 bg-violet-400 animate-pulse rounded-sm" aria-label="Streaming response" />
+              )}
+            </div>
+            {!isStreaming && content && (
+              <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700/30">
+                <MessageActions content={content} messageId={messageId} />
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  )
+}
+
 // Tool Approval Required - auto-expanded with editable parameters and metadata
 interface ToolApprovalBlockProps {
   approvalId: string
@@ -438,10 +502,19 @@ interface ToolApprovalBlockProps {
   parameterSchema?: RJSFSchema
   onApproval: (approved: boolean, modifiedParams?: Record<string, unknown>) => void
   isPending: boolean
+  isExecuting?: boolean
+  isDenied?: boolean
 }
 
-function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending }: ToolApprovalBlockProps) {
-  const [isOpen, setIsOpen] = React.useState(true) // Auto-expand for approval
+function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending, isExecuting = false, isDenied = false }: ToolApprovalBlockProps) {
+  const [isOpen, setIsOpen] = React.useState(isPending) // Only expand when pending
+
+  // Auto-collapse when transitioning from pending to executing/denied
+  React.useEffect(() => {
+    if (!isPending && (isExecuting || isDenied)) {
+      setIsOpen(false)
+    }
+  }, [isPending, isExecuting, isDenied])
 
   // Debug: Log all inputs to trace data flow
   console.log("[ToolApprovalBlock] toolName:", toolName)
@@ -534,7 +607,7 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className={cn(
-        "rounded-2xl bg-white dark:bg-zinc-800/50 border",
+        "rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border",
         metadata.riskLevel === "high" ? "border-red-500/30" : "border-zinc-200 dark:border-zinc-700/50"
       )}>
         <CollapsibleTrigger asChild>
@@ -546,6 +619,25 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
               <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">{metadata.displayName}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Status Badge */}
+              {isPending && (
+                <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-amber-500/30 text-amber-300">
+                  <Clock className="h-2.5 w-2.5" />
+                  Pending
+                </Badge>
+              )}
+              {isExecuting && (
+                <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-emerald-500/30 text-emerald-300">
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  Executing
+                </Badge>
+              )}
+              {isDenied && (
+                <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-red-500/30 text-red-300">
+                  <X className="h-2.5 w-2.5" />
+                  Denied
+                </Badge>
+              )}
               {/* Operation Type Badge */}
               <Badge className={cn("h-5 text-[8px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none", opStyle.bg, opStyle.text)}>
                 {metadata.operationType}
@@ -614,6 +706,22 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
                     {hasChanges ? "Allow with Changes" : "Allow"}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Executing State - after approval, waiting for result */}
+            {isExecuting && (
+              <div className="flex items-center justify-center gap-2 pt-2 border-t border-zinc-700/30">
+                <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
+                <span className="text-[11px] text-emerald-300">Executing...</span>
+              </div>
+            )}
+
+            {/* Denied State */}
+            {isDenied && (
+              <div className="flex items-center justify-center gap-2 pt-2 border-t border-zinc-700/30">
+                <X className="h-4 w-4 text-red-400" />
+                <span className="text-[11px] text-red-300">Execution denied</span>
               </div>
             )}
           </div>
@@ -853,30 +961,37 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
   const events = getEventsFromMessage(message)
   const { displayMode } = useChatSettings()
 
-  const [localApprovals, setLocalApprovals] = React.useState<Map<string, boolean | null>>(new Map())
+  // Note: MCPToolBlock no longer handles approvals - ToolApprovalBlock does
+  // MCPToolBlock just displays tool calls with their request/response
 
-  const handleApproval = (toolName: string, approved: boolean) => {
-    if (onToolApproval) onToolApproval(toolName, approved)
-    else setLocalApprovals(prev => new Map(prev).set(toolName, approved))
-  }
-
-  const getApprovalState = (toolName: string): boolean | null => {
-    if (pendingApprovals.has(toolName)) return pendingApprovals.get(toolName) ?? null
-    if (localApprovals.has(toolName)) return localApprovals.get(toolName) ?? null
-    return isWriteOperation(toolName) ? null : true
-  }
-
-  // Collect approved/denied tool names
-  const approvedToolNames = new Set<string>()
-  const deniedToolNames = new Set<string>()
-  const pendingApprovalToolNames = new Set<string>()
-  for (const event of events) {
-    if (event.type === "tool" && event.approved === true) approvedToolNames.add(event.name)
-    if (event.type === "tool_denied") deniedToolNames.add(event.tool_name)
-    // Track tools with pending approvals (not yet approved or denied)
-    if (event.type === "tool_approval_required") {
-      if (!approvedToolNames.has(event.tool_name) && !deniedToolNames.has(event.tool_name)) {
-        pendingApprovalToolNames.add(event.tool_name)
+  // Build map of tool results by index (tool_result follows its tool event)
+  // Also track which approval events have received their results (by event index)
+  const toolResultsByToolIndex = new Map<number, unknown>()
+  const approvalIndicesWithResults = new Set<number>()
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (event.type === "tool_result") {
+      // Find the preceding tool event with matching name
+      for (let j = i - 1; j >= 0; j--) {
+        const prevEvent = events[j]
+        if (prevEvent.type === "tool" && prevEvent.name === event.name) {
+          // Only map if this tool doesn't already have a result
+          if (!toolResultsByToolIndex.has(j)) {
+            toolResultsByToolIndex.set(j, event.result)
+            break
+          }
+        }
+      }
+      // Find the preceding tool_approval_required event with matching tool name
+      for (let j = i - 1; j >= 0; j--) {
+        const prevEvent = events[j]
+        if (prevEvent.type === "tool_approval_required" && prevEvent.tool_name === event.name) {
+          // Only mark if this approval doesn't already have a result
+          if (!approvalIndicesWithResults.has(j)) {
+            approvalIndicesWithResults.add(j)
+            break
+          }
+        }
       }
     }
   }
@@ -885,42 +1000,76 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
   const processedEvents: Array<
     | { type: "routing"; service: string; capability: string; thinking?: string; key: string }
     | { type: "thinking"; content: string; key: string }
+    | { type: "content"; content: string; key: string }
     | { type: "tool_group"; tool: { name: string; params: Record<string, unknown>; approved?: boolean }; result?: unknown; key: string }
     | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: RJSFSchema; key: string }
     | { type: "tool_denied"; tool_name: string; reason: string; key: string }
   > = []
 
+  // Process events in the order they arrive from LangGraph (which is sequential)
+  // Debug: log event order to verify
+  console.log("[AssistantMessage] Processing events:", events.map(e => e.type))
+
   for (let i = 0; i < events.length; i++) {
     const event = events[i]
-    if (event.type === "routing") processedEvents.push({ ...event, key: `routing-${i}` })
-    else if (event.type === "thinking") processedEvents.push({ ...event, key: `thinking-${i}` })
+    if (event.type === "routing") {
+      processedEvents.push({ ...event, key: `routing-${i}` })
+    }
+    else if (event.type === "thinking") {
+      processedEvents.push({ ...event, key: `thinking-${i}` })
+    }
+    else if (event.type === "content") {
+      // Merge consecutive content events into a single block
+      // This handles both token streaming (many small chunks) and state updates (single chunk)
+      const lastEvent = processedEvents[processedEvents.length - 1]
+      if (lastEvent?.type === "content") {
+        // Append to existing content block
+        lastEvent.content += event.content
+      } else {
+        // Start a new content block
+        processedEvents.push({ type: "content", content: event.content, key: `content-${i}` })
+      }
+    }
     else if (event.type === "tool_approval_required") {
-      if (!approvedToolNames.has(event.tool_name) && !deniedToolNames.has(event.tool_name)) {
+      // Render approval card based on THIS approval's status
+      const approvalState = pendingApprovals.get(event.approval_id)
+      const hasToolResult = approvalIndicesWithResults.has(i)
+
+      // Show approval card if:
+      // 1. Still pending (approvalState === null or undefined), OR
+      // 2. Approved but tool result hasn't arrived yet (show "Executing..." state), OR
+      // 3. Denied (show "Denied" state until tool_denied event arrives)
+      // Hide only when: approved AND tool result has arrived (MCPToolBlock takes over)
+      // OR when tool_denied event has been processed
+      const hasDeniedEvent = events.some((e, idx) => idx > i && e.type === "tool_denied" && e.tool_name === event.tool_name)
+      if (approvalState === undefined || approvalState === null ||
+          (approvalState === true && !hasToolResult) ||
+          (approvalState === false && !hasDeniedEvent)) {
         processedEvents.push({ ...event, key: `approval-${i}` })
       }
     } else if (event.type === "tool_denied") processedEvents.push({ ...event, key: `denied-${i}` })
     else if (event.type === "tool") {
-      // Skip tool events that have a pending approval (approval card handles them)
-      if (pendingApprovalToolNames.has(event.name) && !approvedToolNames.has(event.name) && !deniedToolNames.has(event.name)) {
-        // Still consume the tool_result if present, but don't render the tool card
-        const nextEvent = events[i + 1]
-        if (nextEvent?.type === "tool_result" && nextEvent.name === event.name) {
-          i++
-        }
+      const isDangerous = isWriteOperation(event.name)
+      const hasResult = toolResultsByToolIndex.has(i)
+
+      // Skip dangerous unapproved tools - ToolApprovalBlock handles those
+      if (isDangerous && event.approved !== true) {
         continue
       }
-      const nextEvent = events[i + 1]
-      const toolGroup: typeof processedEvents[number] & { type: "tool_group" } = {
+
+      // Skip tool events without results (avoid duplicate cards)
+      if (!hasResult) {
+        continue
+      }
+
+      processedEvents.push({
         type: "tool_group",
         tool: { name: event.name, params: event.params, approved: event.approved },
+        result: toolResultsByToolIndex.get(i),
         key: `tool-${i}`
-      }
-      if (nextEvent?.type === "tool_result" && nextEvent.name === event.name) {
-        toolGroup.result = nextEvent.result
-        i++
-      }
-      processedEvents.push(toolGroup)
+      })
     }
+    // Skip tool_result events - they're paired with tool events above
   }
 
   const toolGroups = processedEvents.filter(e => e.type === "tool_group")
@@ -946,10 +1095,20 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
             {/* Compact mode: Hide thinking blocks, hide routing reasoning, only show essential events */}
             {processedEvents.filter(e => e.type !== "tool_group" && e.type !== "thinking").map((event) => {
               if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={undefined} />
+              if (event.type === "content") return (
+                <AgentResponseBlock
+                  key={event.key}
+                  content={event.content}
+                  isStreaming={false}
+                  messageId={message.id}
+                />
+              )
               if (event.type === "tool_approval_required") {
                 const approvalState = pendingApprovals.get(event.approval_id)
                 const isPending = approvalState === undefined || approvalState === null
-                return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} />
+                const isExecuting = approvalState === true // Approved but waiting for result
+                const isDenied = approvalState === false // Denied, waiting for tool_denied event
+                return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} isExecuting={isExecuting} isDenied={isDenied} />
               }
               if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
               return null
@@ -957,7 +1116,14 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
             {toolGroups.length > 0 && (
               <ActivitySummaryBlock events={events}>
                 {toolGroups.map((group) => group.type === "tool_group" && (
-                  <MCPToolBlock key={group.key} name={group.tool.name} params={group.tool.params} result={group.result} hasResult={group.result !== undefined} onApproval={(approved) => handleApproval(group.tool.name, approved)} approvalState={group.tool.approved === true ? true : getApprovalState(group.tool.name)} />
+                  <MCPToolBlock
+                    key={group.key}
+                    name={group.tool.name}
+                    params={group.tool.params}
+                    result={group.result}
+                    hasResult={group.result !== undefined}
+                    approvalState={group.tool.approved === true ? true : null}
+                  />
                 ))}
               </ActivitySummaryBlock>
             )}
@@ -966,80 +1132,62 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           processedEvents.map((event) => {
             if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={event.thinking} />
             if (event.type === "thinking") return <ThinkingBlock key={event.key} content={event.content} />
+            if (event.type === "content") return (
+              <AgentResponseBlock
+                key={event.key}
+                content={event.content}
+                isStreaming={false}
+                messageId={message.id}
+              />
+            )
             if (event.type === "tool_approval_required") {
               const approvalState = pendingApprovals.get(event.approval_id)
               const isPending = approvalState === undefined || approvalState === null
-              return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} />
+              const isExecuting = approvalState === true // Approved but waiting for result
+              const isDenied = approvalState === false // Denied, waiting for tool_denied event
+              return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} isExecuting={isExecuting} isDenied={isDenied} />
             }
             if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
-            if (event.type === "tool_group") return <MCPToolBlock key={event.key} name={event.tool.name} params={event.tool.params} result={event.result} hasResult={event.result !== undefined} onApproval={(approved) => handleApproval(event.tool.name, approved)} approvalState={event.tool.approved === true ? true : getApprovalState(event.tool.name)} />
+            if (event.type === "tool_group") return (
+              <MCPToolBlock
+                key={event.key}
+                name={event.tool.name}
+                params={event.tool.params}
+                result={event.result}
+                hasResult={event.result !== undefined}
+                approvalState={event.tool.approved === true ? true : null}
+              />
+            )
             return null
           })
         )}
 
-        {/* Final Content - Markdown rendered (show while streaming with cursor) */}
-        {(message.content || isStreaming) && (
-          <div className="space-y-2 mt-4">
-            <div>
-              <div className="pl-1">
-                <div className={cn(
-                  "prose dark:prose-invert max-w-none",
-                  "text-sm leading-relaxed text-zinc-900 dark:text-zinc-200",
-                  // Headings - clear hierarchy
-                  "prose-headings:text-zinc-950 dark:prose-headings:text-zinc-100 prose-headings:font-semibold prose-headings:tracking-tight",
-                  "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2 prose-h1:border-b prose-h1:border-zinc-200 dark:prose-h1:border-zinc-700/50 prose-h1:pb-2",
-                  "prose-h2:text-lg prose-h2:mt-4 prose-h2:mb-2",
-                  "prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1.5",
-                  // Paragraphs
-                  "prose-p:my-2 prose-p:leading-relaxed",
-                  // Lists
-                  "prose-ul:my-2 prose-ul:pl-4",
-                  "prose-ol:my-2 prose-ol:pl-4",
-                  "prose-li:my-0.5 prose-li:marker:text-zinc-500",
-                  // Code
-                  "prose-code:bg-zinc-100 dark:prose-code:bg-zinc-700/60 prose-code:text-emerald-600 dark:prose-code:text-emerald-300 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-normal",
-                  "prose-code:before:content-none prose-code:after:content-none",
-                  "prose-pre:bg-zinc-50 dark:prose-pre:bg-zinc-900/80 prose-pre:border prose-pre:border-zinc-200 dark:prose-pre:border-zinc-700/50 prose-pre:rounded-xl prose-pre:text-zinc-900 dark:prose-pre:text-zinc-300",
-                  // Strong/emphasis
-                  "prose-strong:text-zinc-950 dark:prose-strong:text-zinc-100 prose-strong:font-semibold",
-                  "prose-em:text-zinc-800 dark:prose-em:text-zinc-300",
-                  // Links
-                  "prose-a:text-violet-600 dark:prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline",
-                  // Blockquotes
-                  "prose-blockquote:border-l-violet-500/50 prose-blockquote:bg-white dark:prose-blockquote:bg-zinc-800/50 prose-blockquote:rounded-r prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-zinc-700 dark:prose-blockquote:text-zinc-300",
-                  // Tables
-                  "prose-table:border prose-table:border-zinc-200 dark:prose-table:border-zinc-700/50",
-                  "prose-th:bg-zinc-50 dark:prose-th:bg-zinc-800 prose-th:px-3 prose-th:py-2 prose-th:text-zinc-900 dark:prose-th:text-zinc-200 prose-th:font-medium",
-                  "prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-zinc-200 dark:prose-td:border-zinc-700/50"
-                )}>
-                  {message.content ? (
-                    <>
-                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                        {message.content}
-                      </ReactMarkdown>
-                      {/* Streaming cursor - shown after content */}
-                      {isStreaming && (
-                        <span className="inline-block w-2 h-4 ml-0.5 bg-violet-400 animate-pulse rounded-sm" aria-label="Streaming response" />
-                      )}
-                    </>
-                  ) : isStreaming ? (
-                    /* Shimmering thinking indicator - shown before any content arrives */
-                    <div className="flex items-center gap-2 py-1">
-                      <div className="flex gap-1">
-                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                      </div>
-                      <span className="text-xs text-zinc-400 animate-pulse">Thinking...</span>
-                    </div>
-                  ) : null}
+        {/* Fallback Content - Only show if content wasn't rendered inline via events */}
+        {/* Show loading indicator while streaming before any content event is pushed */}
+        {!processedEvents.some(e => e.type === "content") && isStreaming && !message.content && (
+          <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
+            <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5")}>
+              <IconBox color="violet">
+                <Bot className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              </IconBox>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
+                <span className="text-xs text-zinc-400 animate-pulse">Responding...</span>
               </div>
             </div>
-            {!isStreaming && message.content && (
-              <MessageActions content={message.content} messageId={message.id} />
-            )}
           </div>
+        )}
+        {/* Fallback for messages without events but with content (legacy/stored messages) */}
+        {!processedEvents.some(e => e.type === "content") && message.content && !isStreaming && (
+          <AgentResponseBlock
+            content={message.content}
+            isStreaming={false}
+            messageId={message.id}
+          />
         )}
       </div>
     </div>

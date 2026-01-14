@@ -184,6 +184,7 @@ async def run_graph(
     context_mode: str = "soft",
     enabled_accounts: list[str] | None = None,
     content_queue: "asyncio.Queue[str | None] | None" = None,
+    output_queue: "asyncio.Queue[str | None] | None" = None,
 ):
     """Run the graph for a user query.
 
@@ -197,6 +198,7 @@ async def run_graph(
         context_mode: Entity grounding mode ("soft" or "strict")
         enabled_accounts: Account IDs enabled for context (empty = all)
         content_queue: Optional asyncio.Queue for streaming content chunks
+        output_queue: Optional asyncio.Queue for SSE events (thinking, etc.)
 
     Yields:
         State updates as the graph executes (for streaming)
@@ -235,11 +237,12 @@ async def run_graph(
         "conversation_history": conversation_history or [],
     }
 
-    # Config with thread ID for checkpointing and content queue for streaming
+    # Config with thread ID for checkpointing and queues for streaming
     config = {
         "configurable": {
             "thread_id": thread_id,
             "content_queue": content_queue,  # For token-level streaming
+            "output_queue": output_queue,  # For SSE events (thinking, etc.)
         },
         "recursion_limit": 25,  # Prevent infinite loops
     }
@@ -278,6 +281,10 @@ async def resume_graph(
     Yields:
         State updates as the graph continues
     """
+    from langgraph.types import Command
+
+    print(f"[resume_graph] Starting for thread_id={thread_id}, approved={approval_result.get('approved')}", flush=True)
+
     config = {
         "configurable": {
             "thread_id": thread_id,
@@ -287,18 +294,28 @@ async def resume_graph(
 
     # Build graph and use checkpointer context manager
     graph = build_graph()
+    print(f"[resume_graph] Graph built, getting checkpointer...", flush=True)
     async with get_checkpointer_context() as checkpointer:
         # Setup tables on first use (idempotent)
         await checkpointer.setup()
+        print(f"[resume_graph] Checkpointer ready, compiling graph...", flush=True)
 
         # Compile with checkpointer
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
-        # Resume with approval result
-        # The interrupt() in tool_executor will receive this
+        # Resume with Command(resume=...) to properly continue from interrupt()
+        # The interrupt() in tool_executor will receive approval_result
+        resume_command = Command(resume=approval_result)
+        print(f"[resume_graph] Calling astream with Command(resume=...)...", flush=True)
+
+        event_count = 0
         async for event in compiled_graph.astream(
-            approval_result,  # This is passed to interrupt() return
+            resume_command,
             config=config,
             stream_mode="updates",
         ):
+            event_count += 1
+            print(f"[resume_graph] Got event #{event_count}: keys={list(event.keys())}", flush=True)
             yield event
+
+        print(f"[resume_graph] Finished, yielded {event_count} events", flush=True)

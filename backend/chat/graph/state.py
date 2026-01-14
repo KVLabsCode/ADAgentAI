@@ -106,6 +106,9 @@ class GraphState(TypedDict, total=False):
     # Final response (set by specialist after all tools complete)
     response: Optional[str]
 
+    # Partial response (text generated before tool calls)
+    partial_response: Optional[str]
+
     # Agent thinking (extended thinking from Claude)
     thinking: Optional[str]
 
@@ -130,3 +133,8 @@ class GraphState(TypedDict, total=False):
     # Token tracking for metrics (set by specialist)
     token_usage: Optional[dict]  # {"input_tokens": N, "output_tokens": N}
     model: Optional[str]  # Model name used for the response
+
+    # Streaming flags (set by specialist when content/thinking already streamed)
+    # Prevents duplicate events in processor
+    thinking_streamed: Optional[bool]
+    content_streamed: Optional[bool]

@@ -20,6 +20,7 @@ from langgraph.types import RunnableConfig
 from ..state import GraphState
 from .entity_loader import build_entity_system_prompt
 from ...tools import get_tools_for_service
+from ...streaming.events import format_sse, ThinkingEvent
 
 
 # Service-specific instructions
@@ -432,43 +433,58 @@ Use these account IDs when calling tools. If the user asks about "my account" or
     if not messages or messages[-1].content != user_query:
         llm_messages.append(HumanMessage(content=user_query))
 
-    # Get content queue from config for token-level streaming
-    content_queue: asyncio.Queue[str | None] | None = config.get("configurable", {}).get("content_queue")
+    # Get streaming queues from config
+    # content_queue: for token-level streaming to frontend
+    # output_queue: for SSE events (thinking, etc.) that need proper ordering
+    configurable = config.get("configurable", {}) if config else {}
+    content_queue: asyncio.Queue[str | None] | None = configurable.get("content_queue")
+    output_queue: asyncio.Queue[str | None] | None = configurable.get("output_queue")
 
     try:
-        # Stream LLM response with tools (token-by-token)
-        # Accumulate full response while streaming chunks to frontend
+        # Stream LLM response with proper event ordering:
+        # 1. Accumulate thinking chunks (Claude sends all thinking before text)
+        # 2. When first text chunk arrives → emit thinking to output_queue
+        # 3. Stream text chunks to content_queue
         response_text = ""
-        thinking_content = None
-        token_usage = {}
-        tool_calls_accumulated = []
+        thinking_content: str | None = None
+        thinking_emitted = False
+        token_usage: dict[str, int] = {}
+        tool_calls_accumulated: list[dict] = []
         response_chunks: list[AIMessageChunk] = []
+        final_response: AIMessageChunk | None = None
 
-        print(f"[specialist] Starting streaming response (queue={'enabled' if content_queue else 'disabled'})")
+        print(f"[specialist] Starting response (streaming mode)")
 
         async for chunk in llm_with_tools.astream(llm_messages):
             response_chunks.append(chunk)
 
-            # Extract and stream text content
+            # Extract content from chunk
             if hasattr(chunk, "content"):
                 chunk_content = chunk.content
 
-                # Handle list of content blocks (Claude with thinking)
+                # Handle list of content blocks (Claude with extended thinking)
                 if isinstance(chunk_content, list):
                     for block in chunk_content:
                         if isinstance(block, dict):
                             if block.get("type") == "thinking":
-                                # Accumulate thinking (don't stream it)
+                                # Accumulate thinking (Claude sends all thinking before text)
                                 thinking_text = block.get("thinking", "")
                                 if thinking_text:
                                     thinking_content = (thinking_content or "") + thinking_text
                             elif block.get("type") == "text":
                                 text = block.get("text", "")
                                 if text:
-                                    response_text += text
-                                    # Stream text chunks to frontend
+                                    # First text chunk means thinking is complete
+                                    # Emit thinking to output_queue BEFORE content
+                                    if not thinking_emitted and thinking_content and output_queue:
+                                        await output_queue.put(format_sse(
+                                            ThinkingEvent(content=thinking_content).model_dump(mode='json')
+                                        ))
+                                        thinking_emitted = True
+                                    # Stream text to content queue
                                     if content_queue:
                                         await content_queue.put(text)
+                                    response_text += text
                         elif hasattr(block, "type"):
                             if block.type == "thinking":
                                 thinking_text = getattr(block, "thinking", "")
@@ -477,15 +493,22 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                             elif block.type == "text":
                                 text = getattr(block, "text", "")
                                 if text:
-                                    response_text += text
+                                    # First text chunk means thinking is complete
+                                    # Emit thinking to output_queue BEFORE content
+                                    if not thinking_emitted and thinking_content and output_queue:
+                                        await output_queue.put(format_sse(
+                                            ThinkingEvent(content=thinking_content).model_dump(mode='json')
+                                        ))
+                                        thinking_emitted = True
+                                    # Stream text to content queue
                                     if content_queue:
                                         await content_queue.put(text)
+                                    response_text += text
                 elif isinstance(chunk_content, str) and chunk_content:
-                    # Simple string content (OpenRouter models)
-                    response_text += chunk_content
-                    # Stream text chunks to frontend
+                    # Simple string content (OpenRouter models - no thinking)
                     if content_queue:
                         await content_queue.put(chunk_content)
+                    response_text += chunk_content
 
             # Accumulate tool calls from chunks
             if hasattr(chunk, "tool_call_chunks") and chunk.tool_call_chunks:
@@ -556,10 +579,21 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                 "model": model_name,
             }
 
+            # Include partial response text if any (text before tool calls)
+            # Mark as streamed so processor knows not to duplicate
+            if response_text:
+                result["partial_response"] = response_text
+                if content_queue:
+                    result["content_streamed"] = True
+
             # Include thinking if present
+            # Mark as streamed so processor knows not to duplicate
             if thinking_content:
                 result["thinking"] = thinking_content
+                if thinking_emitted:
+                    result["thinking_streamed"] = True
 
+            print(f"[specialist] Returning result with keys: {list(result.keys())}, content_streamed: {result.get('content_streamed')}, thinking_streamed: {result.get('thinking_streamed')}", flush=True)
             return result
 
         # No tool calls - return final response
@@ -583,8 +617,15 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         }
 
         # Include thinking if present
+        # Mark as streamed so processor knows not to duplicate
         if thinking_content:
             result["thinking"] = thinking_content
+            if thinking_emitted:
+                result["thinking_streamed"] = True
+
+        # Mark content as streamed so processor knows not to duplicate
+        if content_queue and final_content:
+            result["content_streamed"] = True
 
         return result
 

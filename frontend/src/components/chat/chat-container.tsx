@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { ChatMessages } from "./chat-messages"
 import { ChatInput } from "./chat-input"
 import { ExamplePrompts } from "./example-prompts"
-import { streamChat, approveTool, pollForStreamResult, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
+import { streamChat, approveTool, resumeStream, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
 import { useUser } from "@/hooks/use-user"
 import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, Provider, StreamEventItem } from "@/lib/types"
@@ -54,6 +54,44 @@ function saveChatState(messages: Message[], sessionId: string | null) {
   }
 }
 
+// Extract pending approval states from messages
+// Returns Map<approvalId, boolean | null> where null = still pending, true = approved, false = denied
+function extractPendingApprovals(messages: Message[]): Map<string, boolean | null> {
+  const approvals = new Map<string, boolean | null>()
+
+  for (const message of messages) {
+    if (!message.events) continue
+
+    // Track approval requests in order - each tool_result/tool_denied resolves the PREVIOUS approval
+    let currentApprovalId: string | null = null
+
+    for (const event of message.events) {
+      if (event.type === "tool_approval_required") {
+        // If there was a previous approval that wasn't resolved, it's still pending
+        if (currentApprovalId && !approvals.has(currentApprovalId)) {
+          approvals.set(currentApprovalId, null)
+        }
+        currentApprovalId = event.approval_id
+      } else if (event.type === "tool_result" && currentApprovalId) {
+        // Tool result means the current approval was approved
+        approvals.set(currentApprovalId, true)
+        currentApprovalId = null // Reset for next approval
+      } else if (event.type === "tool_denied" && currentApprovalId) {
+        // Tool denied means the current approval was denied
+        approvals.set(currentApprovalId, false)
+        currentApprovalId = null
+      }
+    }
+
+    // If there's an unresolved approval at the end of the message, it's still pending
+    if (currentApprovalId && !approvals.has(currentApprovalId)) {
+      approvals.set(currentApprovalId, null)
+    }
+  }
+
+  return approvals
+}
+
 export function ChatContainer({ initialMessages = [], providers = [], sessionId: initialSessionId }: ChatContainerProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -83,6 +121,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
       if (saved.messages.length > initialMessages.length) {
         setMessages(saved.messages)
         setCurrentSessionId(saved.sessionId)
+        // Restore pending approval states from messages
+        setPendingApprovals(extractPendingApprovals(saved.messages))
         setIsHydrated(true)
         return
       }
@@ -92,6 +132,8 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     if (!initialSessionId && saved && saved.messages.length > 0) {
       setMessages(saved.messages)
       setCurrentSessionId(saved.sessionId)
+      // Restore pending approval states from messages
+      setPendingApprovals(extractPendingApprovals(saved.messages))
       // Update URL to match the restored session
       if (saved.sessionId) {
         window.history.replaceState(null, '', `/chat/${saved.sessionId}`)
@@ -101,6 +143,10 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     }
 
     // Case 3: Use server data (or empty for new chat)
+    // Also restore pending approvals from initial messages (e.g., from server)
+    if (initialMessages.length > 0) {
+      setPendingApprovals(extractPendingApprovals(initialMessages))
+    }
     setIsHydrated(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run once on mount
   }, [])
@@ -184,7 +230,7 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
     }
   }, [newChatParam, pathname])
 
-  // Handle tool approval from user - calls backend API and updates local state
+  // Handle tool approval from user - calls backend API and resumes graph execution
   const handleToolApproval = React.useCallback(async (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => {
     // Optimistically update UI
     setPendingApprovals(prev => {
@@ -213,75 +259,155 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         return
       }
 
-      // If approved and we have a stream ID, poll for result after a delay
-      // This handles cases where SSE stream stalls or disconnects
-      if (approved && currentStreamIdRef.current && currentAssistantIdRef.current) {
+      // If we have a stream ID and assistant ID, resume the graph to continue execution
+      if (currentStreamIdRef.current && currentAssistantIdRef.current) {
         const streamId = currentStreamIdRef.current
         const assistantId = currentAssistantIdRef.current
 
-        // Always poll after a short delay as fallback (SSE might have stalled)
-        console.log(`[ChatContainer] Approval succeeded, will poll for result in 3s: ${streamId}`)
+        console.log(`[ChatContainer] Approval succeeded, resuming stream: ${streamId}`)
+        setIsLoading(true)
 
-        // Wait 3 seconds to give SSE a chance, then poll if still no result
-        setTimeout(async () => {
-          // Check if message already has content (SSE delivered it)
-          const currentMessages = await new Promise<Message[]>(resolve => {
-            setMessages(prev => { resolve(prev); return prev })
+        // Get access token for authenticated request
+        const accessToken = await getAccessToken()
+
+        // Track events and content during resume
+        let finalContent = ""
+        const resumeEvents: StreamEventItem[] = []
+
+        // Get existing events from the message
+        const existingMessage = await new Promise<Message | undefined>(resolve => {
+          setMessages(prev => {
+            const msg = prev.find(m => m.id === assistantId)
+            resolve(msg)
+            return prev
           })
-          const msg = currentMessages.find(m => m.id === assistantId)
-
-          // If message still has no meaningful content, poll for result
-          if (!msg?.content || msg.content.length < 50) {
-            console.log(`[ChatContainer] No result via SSE, polling: ${streamId}`)
-            pollForStreamResult(streamId, 30, 2000).then(streamResult => {
-              if (streamResult?.status === "done" && streamResult.result) {
-                setMessages(prev =>
-                  prev.map(m =>
-                    m.id === assistantId
-                      ? { ...m, content: streamResult.result || m.content }
-                      : m
-                  )
-                )
-                setIsLoading(false)
-              }
-            })
-          }
-        }, 3000)
-
-        // Legacy: If not currently loading (stream fully disconnected), poll immediately
-        if (!isLoading) {
-          console.log(`[ChatContainer] Stream already disconnected, polling now: ${streamId}`)
-
-          // Show loading state
-          setIsLoading(true)
-
-          // Poll for result in background
-          pollForStreamResult(streamId, 30, 2000).then(streamResult => {
-            setIsLoading(false)
-
-            if (streamResult?.status === "done" && streamResult.result) {
-              // Update the assistant message with the result
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, content: streamResult.result || m.content }
-                    : m
-                )
-              )
-            } else if (streamResult?.error) {
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, content: `Error: ${streamResult.error}` }
-                    : m
-                )
-              )
-            }
-          }).catch(err => {
-            console.error('[ChatContainer] Error polling for result:', err)
-            setIsLoading(false)
-          })
+        })
+        if (existingMessage?.events) {
+          resumeEvents.push(...existingMessage.events)
         }
+
+        // Track the last tool name for pairing with tool_result
+        let lastToolName = "unknown"
+
+        // Resume the graph stream
+        await resumeStream(
+          streamId,
+          approved,
+          {
+            onThinking: (thinkingContent) => {
+              resumeEvents.push({ type: "thinking", content: thinkingContent })
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, events: [...resumeEvents] }
+                    : m
+                )
+              )
+            },
+            onToolCall: (tool, inputPreview, inputFull, toolApproved) => {
+              let params: Record<string, unknown> = {}
+              try {
+                const inputStr = inputFull || inputPreview
+                if (inputStr) {
+                  params = JSON.parse(inputStr)
+                }
+              } catch {
+                params = { input: inputPreview }
+              }
+              lastToolName = tool
+              resumeEvents.push({ type: "tool", name: tool, params, approved: toolApproved })
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, events: [...resumeEvents] }
+                    : m
+                )
+              )
+            },
+            onToolResult: (preview, full, dataType) => {
+              let toolResult: unknown = preview
+              if (dataType === "json" || dataType === "json_list") {
+                try {
+                  toolResult = JSON.parse(full || preview)
+                } catch {
+                  toolResult = preview
+                }
+              }
+              resumeEvents.push({ type: "tool_result", name: lastToolName, result: toolResult })
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, events: [...resumeEvents] }
+                    : m
+                )
+              )
+            },
+            onContent: (chunk) => {
+              // Push each content chunk as an event - like thinking, content appears inline
+              finalContent += chunk
+              resumeEvents.push({ type: "content", content: chunk })
+
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, content: finalContent, events: [...resumeEvents] }
+                    : m
+                )
+              )
+            },
+            onResult: (resultContent) => {
+              finalContent = resultContent
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, content: resultContent, events: [...resumeEvents] }
+                    : m
+                )
+              )
+            },
+            onError: (error) => {
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, content: `Error: ${error}` }
+                    : m
+                )
+              )
+              setIsLoading(false)
+            },
+            onDone: () => {
+              setIsLoading(false)
+            },
+            onToolApprovalRequired: (approvalId, toolName, toolInput, parameterSchema) => {
+              // Another dangerous tool was called - add approval request event
+              resumeEvents.push({
+                type: "tool_approval_required",
+                approval_id: approvalId,
+                tool_name: toolName,
+                tool_input: toolInput,
+                parameter_schema: parameterSchema as import("@/lib/types").RJSFSchema | undefined
+              })
+              // Mark as pending in approval state
+              setPendingApprovals(prev => {
+                const newMap = new Map(prev)
+                newMap.set(approvalId, null) // null = pending
+                return newMap
+              })
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, events: [...resumeEvents] }
+                    : m
+                )
+              )
+            },
+          },
+          accessToken,
+          modifiedParams,
+          abortControllerRef.current?.signal
+        )
+
+        setIsLoading(false)
       }
     } catch (error) {
       console.error('Error calling approveTool:', error)
@@ -291,8 +417,9 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
         newMap.set(approvalId, null)
         return newMap
       })
+      setIsLoading(false)
     }
-  }, [isLoading])
+  }, [getAccessToken])
 
   const hasProviders = providers.some(p => p.status === "connected")
   const hasMessages = messages.length > 0
@@ -537,12 +664,15 @@ export function ChatContainer({ initialMessages = [], providers = [], sessionId:
           )
         },
         onContent: (chunk) => {
-          // Append streaming content chunk to the message
+          // Push each content chunk as an event - like thinking, content appears inline
+          // We push the chunk content so we can track WHERE in the sequence it appeared
           finalContent += chunk
+          events.push({ type: "content", content: chunk })
+
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, content: finalContent }
+                ? { ...m, content: finalContent, events: [...events] }
                 : m
             )
           )

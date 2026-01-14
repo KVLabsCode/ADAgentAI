@@ -429,3 +429,93 @@ export async function pollForStreamResult(
 
   return null; // Timeout
 }
+
+/**
+ * Resume a paused graph stream after tool approval.
+ * This continues the LangGraph execution from where it was interrupted.
+ */
+export async function resumeStream(
+  streamId: string,
+  approved: boolean,
+  callbacks: ChatStreamCallbacks,
+  accessToken?: string | null,
+  modifiedParams?: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<void> {
+  const url = `${AGENT_URL}/chat/resume`;
+  let doneHandled = false;
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    };
+
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        stream_id: streamId,
+        approved,
+        modified_params: modifiedParams,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event: StreamEvent = JSON.parse(jsonStr);
+            if (event.type === "done") {
+              if (!doneHandled) {
+                doneHandled = true;
+                callbacks.onDone?.();
+              }
+            } else {
+              handleEvent(event, callbacks);
+            }
+          } catch {
+            console.warn("Failed to parse SSE event:", jsonStr);
+          }
+        }
+      }
+    }
+
+    if (!doneHandled) {
+      callbacks.onDone?.();
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return;
+    }
+    console.error("[resumeStream] Error:", error);
+    callbacks.onError?.(error instanceof Error ? error.message : "Unknown error");
+  }
+}

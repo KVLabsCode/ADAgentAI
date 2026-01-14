@@ -177,6 +177,7 @@ async def stream_chat_response(
                 context_mode=context_mode,
                 enabled_accounts=enabled_accounts or [],
                 content_queue=content_queue,
+                output_queue=output_queue,
             ):
                 # Check for LangGraph interrupt events (tool approval required)
                 if "__interrupt__" in event:
@@ -186,6 +187,11 @@ async def stream_chat_response(
                         if isinstance(interrupt_value, dict) and interrupt_value.get("type") == "tool_approval_required":
                             tool_args = interrupt_value.get("tool_args", {})
                             tool_input_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
+                            # Debug: Log what's being sent in the SSE event
+                            print(f"[processor] Emitting tool_approval_required event")
+                            print(f"[processor] tool_name: {interrupt_value.get('tool_name')}")
+                            print(f"[processor] tool_args: {tool_args}")
+                            print(f"[processor] tool_input_str: {tool_input_str}")
                             await output_queue.put(format_sse(ToolApprovalRequiredEvent(
                                 approval_id=interrupt_value.get("approval_id", ""),
                                 tool_name=interrupt_value.get("tool_name", ""),
@@ -364,9 +370,19 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
 
     elif node_name == "specialist":
         # Check for thinking content (extended thinking from Claude)
+        # Only emit if NOT already streamed via output_queue
         thinking = state_update.get("thinking")
-        if thinking:
+        thinking_streamed = state_update.get("thinking_streamed", False)
+        if thinking and not thinking_streamed:
             events.append(ThinkingEvent(content=thinking).model_dump(mode='json'))
+
+        # Check for partial response (text before tool calls)
+        # Only emit as ContentEvent if NOT already streamed via content_queue
+        partial_response = state_update.get("partial_response")
+        content_streamed = state_update.get("content_streamed", False)
+        if partial_response and not content_streamed:
+            # Emit as content event for inline rendering
+            events.append(ContentEvent(content=partial_response).model_dump(mode='json'))
 
         # Check for tool calls
         tool_calls = state_update.get("tool_calls", [])
@@ -375,9 +391,11 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
                 # Format tool args as JSON string for frontend
                 tool_args = tc.get("args", {})
                 args_json = json.dumps(tool_args)
+                tool_name = tc.get("name", "unknown")
                 events.append({
                     "type": "tool",
-                    "tool": tc.get("name"),  # Frontend expects 'tool'
+                    "name": tool_name,  # Frontend uses 'name' for deduplication with pending approvals
+                    "tool": tool_name,  # Frontend also expects 'tool' field
                     "input_preview": args_json[:200] if len(args_json) > 200 else args_json,
                     "input_full": args_json,
                     "is_dangerous": tc.get("is_dangerous", False),
@@ -385,8 +403,9 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
                 })
 
         # Check for final response
+        # Only emit if NOT already streamed via content_queue
         response = state_update.get("response")
-        if response:
+        if response and not content_streamed:
             events.append(ResultEvent(content=response).model_dump(mode='json'))
 
         # Check for error
@@ -416,6 +435,19 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
                         tool_name=tc.get("name", "unknown"),
                     ).model_dump(mode='json'))
                 else:
+                    # Emit tool event first (so frontend can pair with tool_result)
+                    tool_args = tc.get("args", {})
+                    args_json = json.dumps(tool_args)
+                    events.append({
+                        "type": "tool",
+                        "name": tc.get("name", "unknown"),
+                        "tool": tc.get("name", "unknown"),  # Frontend expects 'tool' field too
+                        "input_preview": args_json[:200] if len(args_json) > 200 else args_json,
+                        "input_full": args_json,
+                        "is_dangerous": tc.get("is_dangerous", False),
+                        "approved": True,  # Already approved and executed
+                    })
+
                     # Format result for frontend
                     result_str = result if isinstance(result, str) else json.dumps(result)
                     # Determine data type
@@ -431,6 +463,8 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
 
                     events.append({
                         "type": "tool_result",
+                        "name": tc.get("name", "unknown"),
+                        "result": result_str,  # Full result for rendering
                         "preview": result_str[:500] if len(result_str) > 500 else result_str,
                         "full": result_str,
                         "data_type": data_type,
@@ -462,41 +496,58 @@ async def stream_resume_response(
     Yields:
         SSE events from the resumed graph execution
     """
+    print(f"[resume_gen] Starting resume for stream_id={stream_id}, approved={approved}", flush=True)
     try:
         approval_result = {
             "approved": approved,
             "modified_params": modified_params,
         }
 
+        print(f"[resume_gen] Calling resume_graph...", flush=True)
         async for event in resume_graph(
             thread_id=stream_id,
             approval_result=approval_result,
         ):
+            print(f"[resume_gen] Got event keys: {list(event.keys())}", flush=True)
+
+            # Check for LangGraph interrupt events (another tool approval required)
+            if "__interrupt__" in event:
+                print(f"[resume_gen] Got __interrupt__ - checking for tool approval", flush=True)
+                interrupt_data_list = event["__interrupt__"]
+                for interrupt_item in interrupt_data_list:
+                    interrupt_value = getattr(interrupt_item, 'value', interrupt_item)
+                    if isinstance(interrupt_value, dict) and interrupt_value.get("type") == "tool_approval_required":
+                        tool_args = interrupt_value.get("tool_args", {})
+                        tool_input_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
+                        print(f"[resume_gen] Emitting tool_approval_required for {interrupt_value.get('tool_name')}", flush=True)
+                        yield format_sse(ToolApprovalRequiredEvent(
+                            approval_id=interrupt_value.get("approval_id", ""),
+                            tool_name=interrupt_value.get("tool_name", ""),
+                            tool_input=tool_input_str,
+                            parameter_schema=interrupt_value.get("param_schema"),
+                        ).model_dump(mode='json'))
+                continue
+
             for node_name, state_update in event.items():
+                print(f"[resume_gen] Processing node: {node_name}", flush=True)
+                # Skip special keys
+                if node_name.startswith("__"):
+                    print(f"[resume_gen] Skipping special key: {node_name}", flush=True)
+                    continue
                 sse_events = _convert_state_to_sse(node_name, state_update)
+                print(f"[resume_gen] Generated {len(sse_events)} SSE events for {node_name}", flush=True)
                 for sse_event in sse_events:
+                    print(f"[resume_gen] Yielding SSE event type: {sse_event.get('type')}", flush=True)
                     yield format_sse(sse_event)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
+        print(f"[resume_gen] Error: {e}", flush=True)
         yield format_sse(ErrorEvent(content=str(e)).model_dump(mode='json'))
 
     finally:
+        print(f"[resume_gen] Done, yielding DoneEvent", flush=True)
         yield format_sse(DoneEvent().model_dump(mode='json'))
 
 
-def _build_routing_context(conversation_history: Optional[list]) -> str:
-    """Build context string for routing from conversation history."""
-    if not conversation_history:
-        return ""
-
-    recent = conversation_history[-6:] if len(conversation_history) > 6 else conversation_history
-    context_parts = []
-
-    for msg in recent:
-        role = msg.get("role", "unknown")
-        content = msg.get("content", "")[:200]
-        context_parts.append(f"{role}: {content}")
-
-    return "\n".join(context_parts)
