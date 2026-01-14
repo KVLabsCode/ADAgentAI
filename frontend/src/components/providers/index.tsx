@@ -9,6 +9,7 @@ import { ThemeProvider } from "./theme-provider"
 import { QueryProvider } from "./query-provider"
 import { PostHogProvider } from "./posthog-provider"
 import { UserProvider } from "@/contexts/user-context"
+import { EntityDataProvider } from "@/contexts/entity-data-context"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -26,9 +27,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
           Link={Link}
         >
           <UserProvider>
-            <ThemeProvider>
-              {children}
-            </ThemeProvider>
+            <EntityDataProvider>
+              <ThemeProvider>
+                {children}
+              </ThemeProvider>
+            </EntityDataProvider>
           </UserProvider>
         </NeonAuthUIProvider>
       </QueryProvider>

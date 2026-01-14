@@ -443,8 +443,11 @@ interface ToolApprovalBlockProps {
 function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending }: ToolApprovalBlockProps) {
   const [isOpen, setIsOpen] = React.useState(true) // Auto-expand for approval
 
-  // Debug: Log if schema is received
-  console.log("[ToolApprovalBlock] toolName:", toolName, "parameterSchema:", parameterSchema ? "YES" : "NO", parameterSchema)
+  // Debug: Log all inputs to trace data flow
+  console.log("[ToolApprovalBlock] toolName:", toolName)
+  console.log("[ToolApprovalBlock] toolInput RAW:", toolInput)
+  console.log("[ToolApprovalBlock] toolInput type:", typeof toolInput)
+  console.log("[ToolApprovalBlock] parameterSchema:", parameterSchema ? "YES" : "NO", parameterSchema)
 
   // Get tool metadata for enhanced display
   const metadata = React.useMemo(() => getToolMetadata(toolName), [toolName])
@@ -455,11 +458,45 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
   const toolIcon = getToolIcon(toolName)
   const ToolIconComponent = metadata.riskLevel === "high" ? AlertTriangle : toolIcon.icon
 
-  // Parse initial values from tool input
+  // Parse initial values from tool input and normalize structure
   const initialValues = React.useMemo(() => {
     try {
-      return JSON.parse(toolInput) as Record<string, unknown>
-    } catch {
+      const parsed = JSON.parse(toolInput) as Record<string, unknown>
+      console.log("[ToolApprovalBlock] initialValues RAW PARSED:", parsed)
+
+      // Unwrap "params" wrapper if present (LLM often wraps args in params)
+      let values = parsed
+      if (parsed.params && typeof parsed.params === "object") {
+        values = parsed.params as Record<string, unknown>
+        console.log("[ToolApprovalBlock] Unwrapped params:", values)
+      }
+
+      // Flatten "targeting" object if present (AdMob mediation groups use this)
+      if (values.targeting && typeof values.targeting === "object") {
+        const targeting = values.targeting as Record<string, unknown>
+        const { targeting: _, ...rest } = values
+        values = {
+          ...rest,
+          platform: targeting.platform,
+          ad_format: targeting.format, // LLM sends "format", schema expects "ad_format"
+          ad_unit_ids: targeting.ad_unit_ids,
+        }
+        console.log("[ToolApprovalBlock] Flattened targeting:", values)
+      }
+
+      // Convert array fields to comma-separated strings if schema expects string
+      if (Array.isArray(values.ad_unit_ids)) {
+        values = {
+          ...values,
+          ad_unit_ids: (values.ad_unit_ids as string[]).join(", ")
+        }
+        console.log("[ToolApprovalBlock] Converted ad_unit_ids array to string:", values.ad_unit_ids)
+      }
+
+      console.log("[ToolApprovalBlock] FINAL initialValues:", values)
+      return values
+    } catch (e) {
+      console.log("[ToolApprovalBlock] JSON parse FAILED:", e, "input was:", toolInput)
       return {}
     }
   }, [toolInput])
@@ -497,7 +534,7 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className={cn(
-        "rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border",
+        "rounded-2xl bg-white dark:bg-zinc-800/50 border",
         metadata.riskLevel === "high" ? "border-red-500/30" : "border-zinc-200 dark:border-zinc-700/50"
       )}>
         <CollapsibleTrigger asChild>
@@ -513,40 +550,12 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
               <Badge className={cn("h-5 text-[8px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none", opStyle.bg, opStyle.text)}>
                 {metadata.operationType}
               </Badge>
-              {/* Risk Level Badge */}
-              <Badge className={cn("h-5 text-[8px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none", riskStyle.bg, riskStyle.text)}>
-                {metadata.riskLevel === "high" ? "High Risk" : metadata.riskLevel === "medium" ? "Med Risk" : "Low"}
-              </Badge>
               <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 transition-transform duration-200", isOpen && "rotate-180")} />
             </div>
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-200 dark:border-zinc-700/50 mt-1">
-            {/* Metadata Header */}
-            <div className="flex items-center justify-between text-[10px]">
-              <div className="flex items-center gap-3">
-                <span className="text-zinc-500">{metadata.category}</span>
-                {affectedEntity && (
-                  <>
-                    <span className="text-zinc-600">•</span>
-                    <span className="text-zinc-400 font-mono">{affectedEntity}</span>
-                  </>
-                )}
-              </div>
-              {metadata.docUrl && (
-                <a
-                  href={metadata.docUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Docs
-                </a>
-              )}
-            </div>
 
             {/* Editable form when schema available, otherwise tree/json view */}
             {parameterSchema && isPending ? (
@@ -860,9 +869,16 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
   // Collect approved/denied tool names
   const approvedToolNames = new Set<string>()
   const deniedToolNames = new Set<string>()
+  const pendingApprovalToolNames = new Set<string>()
   for (const event of events) {
     if (event.type === "tool" && event.approved === true) approvedToolNames.add(event.name)
     if (event.type === "tool_denied") deniedToolNames.add(event.tool_name)
+    // Track tools with pending approvals (not yet approved or denied)
+    if (event.type === "tool_approval_required") {
+      if (!approvedToolNames.has(event.tool_name) && !deniedToolNames.has(event.tool_name)) {
+        pendingApprovalToolNames.add(event.tool_name)
+      }
+    }
   }
 
   // Process events
@@ -884,6 +900,15 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
       }
     } else if (event.type === "tool_denied") processedEvents.push({ ...event, key: `denied-${i}` })
     else if (event.type === "tool") {
+      // Skip tool events that have a pending approval (approval card handles them)
+      if (pendingApprovalToolNames.has(event.name) && !approvedToolNames.has(event.name) && !deniedToolNames.has(event.name)) {
+        // Still consume the tool_result if present, but don't render the tool card
+        const nextEvent = events[i + 1]
+        if (nextEvent?.type === "tool_result" && nextEvent.name === event.name) {
+          i++
+        }
+        continue
+      }
       const nextEvent = events[i + 1]
       const toolGroup: typeof processedEvents[number] & { type: "tool_group" } = {
         type: "tool_group",
