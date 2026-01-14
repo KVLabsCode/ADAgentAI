@@ -18,16 +18,18 @@ export function SelectWidget(props: WidgetProps) {
   const showRefresh = (options?.showRefresh as boolean) ?? true
 
   const enumOptions = React.useMemo(() => {
-    if (options?.enumOptions && Array.isArray(options.enumOptions)) {
-      return options.enumOptions as { value: string; label: string }[]
+    const enumOpts = options?.enumOptions
+    const schemaEnum = schema?.enum
+    if (enumOpts && Array.isArray(enumOpts)) {
+      return enumOpts as { value: string; label: string }[]
     }
-    if (schema?.enum && Array.isArray(schema.enum)) {
-      return schema.enum
+    if (schemaEnum && Array.isArray(schemaEnum)) {
+      return schemaEnum
         .filter((val): val is string => typeof val === "string")
         .map((val) => ({ value: val, label: val }))
     }
     return []
-  }, [options?.enumOptions, schema?.enum])
+  }, [options, schema])
 
   const displayLabel = React.useMemo(() => {
     const selected = enumOptions.find((opt) => opt.value === value)

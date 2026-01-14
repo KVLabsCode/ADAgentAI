@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Bot } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UserMessage } from "./user-message"
 import { AssistantMessage } from "./assistant-message"

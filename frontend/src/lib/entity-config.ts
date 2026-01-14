@@ -108,8 +108,8 @@ export function getParentField(fetchType: string): string | null {
   if (parentType === "accounts") return "account_id"
   if (parentType === "networks") return "network_code"
 
-  // Fallback: singularize and add _id
-  return `${parentType.replace(/s$/, "")}_id`
+  // Fallback for future parent types: singularize and add _id
+  return `${(parentType as string).replace(/s$/, "")}_id`
 }
 
 /**

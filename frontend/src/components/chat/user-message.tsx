@@ -1,16 +1,12 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { User } from "lucide-react"
-import { useUser } from "@/hooks/use-user"
-import Image from "next/image"
 
 interface UserMessageProps {
   content: string
 }
 
 export function UserMessage({ content }: UserMessageProps) {
-  const { user } = useUser()
 
   // Check if content is short (single line)
   const isShort = content.length <= 80 && !content.includes('\n')

@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Plug, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Button } from "@/components/ui/button"
 import { AdMobLogo, ProviderLogoBadge } from "@/components/icons/provider-logos"
 
 export function PlatformsSection() {

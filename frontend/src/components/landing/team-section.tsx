@@ -1,7 +1,6 @@
 "use client"
 
 import { Building2, Users, Mail, Crown, ShieldCheck, RotateCw, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
 
 export function TeamSection() {
   return (

@@ -4,7 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Sparkles, Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, ExternalLink, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree } from "lucide-react"
+import { Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -451,7 +451,7 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
 
   // Get tool metadata for enhanced display
   const metadata = React.useMemo(() => getToolMetadata(toolName), [toolName])
-  const riskStyle = RISK_STYLES[metadata.riskLevel]
+  const _riskStyle = RISK_STYLES[metadata.riskLevel]
   const opStyle = OP_STYLES[metadata.operationType]
 
   // Get appropriate icon for this tool type
@@ -502,7 +502,7 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
   }, [toolInput])
 
   // Extract affected entity from params (e.g., ad_units_id, network_code)
-  const affectedEntity = React.useMemo(() => {
+  const _affectedEntity = React.useMemo(() => {
     const keys = Object.keys(initialValues)
     // Look for ID fields
     const idKey = keys.find(k => k.endsWith("_id") || k === "network_code")
