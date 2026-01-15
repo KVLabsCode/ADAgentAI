@@ -18,9 +18,9 @@ const isTestEnabled =
   process.env.NODE_ENV === "test" ||
   process.env.NODE_ENV === "development";
 
-// Test user details
+// Test user details (using a deterministic UUID for the test user)
 const TEST_USER = {
-  id: "test-user-e2e-playwright",
+  id: "00000000-0000-0000-0000-e2e000000001",
   email: "e2e-test@example.com",
   name: "E2E Test User",
 };
