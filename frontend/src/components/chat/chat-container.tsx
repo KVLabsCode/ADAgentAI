@@ -380,7 +380,7 @@ export function ChatContainer({
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-testid="chat-container">
       {!hasMessages ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
           <div className="max-w-xl w-full space-y-6">

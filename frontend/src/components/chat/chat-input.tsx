@@ -60,6 +60,7 @@ export function ChatInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled || (isLoading && !onStop)}
+        data-testid="chat-input"
         rows={1}
         className={cn(
           "min-h-[54px] max-h-[200px] resize-none pl-12 pr-8 py-4 text-base",
