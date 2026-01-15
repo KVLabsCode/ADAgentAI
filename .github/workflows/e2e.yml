@@ -71,11 +71,14 @@ jobs:
           # Start API server
           cd backend/api && bun --hot src/index.ts &
 
+          # Start chat agent (Python)
+          cd backend && python chat_server.py &
+
           # Start frontend in production mode
           cd frontend && bun run start &
 
           # Wait for services to be ready
-          bunx wait-on http://localhost:3000 http://localhost:3001 --timeout 120000
+          bunx wait-on http://localhost:3000 http://localhost:3001 http://localhost:5000/health --timeout 120000
         env:
           NODE_ENV: test
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -85,6 +88,8 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
           NEON_AUTH_URL: ${{ secrets.NEON_AUTH_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          API_URL: http://localhost:3001
 
       - name: Run Playwright tests
         working-directory: frontend

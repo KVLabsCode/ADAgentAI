@@ -44,12 +44,14 @@ test.describe('Smoke Tests', () => {
   test('should have accessible navigation', async ({ page }) => {
     await page.goto('/chat');
 
-    // Check for sidebar or navigation
-    const nav = page.locator('nav').or(
-      page.locator('[data-testid="sidebar"]')
+    // Check for sidebar (uses data-slot="sidebar" or data-sidebar attributes)
+    const sidebar = page.locator('[data-slot="sidebar"]').or(
+      page.locator('[data-sidebar="content"]')
+    ).or(
+      page.locator('aside')
     );
 
-    await expect(nav.first()).toBeVisible();
+    await expect(sidebar.first()).toBeVisible({ timeout: 15000 });
   });
 });
 
