@@ -67,20 +67,20 @@ testAuth.post("/session", async (c) => {
 
     // Add to waitlist with 'joined' status (valid enum value) so tests can access the app
     await db.execute(sql`
-      INSERT INTO waitlist (email, status, "joinedAt", "createdAt")
+      INSERT INTO waitlist (email, status, joined_at, created_at)
       VALUES (${TEST_USER.email}, 'joined', NOW(), NOW())
       ON CONFLICT (email) DO UPDATE SET
         status = 'joined',
-        "joinedAt" = COALESCE(waitlist."joinedAt", NOW())
+        joined_at = COALESCE(waitlist.joined_at, NOW())
     `);
 
     // Add user preferences with ToS acceptance for test user
     await db.execute(sql`
-      INSERT INTO user_preferences ("userId", "tosAcceptedAt", "tosVersion", "createdAt", "updatedAt")
+      INSERT INTO user_preferences (user_id, tos_accepted_at, tos_version, created_at, updated_at)
       VALUES (${TEST_USER.id}, NOW(), '1.0', NOW(), NOW())
-      ON CONFLICT ("userId") DO UPDATE SET
-        "tosAcceptedAt" = NOW(),
-        "updatedAt" = NOW()
+      ON CONFLICT (user_id) DO UPDATE SET
+        tos_accepted_at = NOW(),
+        updated_at = NOW()
     `);
 
     console.log("[test-auth] Created test session for E2E testing");
