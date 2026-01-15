@@ -18,7 +18,7 @@ test.describe('Tool Approval Workflow', () => {
     await sendChatMessage(page, 'Create a new ad unit called Test Banner for my first app');
 
     // Wait for streaming to start
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 15000,
     });
@@ -176,7 +176,7 @@ test.describe('Tool Approval - Read Operations', () => {
     await sendChatMessage(page, 'Show me my revenue for yesterday');
 
     // Wait for response to start streaming
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 15000,
     });

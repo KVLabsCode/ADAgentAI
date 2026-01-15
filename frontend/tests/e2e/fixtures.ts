@@ -60,7 +60,6 @@ export async function sendChatMessage(page: Page, message: string): Promise<void
 export async function waitForAIResponse(page: Page, timeout = 30000): Promise<void> {
   // Wait for streaming to start (assistant message appears)
   const assistantMessage = page.locator('[data-testid="assistant-message"]')
-    .or(page.locator('[class*="assistant"]'))
     .or(page.locator('[data-role="assistant"]'));
 
   await assistantMessage.first().waitFor({

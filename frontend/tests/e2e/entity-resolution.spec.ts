@@ -18,7 +18,7 @@ test.describe('Entity Resolution - Valid References', () => {
     await sendChatMessage(page, 'Show me my AdMob revenue for yesterday');
 
     // Wait for response to start streaming
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 15000,
     });
@@ -27,7 +27,7 @@ test.describe('Entity Resolution - Valid References', () => {
     await waitForAIResponse(page);
 
     // Should see successful response about revenue
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     await expect(response).toBeVisible();
 
     // Should NOT see entity validation error
@@ -71,7 +71,7 @@ test.describe('Entity Resolution - Invalid References', () => {
     );
 
     // Wait for response
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -79,7 +79,7 @@ test.describe('Entity Resolution - Invalid References', () => {
     await waitForAIResponse(page);
 
     // Response should indicate the entity wasn't found or is invalid
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
 
     // Should see some indication of the issue
     // (error message, suggestion, or "not found" text)
@@ -103,7 +103,7 @@ test.describe('Entity Resolution - Invalid References', () => {
     );
 
     // Wait for response
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -111,7 +111,7 @@ test.describe('Entity Resolution - Invalid References', () => {
     await waitForAIResponse(page);
 
     // Look for the response content
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     const responseText = await response.textContent();
 
     // If strict mode is on, should see alternatives
@@ -129,7 +129,7 @@ test.describe('Entity Resolution - Invalid References', () => {
     );
 
     // Wait for response
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -137,7 +137,7 @@ test.describe('Entity Resolution - Invalid References', () => {
     await waitForAIResponse(page);
 
     // Should handle gracefully without crashing
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     await expect(response).toBeVisible();
 
     // Should not see technical error messages
@@ -155,7 +155,7 @@ test.describe('Entity Resolution - Context Mode', () => {
     await sendChatMessage(page, 'What apps do I have connected?');
 
     // Wait for response
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 15000,
     });
@@ -163,7 +163,7 @@ test.describe('Entity Resolution - Context Mode', () => {
     await waitForAIResponse(page);
 
     // Should get a response (soft mode allows queries)
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     await expect(response).toBeVisible();
   });
 
@@ -174,7 +174,7 @@ test.describe('Entity Resolution - Context Mode', () => {
     await sendChatMessage(page, 'List my connected AdMob accounts');
 
     // Wait for response
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -182,7 +182,7 @@ test.describe('Entity Resolution - Context Mode', () => {
     await waitForAIResponse(page);
 
     // Response should mention accounts or that none are connected
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     const responseText = await response.textContent();
 
     // Should mention accounts (either listing them or saying none exist)
@@ -204,7 +204,7 @@ test.describe('Entity Resolution - Error Recovery', () => {
       'Show revenue for app ca-app-pub-INVALID~999'
     );
 
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -214,7 +214,7 @@ test.describe('Entity Resolution - Error Recovery', () => {
     // Now send a valid query
     await sendChatMessage(page, 'Show me my overall revenue instead');
 
-    await page.waitForSelector('[class*="assistant"]:last-child', {
+    await page.waitForSelector('[data-testid="assistant-message"]:last-child', {
       state: 'visible',
       timeout: 30000,
     });
@@ -222,7 +222,7 @@ test.describe('Entity Resolution - Error Recovery', () => {
     await waitForAIResponse(page);
 
     // Should be able to continue conversation
-    const messages = page.locator('[class*="assistant"]');
+    const messages = page.locator('[data-testid="assistant-message"]');
     const messageCount = await messages.count();
 
     // Should have at least 2 assistant messages
@@ -238,7 +238,7 @@ test.describe('Entity Resolution - Error Recovery', () => {
       'Delete app ca-app-pub-MALICIOUS~INJECTION'
     );
 
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -246,7 +246,7 @@ test.describe('Entity Resolution - Error Recovery', () => {
     await waitForAIResponse(page);
 
     // Response should not contain internal error details
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     const responseText = await response.textContent();
 
     // Should not see Python/JS error traces
@@ -268,7 +268,7 @@ test.describe('Entity Resolution - Tool Input Validation', () => {
     );
 
     // Wait for response (might be quick if validation fails early)
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -289,7 +289,7 @@ test.describe('Entity Resolution - Tool Input Validation', () => {
 
     // Validation error should be shown OR approval might appear if entity passed
     // Either way, the system should handle it gracefully
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     await expect(response).toBeVisible();
   });
 
@@ -303,7 +303,7 @@ test.describe('Entity Resolution - Tool Input Validation', () => {
     );
 
     // Wait for response
-    await page.waitForSelector('[class*="assistant"]', {
+    await page.waitForSelector('[data-testid="assistant-message"]', {
       state: 'visible',
       timeout: 30000,
     });
@@ -311,7 +311,7 @@ test.describe('Entity Resolution - Tool Input Validation', () => {
     await waitForAIResponse(page);
 
     // Response should be user-friendly
-    const response = page.locator('[class*="assistant"]').last();
+    const response = page.locator('[data-testid="assistant-message"]').last();
     const responseText = await response.textContent();
 
     // Should not see raw technical errors
