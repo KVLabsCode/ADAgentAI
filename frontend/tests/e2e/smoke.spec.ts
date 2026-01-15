@@ -44,14 +44,17 @@ test.describe('Smoke Tests', () => {
   test('should have accessible navigation', async ({ page }) => {
     await page.goto('/chat');
 
-    // Check for sidebar (uses data-slot="sidebar" or data-sidebar attributes)
-    const sidebar = page.locator('[data-slot="sidebar"]').or(
+    // Check for sidebar elements (desktop) or sidebar trigger (mobile)
+    // On mobile, sidebar is collapsed by default, so we check for the trigger button
+    const sidebarOrTrigger = page.locator('[data-slot="sidebar"]').or(
       page.locator('[data-sidebar="content"]')
     ).or(
-      page.locator('aside')
+      page.locator('[data-sidebar="trigger"]')  // Mobile sidebar trigger
+    ).or(
+      page.locator('[data-slot="sidebar-trigger"]')  // Alternative trigger selector
     );
 
-    await expect(sidebar.first()).toBeVisible({ timeout: 15000 });
+    await expect(sidebarOrTrigger.first()).toBeVisible({ timeout: 15000 });
   });
 });
 
