@@ -2,9 +2,9 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, DEV]
   pull_request:
-    branches: [main]
+    branches: [main, DEV]
   # Allow manual triggering
   workflow_dispatch:
 
@@ -51,7 +51,6 @@ jobs:
         run: bun run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
-          NEXT_PUBLIC_COPILOTKIT_URL: http://localhost:5000/copilotkit
 
       - name: Start services
         run: |

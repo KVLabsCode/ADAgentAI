@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Moon, Sun, Monitor, Bell, Shield, User, MessageSquare, Building2, UserPlus, Trash2, Crown, ShieldCheck, Users, Loader2, Send, Mail, X, RotateCw, Pencil, AlertTriangle, Download } from "lucide-react"
+import Image from "next/image"
+import { Moon, Sun, Monitor, Bell, Shield, User, MessageSquare, Building2, UserPlus, Trash2, Crown, ShieldCheck, Users, Loader2, Send, Mail, X, Clock, Pencil, AlertTriangle, Download, Link2, Copy, Check, RefreshCw } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { GmailEmailInput, GMAIL_DOMAINS, getFullEmail } from "@/components/ui/gmail-email-input"
+import { GmailEmailInput, getFullEmail } from "@/components/ui/gmail-email-input"
 import {
   PageContainer,
   PageHeader,
@@ -20,7 +21,7 @@ import { useChatSettings } from "@/lib/chat-settings"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import { authClient } from "@/lib/neon-auth/client"
-import { OrganizationMember } from "@/lib/types"
+import { OrganizationMember, OrganizationInviteLink } from "@/lib/types"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { MyInvitationsSection } from "@/components/invitations"
 
 // Type for pending invitations
 interface PendingInvitation {
@@ -53,17 +55,28 @@ export default function SettingsPage() {
   const [members, setMembers] = React.useState<OrganizationMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = React.useState(false)
   const [inviteUsername, setInviteUsername] = React.useState("")
-  const [inviteDomain, setInviteDomain] = React.useState<string>(GMAIL_DOMAINS[0].id)
-  const [inviteRole, setInviteRole] = React.useState<"member" | "admin">("member")
+  const [inviteDomain, setInviteDomain] = React.useState("gmail.com")
+  const [inviteRole, setInviteRole] = React.useState<"member" | "admin">("admin")
   const [isInviting, setIsInviting] = React.useState(false)
   const [inviteError, setInviteError] = React.useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = React.useState(false)
+
+  // Copy invite message modal state
+  const [showInviteMessageModal, setShowInviteMessageModal] = React.useState(false)
+  const [invitedEmail, setInvitedEmail] = React.useState<string | null>(null)
+  const [inviteMessageCopied, setInviteMessageCopied] = React.useState(false)
 
   // Pending invitations state
   const [pendingInvites, setPendingInvites] = React.useState<PendingInvitation[]>([])
   const [isLoadingInvites, setIsLoadingInvites] = React.useState(false)
   const [cancellingInviteId, setCancellingInviteId] = React.useState<string | null>(null)
   const [resendingInviteId, setResendingInviteId] = React.useState<string | null>(null)
+
+  // Invite link state
+  const [inviteLink, setInviteLink] = React.useState<OrganizationInviteLink | null>(null)
+  const [isLoadingInviteLink, setIsLoadingInviteLink] = React.useState(false)
+  const [isRegeneratingLink, setIsRegeneratingLink] = React.useState(false)
+  const [linkCopied, setLinkCopied] = React.useState(false)
 
   // Organization settings state
   const [isEditingOrgName, setIsEditingOrgName] = React.useState(false)
@@ -75,6 +88,8 @@ export default function SettingsPage() {
 
   // Role change state
   const [changingRoleMemberId, setChangingRoleMemberId] = React.useState<string | null>(null)
+  const [editingMemberId, setEditingMemberId] = React.useState<string | null>(null)
+  const [pendingRole, setPendingRole] = React.useState<"member" | "admin" | null>(null)
 
   // Delete account state
   const [deleteAccountConfirmEmail, setDeleteAccountConfirmEmail] = React.useState("")
@@ -169,6 +184,73 @@ export default function SettingsPage() {
     }
   }, [selectedOrganizationId, fetchPendingInvites])
 
+  // Fetch invite link
+  const fetchInviteLink = React.useCallback(async () => {
+    if (!selectedOrganizationId) return
+    setIsLoadingInviteLink(true)
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${apiUrl}/api/invite-links`, accessToken)
+      if (response.ok) {
+        const data = await response.json()
+        setInviteLink(data.link || null)
+      }
+    } catch (error) {
+      console.error("Failed to fetch invite link:", error)
+    } finally {
+      setIsLoadingInviteLink(false)
+    }
+  }, [selectedOrganizationId, getAccessToken])
+
+  // Fetch invite link when org is selected and user is admin
+  React.useEffect(() => {
+    // Compute admin status inline since canManageMembers is defined later
+    const memberRole = members.find(m => m.userId === user?.id)?.role?.toLowerCase()
+    const currentRole = memberRole || selectedOrgRole?.toLowerCase() || null
+    const isAdmin = currentRole === "owner" || currentRole === "admin"
+
+    if (selectedOrganizationId && isAdmin) {
+      fetchInviteLink()
+    } else {
+      setInviteLink(null)
+    }
+  }, [selectedOrganizationId, members, user?.id, selectedOrgRole, fetchInviteLink])
+
+  // Create or regenerate invite link
+  const handleCreateOrRegenerateLink = async () => {
+    if (!selectedOrganizationId) return
+    setIsRegeneratingLink(true)
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const accessToken = await getAccessToken()
+      const response = await authFetch(`${apiUrl}/api/invite-links`, accessToken, {
+        method: 'POST',
+        body: JSON.stringify({ role: 'member' }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setInviteLink(data.link || null)
+      }
+    } catch (error) {
+      console.error("Failed to create invite link:", error)
+    } finally {
+      setIsRegeneratingLink(false)
+    }
+  }
+
+  // Copy invite link to clipboard
+  const handleCopyInviteLink = async () => {
+    if (!inviteLink?.url) return
+    try {
+      await navigator.clipboard.writeText(inviteLink.url)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (error) {
+      console.error("Failed to copy link:", error)
+    }
+  }
+
   // Initialize org name for editing
   React.useEffect(() => {
     if (selectedOrganization) {
@@ -177,8 +259,8 @@ export default function SettingsPage() {
   }, [selectedOrganization])
 
   const handleInvite = async () => {
-    if (!inviteUsername || !selectedOrganizationId) return
     const email = getFullEmail(inviteUsername, inviteDomain)
+    if (!email || !selectedOrganizationId) return
     setIsInviting(true)
     setInviteError(null)
     setInviteSuccess(false)
@@ -188,14 +270,33 @@ export default function SettingsPage() {
         email,
         role: inviteRole,
       })
+      // Show copy invite message modal (set before clearing input)
+      setInvitedEmail(email)
+      setShowInviteMessageModal(true)
+      setInviteMessageCopied(false)
+
       setInviteUsername("")
       setInviteSuccess(true)
       fetchPendingInvites() // Refresh pending invites list
+
       setTimeout(() => setInviteSuccess(false), 3000)
     } catch (error) {
       setInviteError(error instanceof Error ? error.message : "Failed to send invite")
     } finally {
       setIsInviting(false)
+    }
+  }
+
+  // Copy invite message to clipboard
+  const handleCopyInviteMessage = async () => {
+    if (!invitedEmail || !selectedOrganization) return
+    const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin
+    const message = `I invited you to ${selectedOrganization.name} on ADAgent!\n\nSign in with Google (${invitedEmail}) to accept:\n${baseUrl}/login`
+    try {
+      await navigator.clipboard.writeText(message)
+      setInviteMessageCopied(true)
+    } catch (error) {
+      console.error("Failed to copy message:", error)
     }
   }
 
@@ -284,17 +385,31 @@ export default function SettingsPage() {
     }
   }
 
-  // Change member role (org admin only feature)
-  const handleChangeRole = async (memberId: string, newRole: "member" | "admin") => {
-    if (!selectedOrganizationId) return
+  // Start editing a member's role
+  const handleStartEditRole = (memberId: string, currentRole: string) => {
+    setEditingMemberId(memberId)
+    setPendingRole(currentRole as "member" | "admin")
+  }
+
+  // Cancel editing
+  const handleCancelEditRole = () => {
+    setEditingMemberId(null)
+    setPendingRole(null)
+  }
+
+  // Save role change (org admin only feature)
+  const handleSaveRole = async (memberId: string) => {
+    if (!selectedOrganizationId || !pendingRole) return
     setChangingRoleMemberId(memberId)
     try {
       await authClient.organization.updateMemberRole({
         memberId,
-        role: newRole, // Better Auth/Neon Auth accepts string role
+        role: pendingRole,
         organizationId: selectedOrganizationId,
       })
       fetchMembers()
+      setEditingMemberId(null)
+      setPendingRole(null)
     } catch (error) {
       console.error("Failed to change member role:", error)
     } finally {
@@ -432,6 +547,9 @@ export default function SettingsPage() {
         description="Manage your application preferences."
       />
 
+      {/* Invitations To You - Shows pending invitations user has received */}
+      <MyInvitationsSection />
+
       {/* Chat Display */}
       <SectionCard>
         <SectionCardHeader
@@ -466,31 +584,132 @@ export default function SettingsPage() {
             </p>
           ) : (
             <>
-              {/* Invite Members */}
+              {/* Share Member Link */}
+              {canManageMembers && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="h-3.5 w-3.5 text-muted-foreground/70" />
+                    <p className="text-xs font-medium">Share Member Link</p>
+                    {isLoadingInviteLink && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </div>
+
+                  {inviteLink ? (
+                    <div className="space-y-2">
+                      {/* Link input with copy button */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center gap-2 h-9 px-3 rounded-md border border-border bg-muted/30 text-xs font-mono overflow-hidden">
+                          <span className="truncate text-muted-foreground">{inviteLink.url}</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyInviteLink}
+                          className="h-9 w-9 p-0 shrink-0"
+                        >
+                          {linkCopied ? (
+                            <Check className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {/* Info and regenerate */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-muted-foreground">
+                          Anyone with this link can join as Member
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <span>Used {inviteLink.usageCount} time{inviteLink.usageCount !== 1 ? 's' : ''}</span>
+                          <span>·</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCreateOrRegenerateLink}
+                            disabled={isRegeneratingLink}
+                            className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                          >
+                            {isRegeneratingLink ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Regenerate
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-muted-foreground">
+                        Create a shareable link that lets anyone join as a Member.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateOrRegenerateLink}
+                        disabled={isRegeneratingLink}
+                        className="h-8 text-xs"
+                      >
+                        {isRegeneratingLink ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <Link2 className="h-3 w-3 mr-1" />
+                        )}
+                        Create Invite Link
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Divider for admin invites */}
+              {canManageMembers && (
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-border/40" />
+                  <span className="text-[10px] text-muted-foreground">or invite as Admin</span>
+                  <div className="flex-1 h-px bg-border/40" />
+                </div>
+              )}
+
+              {/* Invite Members via Email (Admin role) */}
               {canManageMembers && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <UserPlus className="h-3.5 w-3.5 text-muted-foreground/70" />
-                    <p className="text-xs font-medium">Invite Member</p>
+                    <p className="text-xs font-medium">Invite as Admin</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* Email input with Google icon and domain dropdown */}
+                    {/* Email input */}
                     <GmailEmailInput
                       value={inviteUsername}
                       onChange={setInviteUsername}
                       domain={inviteDomain}
                       onDomainChange={setInviteDomain}
                       disabled={isInviting}
+                      placeholder="username"
                       className="flex-1"
+                      showDomainSelector={false}
                     />
-                    {/* Role selector */}
+                    {/* Role selector - sleek pill style */}
                     <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "member" | "admin")}>
-                      <SelectTrigger className="h-9 w-24 text-xs shrink-0">
+                      <SelectTrigger className="h-9 w-[125px] text-[11px] font-medium shrink-0 rounded-full border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="member" className="text-xs">Member</SelectItem>
-                        <SelectItem value="admin" className="text-xs">Admin</SelectItem>
+                      <SelectContent align="end" className="min-w-[120px]">
+                        <SelectItem value="admin" className="text-xs">
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-3 w-3 text-primary" />
+                            <span>Admin</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="member" className="text-xs">
+                          <div className="flex items-center gap-2">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            <span>Member</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     {/* Send button */}
@@ -504,13 +723,13 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    They&apos;ll receive an email invite and can join by signing in with Google.
+                    They can accept after signing in with Google.
                   </p>
                   {inviteError && (
                     <p className="text-[10px] text-destructive">{inviteError}</p>
                   )}
                   {inviteSuccess && (
-                    <p className="text-[10px] text-green-600">Invite sent! They&apos;ll receive an email shortly.</p>
+                    <p className="text-[10px] text-green-600">Invitation created! They&apos;ll see it after signing in.</p>
                   )}
                 </div>
               )}
@@ -552,8 +771,8 @@ export default function SettingsPage() {
                               <Loader2 className="h-3 w-3 animate-spin" />
                             ) : (
                               <>
-                                <RotateCw className="h-3 w-3 mr-1" />
-                                Resend
+                                <Clock className="h-3 w-3 mr-1" />
+                                Extend
                               </>
                             )}
                           </Button>
@@ -583,60 +802,127 @@ export default function SettingsPage() {
                   <p className="text-xs font-medium">Members</p>
                   {isLoadingMembers && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {members.length === 0 && !isLoadingMembers ? (
                     <p className="text-[10px] text-muted-foreground py-2">No members found.</p>
                   ) : (
-                    members.map((member) => (
-                      <div
-                        key={member.id}
-                        className="flex items-center justify-between py-1.5 px-2 rounded bg-muted/30 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          {getRoleIcon(member.role)}
-                          <div>
-                            <p className="text-xs font-medium">{member.user?.name || member.user?.email || "Unknown"}</p>
-                            <p className="text-[10px] text-muted-foreground">{member.user?.email}</p>
+                    members.map((member) => {
+                      const isEditing = editingMemberId === member.id
+                      const canEdit = canManageMembers && member.role !== "owner" && member.userId !== user?.id
+
+                      return (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* Member avatar */}
+                            {member.user?.image ? (
+                              <Image
+                                src={member.user.image}
+                                alt={member.user.name || "Member"}
+                                width={32}
+                                height={32}
+                                className="rounded-full border border-border/50 shrink-0"
+                                referrerPolicy="no-referrer"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center border border-border/50 shrink-0">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            {/* Role icon with proper spacing - overlapped on avatar */}
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-background border border-border/50 -ml-5 shrink-0">
+                              {getRoleIcon(member.role)}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium">{member.user?.name || member.user?.email || "Unknown"}</p>
+                              <p className="text-[10px] text-muted-foreground">{member.user?.email}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {isEditing ? (
+                              /* Edit mode: dropdown + save/cancel */
+                              <>
+                                <Select
+                                  value={pendingRole || member.role}
+                                  onValueChange={(v) => setPendingRole(v as "member" | "admin")}
+                                  disabled={changingRoleMemberId === member.id}
+                                >
+                                  <SelectTrigger className="h-7 w-[125px] text-[11px] font-medium rounded-full border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent align="end" className="min-w-[110px]">
+                                    <SelectItem value="admin" className="text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <Shield className="h-3 w-3 text-primary" />
+                                        <span>Admin</span>
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="member" className="text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <User className="h-3 w-3 text-muted-foreground" />
+                                        <span>Member</span>
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleSaveRole(member.id)}
+                                  disabled={changingRoleMemberId === member.id || pendingRole === member.role}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  {changingRoleMemberId === member.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    "Save"
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEditRole}
+                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              /* View mode: role badge + edit button */
+                              <>
+                                <span className="text-[10px] text-muted-foreground capitalize px-2 py-1 rounded-md bg-muted border border-border/30">
+                                  {member.role}
+                                </span>
+                                {canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleStartEditRole(member.id, member.role)}
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                {canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveMember(member.id)}
+                                    className="h-7 w-7 p-0 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {/* Role badge - editable for non-owners by admins */}
-                          {canManageMembers && member.role !== "owner" && member.userId !== user?.id ? (
-                            <Select
-                              value={member.role}
-                              onValueChange={(newRole) => handleChangeRole(member.id, newRole as "member" | "admin")}
-                              disabled={changingRoleMemberId === member.id}
-                            >
-                              <SelectTrigger className="h-6 w-20 text-[10px] px-1.5 py-0">
-                                {changingRoleMemberId === member.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <SelectValue />
-                                )}
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="member" className="text-[10px]">Member</SelectItem>
-                                <SelectItem value="admin" className="text-[10px]">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground capitalize px-1.5 py-0.5 rounded bg-muted">
-                              {member.role}
-                            </span>
-                          )}
-                          {canManageMembers && member.role !== "owner" && member.userId !== user?.id && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveMember(member.id)}
-                              className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>
@@ -881,6 +1167,32 @@ export default function SettingsPage() {
           description="Manage your account and data."
         />
         <SectionCardContent className="space-y-3">
+          {/* Profile with avatar refresh */}
+          <div className="flex items-center justify-between py-3 px-3 rounded-lg bg-muted/30 border border-border/20">
+            <div className="flex items-center gap-3">
+              {/* User avatar */}
+              {user?.avatar ? (
+                <Image
+                  src={user.avatar}
+                  alt={user.name || "Profile"}
+                  width={40}
+                  height={40}
+                  className="rounded-full border border-border/50"
+                  referrerPolicy="no-referrer"
+                  unoptimized
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border/50">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium">{user?.name || "No name set"}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+            </div>
+          </div>
+
           {/* Data Export - GDPR Article 20 */}
           <div className="flex items-center justify-between py-2 px-2 rounded bg-muted/30 border border-border/20">
             <div>
@@ -1064,6 +1376,61 @@ export default function SettingsPage() {
           </div>
         </SectionCardContent>
       </SectionCard>
+
+      {/* Copy Invite Message Modal */}
+      <AlertDialog open={showInviteMessageModal} onOpenChange={(open) => {
+        setShowInviteMessageModal(open)
+        if (!open) {
+          setInviteMessageCopied(false)
+        }
+      }}>
+        <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2 sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-green-700 dark:text-green-500">
+              <Check className="h-5 w-5" />
+              Invitation Created
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Copy this message and send it to <strong>{invitedEmail}</strong> via Slack, email, or any messaging app:
+                </p>
+                <div className="p-3 rounded-lg bg-muted border border-border font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                  {selectedOrganization && invitedEmail && (
+                    <>
+                      I invited you to {selectedOrganization.name} on ADAgent!
+                      {"\n\n"}
+                      Sign in with Google ({invitedEmail}) to accept:
+                      {"\n"}
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/login
+                    </>
+                  )}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:justify-end">
+            <Button
+              onClick={handleCopyInviteMessage}
+              variant={inviteMessageCopied ? "outline" : "default"}
+              className="flex-1 sm:flex-none"
+            >
+              {inviteMessageCopied ? (
+                <>
+                  <Check className="h-4 w-4 mr-2 text-green-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Message
+                </>
+              )}
+            </Button>
+            <AlertDialogCancel className="flex-1 sm:flex-none mt-0">Done</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   )
 }

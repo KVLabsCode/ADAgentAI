@@ -662,4 +662,250 @@ account.get("/export", async (c) => {
   }
 });
 
+// ============================================================
+// Avatar Refresh Routes (Google People API)
+// ============================================================
+
+/**
+ * Helper: Refresh Google access token using refresh token
+ */
+async function refreshGoogleAccessToken(
+  userId: string,
+  accountId: string,
+  refreshToken: string
+): Promise<string | null> {
+  try {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      console.error("[Account] Missing Google OAuth credentials");
+      return null;
+    }
+
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("[Account] Failed to refresh token:", await response.text());
+      return null;
+    }
+
+    const data = (await response.json()) as { access_token: string; expires_in: number };
+
+    // Update the access token in Neon Auth
+    await db.execute(sql`
+      UPDATE neon_auth.account
+      SET "accessToken" = ${data.access_token},
+          "accessTokenExpiresAt" = ${new Date(Date.now() + data.expires_in * 1000).toISOString()}
+      WHERE id = ${accountId}
+    `);
+
+    console.log(`[Account] Refreshed Google access token for user: ${userId}`);
+    return data.access_token;
+  } catch (error) {
+    console.error("[Account] Error refreshing token:", error);
+    return null;
+  }
+}
+
+/**
+ * GET /account/refresh-avatar - Fetch latest avatar from Google and update user
+ */
+account.get("/refresh-avatar", async (c) => {
+  const user = c.get("user");
+
+  try {
+    // Get user's Google OAuth account info from Neon Auth
+    const result = await db.execute(sql`
+      SELECT id, "accessToken", "refreshToken"
+      FROM neon_auth.account
+      WHERE "userId" = ${user.id}
+      AND "providerId" = 'google'
+      LIMIT 1
+    `);
+
+    if (!result.rows[0]) {
+      return c.json({ error: "No Google account linked" }, 400);
+    }
+
+    const { id: accountId, accessToken, refreshToken } = result.rows[0] as {
+      id: string;
+      accessToken: string;
+      refreshToken: string | null;
+    };
+
+    console.log(`[Account] Found Google account for user ${user.id}, accountId: ${accountId}, has refresh token: ${!!refreshToken}, token prefix: ${accessToken?.substring(0, 20)}...`);
+
+    // Try to fetch from People API
+    let response = await fetch(
+      "https://people.googleapis.com/v1/people/me?personFields=photos",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    console.log(`[Account] People API response status: ${response.status}`);
+
+    // If 401, try refreshing the token
+    if (response.status === 401) {
+      if (refreshToken) {
+        console.log("[Account] Access token expired, refreshing...");
+        const newAccessToken = await refreshGoogleAccessToken(user.id, accountId, refreshToken);
+
+        if (newAccessToken) {
+          // Retry with new token
+          response = await fetch(
+            "https://people.googleapis.com/v1/people/me?personFields=photos",
+            { headers: { Authorization: `Bearer ${newAccessToken}` } }
+          );
+        }
+      } else {
+        console.warn("[Account] Access token expired but no refresh token available");
+        return c.json({
+          error: "Session expired. Please sign out and sign back in to refresh your Google connection.",
+          needsReauth: true
+        }, 401);
+      }
+    }
+
+    if (!response.ok) {
+      console.error("[Account] People API error:", response.status, await response.text());
+      return c.json({ error: "Failed to fetch profile from Google" }, 500);
+    }
+
+    const data = (await response.json()) as {
+      photos?: Array<{ url?: string; metadata?: { primary?: boolean } }>;
+    };
+
+    // Get primary photo
+    const primaryPhoto = data.photos?.find((p) => p.metadata?.primary);
+    const photoUrl = primaryPhoto?.url || data.photos?.[0]?.url;
+
+    if (photoUrl) {
+      // Update user's image in Neon Auth
+      await db.execute(sql`
+        UPDATE neon_auth."user"
+        SET image = ${photoUrl}
+        WHERE id = ${user.id}
+      `);
+    }
+
+    console.log(`[Account] Avatar refreshed for user: ${user.id}`);
+
+    return c.json({
+      success: true,
+      image: photoUrl || null,
+    });
+  } catch (error) {
+    console.error("[Account] Error refreshing avatar:", error);
+    return c.json({ error: "Failed to refresh avatar" }, 500);
+  }
+});
+
+// ============================================================
+// Contact Search Routes (Google People API)
+// ============================================================
+
+/**
+ * GET /account/contacts/search - Search user's Google Contacts
+ * Requires contacts.readonly scope
+ */
+account.get("/contacts/search", async (c) => {
+  const user = c.get("user");
+  const query = c.req.query("q");
+
+  // Require at least 2 characters
+  if (!query || query.length < 2) {
+    return c.json({ contacts: [] });
+  }
+
+  try {
+    // Get user's Google OAuth account info from Neon Auth
+    const result = await db.execute(sql`
+      SELECT id, "accessToken", "refreshToken"
+      FROM neon_auth.account
+      WHERE "userId" = ${user.id}
+      AND "providerId" = 'google'
+      LIMIT 1
+    `);
+
+    if (!result.rows[0]) {
+      return c.json({ contacts: [] });
+    }
+
+    const { id: accountId, accessToken, refreshToken } = result.rows[0] as {
+      id: string;
+      accessToken: string;
+      refreshToken: string;
+    };
+
+    // Search People API for contacts
+    let response = await fetch(
+      `https://people.googleapis.com/v1/people:searchContacts?query=${encodeURIComponent(query)}&readMask=names,emailAddresses,photos&pageSize=10`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    // If 401, try refreshing the token
+    if (response.status === 401) {
+      if (refreshToken) {
+        console.log("[Account] Access token expired for contacts search, refreshing...");
+        const newAccessToken = await refreshGoogleAccessToken(user.id, accountId, refreshToken);
+
+        if (newAccessToken) {
+          // Retry with new token
+          response = await fetch(
+            `https://people.googleapis.com/v1/people:searchContacts?query=${encodeURIComponent(query)}&readMask=names,emailAddresses,photos&pageSize=10`,
+            { headers: { Authorization: `Bearer ${newAccessToken}` } }
+          );
+        }
+      } else {
+        // No refresh token - user needs to re-auth to get contacts
+        console.warn("[Account] Access token expired, no refresh token - need re-auth for contacts");
+        return c.json({ contacts: [], scopeRequired: true });
+      }
+    }
+
+    if (!response.ok) {
+      // If 403, it's likely the contacts.readonly scope isn't granted
+      if (response.status === 403) {
+        console.warn("[Account] Contacts API access denied - scope may not be granted");
+        return c.json({ contacts: [], scopeRequired: true });
+      }
+      console.error("[Account] People API contacts search error:", response.status);
+      return c.json({ contacts: [] });
+    }
+
+    const data = (await response.json()) as {
+      results?: Array<{
+        person?: {
+          names?: Array<{ displayName?: string }>;
+          emailAddresses?: Array<{ value?: string }>;
+          photos?: Array<{ url?: string }>;
+        };
+      }>;
+    };
+
+    // Transform to simplified format
+    const contacts = (data.results || [])
+      .map((r) => ({
+        name: r.person?.names?.[0]?.displayName || null,
+        email: r.person?.emailAddresses?.[0]?.value || null,
+        photo: r.person?.photos?.[0]?.url || null,
+      }))
+      .filter((c) => c.email); // Only return contacts with emails
+
+    return c.json({ contacts });
+  } catch (error) {
+    console.error("[Account] Error searching contacts:", error);
+    return c.json({ contacts: [] });
+  }
+});
+
 export default account;

@@ -120,6 +120,24 @@ export const invitations = pgTable("invitations", {
   index("invitations_email_idx").on(table.email),
 ]);
 
+// Organization Invite Links - Shareable links for joining orgs
+// Note: organizationId references Neon Auth orgs, not legacy public.organizations
+export const organizationInviteLinks = pgTable("organization_invite_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: text("organization_id").notNull(), // Neon Auth org ID (no FK to legacy orgs)
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  role: text("role").notNull().default("member"), // member or admin
+  createdBy: text("created_by").notNull(), // User ID who created
+  isActive: boolean("is_active").default(true).notNull(),
+  usageCount: integer("usage_count").default(0).notNull(),
+  expiresAt: timestamp("expires_at"), // Optional expiration
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("org_invite_links_token_idx").on(table.token),
+  index("org_invite_links_org_id_idx").on(table.organizationId),
+  index("org_invite_links_active_idx").on(table.organizationId, table.isActive),
+]);
+
 // ============================================================
 // Application Tables
 // ============================================================
@@ -497,6 +515,8 @@ export type Member = typeof members.$inferSelect;
 export type NewMember = typeof members.$inferInsert;
 export type Invitation = typeof invitations.$inferSelect;
 export type NewInvitation = typeof invitations.$inferInsert;
+export type OrganizationInviteLink = typeof organizationInviteLinks.$inferSelect;
+export type NewOrganizationInviteLink = typeof organizationInviteLinks.$inferInsert;
 export type ConnectedProvider = typeof connectedProviders.$inferSelect;
 export type NewConnectedProvider = typeof connectedProviders.$inferInsert;
 export type UserProviderPreference = typeof userProviderPreferences.$inferSelect;

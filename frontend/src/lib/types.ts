@@ -141,12 +141,36 @@ export interface OrganizationMember {
   }
 }
 
-// Organization invitation
+// Organization invitation (sent by admin)
 export interface OrganizationInvitation {
   id: string
   email: string
   role: string
   status: string
+  expiresAt: string
+  createdAt: string
+}
+
+// Shareable organization invite link
+export interface OrganizationInviteLink {
+  id: string
+  token: string
+  url: string
+  role: string
+  usageCount: number
+  expiresAt: string | null
+  createdAt: string
+}
+
+// Invitation received by current user (from another org)
+export interface ReceivedInvitation {
+  id: string
+  organizationId: string
+  organizationName: string
+  organizationSlug: string
+  role: string
+  status: "pending" | "accepted" | "rejected" | "canceled" | "expired"
+  inviterEmail?: string
   expiresAt: string
   createdAt: string
 }

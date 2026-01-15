@@ -4,7 +4,7 @@ import * as React from "react"
 import { useCallback, useState, createContext, useContext } from "react"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/neon-auth/client"
-import { User, Organization } from "@/lib/types"
+import { User, Organization, ReceivedInvitation } from "@/lib/types"
 
 const ORG_STORAGE_KEY = "adagent_selected_org"
 
@@ -32,6 +32,12 @@ interface UserContextValue {
   hasAcceptedTos: boolean | null // null = not checked yet
   isCheckingTos: boolean
   acceptTos: (marketingOptIn?: boolean) => Promise<boolean>
+  // Received invitations (invitations TO this user from other orgs)
+  receivedInvitations: ReceivedInvitation[]
+  isLoadingInvitations: boolean
+  fetchReceivedInvitations: () => Promise<void>
+  acceptInvitation: (invitationId: string) => Promise<boolean>
+  rejectInvitation: (invitationId: string) => Promise<boolean>
 }
 
 const UserContext = createContext<UserContextValue | null>(null)
@@ -68,6 +74,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Terms of Service state
   const [hasAcceptedTos, setHasAcceptedTos] = useState<boolean | null>(null)
   const [isCheckingTos, setIsCheckingTos] = useState(false)
+
+  // Received invitations state (invitations TO this user)
+  const [receivedInvitations, setReceivedInvitations] = useState<ReceivedInvitation[]>([])
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false)
 
   // Use Neon Auth's built-in organization hooks
   // useListOrganizations returns basic org info
@@ -415,6 +425,90 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session])
 
+  // Fetch invitations received by the current user
+  const fetchReceivedInvitations = useCallback(async () => {
+    if (!neonUser) return
+    setIsLoadingInvitations(true)
+    try {
+      const response = await authClient.organization.listUserInvitations()
+      if (response.data) {
+        // Response may be array or object with invitations property
+        const rawList = Array.isArray(response.data)
+          ? response.data
+          : (response.data as { invitations?: unknown[] }).invitations || []
+
+        // Type for raw invitation from Neon Auth
+        type RawInvitation = {
+          id: string
+          organizationId: string
+          organization?: { name?: string; slug?: string }
+          organizationName?: string
+          organizationSlug?: string
+          role: string
+          status: string
+          inviterEmail?: string
+          expiresAt: string | Date
+          createdAt: string | Date
+        }
+
+        // Cast to typed array and filter/map
+        const inviteList = rawList as RawInvitation[]
+        const mapped: ReceivedInvitation[] = inviteList
+          .filter((inv) => inv.status === 'pending')
+          .map((inv) => ({
+            id: inv.id,
+            organizationId: inv.organizationId,
+            organizationName: inv.organization?.name || inv.organizationName || 'Unknown Organization',
+            organizationSlug: inv.organization?.slug || inv.organizationSlug || '',
+            role: inv.role,
+            status: inv.status as ReceivedInvitation['status'],
+            inviterEmail: inv.inviterEmail,
+            expiresAt: typeof inv.expiresAt === 'string' ? inv.expiresAt : inv.expiresAt.toISOString(),
+            createdAt: typeof inv.createdAt === 'string' ? inv.createdAt : inv.createdAt.toISOString(),
+          }))
+
+        setReceivedInvitations(mapped)
+      }
+    } catch (error) {
+      console.error('Failed to fetch received invitations:', error)
+    } finally {
+      setIsLoadingInvitations(false)
+    }
+  }, [neonUser])
+
+  // Accept an invitation
+  const acceptInvitation = useCallback(async (invitationId: string): Promise<boolean> => {
+    try {
+      await authClient.organization.acceptInvitation({ invitationId })
+      // Refresh both invitations and orgs list
+      await fetchReceivedInvitations()
+      await refetchOrgs()
+      return true
+    } catch (error) {
+      console.error('Failed to accept invitation:', error)
+      return false
+    }
+  }, [fetchReceivedInvitations, refetchOrgs])
+
+  // Reject an invitation
+  const rejectInvitation = useCallback(async (invitationId: string): Promise<boolean> => {
+    try {
+      await authClient.organization.rejectInvitation({ invitationId })
+      await fetchReceivedInvitations()
+      return true
+    } catch (error) {
+      console.error('Failed to reject invitation:', error)
+      return false
+    }
+  }, [fetchReceivedInvitations])
+
+  // Fetch received invitations when user authenticates
+  React.useEffect(() => {
+    if (neonUser) {
+      fetchReceivedInvitations()
+    }
+  }, [neonUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Platform admin check - uses role from Neon Auth (set in Neon Console)
   const isAdmin = user?.role === 'admin'
 
@@ -440,6 +534,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     hasAcceptedTos,
     isCheckingTos,
     acceptTos,
+    receivedInvitations,
+    isLoadingInvitations,
+    fetchReceivedInvitations,
+    acceptInvitation,
+    rejectInvitation,
   }
 
   return (

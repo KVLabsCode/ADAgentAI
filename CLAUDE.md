@@ -79,8 +79,8 @@ Frontend (SSE) → Chat Agent → LangGraph StateGraph → MCP Tools
 ### Frontend Structure
 - `frontend/src/app/(authenticated)/` - Protected routes (chat, billing, settings)
 - `frontend/src/app/(public)/` - Public routes (landing, login, blog)
-- `frontend/src/app/(authenticated)/layout.tsx` - Wraps with `<CopilotKit runtimeUrl={...}>`
-- `frontend/src/app/(authenticated)/chat/page.tsx` - Uses `<CopilotChat />` component
+- `frontend/src/app/(authenticated)/layout.tsx` - Auth wrapper with sidebar and header
+- `frontend/src/app/(authenticated)/chat/page.tsx` - Custom chat UI with SSE streaming
 - `frontend/src/components/` - React components with shadcn/ui
 
 ### API Server Structure (`backend/api/`)
@@ -145,7 +145,7 @@ Lightweight LLM call classifies user queries to route to appropriate specialists
 
 ### Frontend (`frontend/.env`)
 - `NEXT_PUBLIC_API_URL` - Backend API URL (default: http://localhost:3001)
-- `NEXT_PUBLIC_COPILOTKIT_URL` - CopilotKit agent URL (default: http://localhost:5000/copilotkit)
+- `NEXT_PUBLIC_CHAT_URL` - Chat agent URL (default: http://localhost:5000)
 - `NEXT_PUBLIC_SANITY_*` - Sanity CMS for blog
 
 ### API (`backend/api/.env`)

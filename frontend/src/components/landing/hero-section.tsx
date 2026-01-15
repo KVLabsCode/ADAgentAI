@@ -35,22 +35,6 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
             <p className="text-muted-foreground/70">You focus on strategy</p>
           </div>
 
-          {/* Agent types */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mb-6 md:mb-10">
-            <span className="px-3 py-1.5 rounded-full border border-border/40 font-mono text-[11px] text-muted-foreground tracking-wide">
-              reporting
-            </span>
-            <span className="px-3 py-1.5 rounded-full border border-border/40 font-mono text-[11px] text-muted-foreground tracking-wide">
-              inventory
-            </span>
-            <span className="px-3 py-1.5 rounded-full border border-border/40 font-mono text-[11px] text-muted-foreground tracking-wide">
-              mediation
-            </span>
-            <span className="px-3 py-1.5 rounded-full border border-border/40 font-mono text-[11px] text-muted-foreground tracking-wide">
-              optimization
-            </span>
-          </div>
-
           {/* CTA */}
           <div className="flex flex-col items-center gap-3">
             {isAuthenticated ? (

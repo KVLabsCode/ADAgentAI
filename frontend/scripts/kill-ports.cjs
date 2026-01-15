@@ -2,7 +2,7 @@
 /**
  * Kill processes on specified ports (Windows/Mac/Linux)
  * Usage: node kill-ports.js [port1] [port2] ...
- * Default: kills 3000 (Next.js), 3001 (API), 5000 (CopilotKit)
+ * Default: kills 3000 (Next.js), 3001 (API), 5001 (Chat Agent)
  */
 
 const { execSync } = require('child_process');

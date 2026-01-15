@@ -10,6 +10,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 import { TosModal } from "@/components/tos-modal"
+import { InvitationBanner } from "@/components/invitations"
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
@@ -67,10 +68,23 @@ export default function AuthenticatedLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { isLoading, isAuthenticated, hasWaitlistAccess, isCheckingWaitlist, hasAcceptedTos, isCheckingTos } = useUser()
+  const {
+    isLoading,
+    isAuthenticated,
+    hasWaitlistAccess,
+    isCheckingWaitlist,
+    hasAcceptedTos,
+    isCheckingTos,
+    receivedInvitations,
+    acceptInvitation,
+    rejectInvitation,
+  } = useUser()
 
   // Track if we've completed initial auth check to prevent flashing on subsequent updates
   const [hasInitialized, setHasInitialized] = React.useState(false)
+
+  // Track if invitation banner is dismissed (per-session)
+  const [isBannerDismissed, setIsBannerDismissed] = React.useState(false)
 
   // Only show model selector on chat pages
   const showModelSelector = pathname === "/chat" || pathname.startsWith("/chat/")
@@ -136,6 +150,15 @@ export default function AuthenticatedLayout({
           </div>
           <ThemeToggle />
         </header>
+        {/* Invitation Banner - shows if user has pending invitations */}
+        {receivedInvitations.length > 0 && !isBannerDismissed && (
+          <InvitationBanner
+            invitations={receivedInvitations}
+            onAccept={acceptInvitation}
+            onReject={rejectInvitation}
+            onDismiss={() => setIsBannerDismissed(true)}
+          />
+        )}
         <div className="flex-1 min-h-0 flex flex-col">
           {children}
         </div>
