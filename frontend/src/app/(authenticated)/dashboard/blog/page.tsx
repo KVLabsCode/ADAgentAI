@@ -1,4 +1,5 @@
 "use client"
+"use no memo" // TanStack Table returns functions that can't be memoized safely
 
 import * as React from "react"
 import Link from "next/link"
