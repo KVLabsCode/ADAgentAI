@@ -51,6 +51,7 @@ jobs:
         run: bun run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEON_AUTH_BASE_URL: ${{ secrets.NEON_AUTH_BASE_URL }}
 
       - name: Start services
         run: |
