@@ -47,10 +47,15 @@ async function globalSetup(config: FullConfig) {
     await page.goto(baseURL || 'http://localhost:3000');
 
     // Set the session token in localStorage (Neon Auth stores it here)
-    await page.evaluate((sessionToken) => {
+    await page.evaluate((data) => {
       // Neon Auth session storage format
-      localStorage.setItem('neon-auth.session_token', sessionToken);
-    }, token);
+      localStorage.setItem('neon-auth.session_token', data.token);
+
+      // E2E test mode - store test user info for frontend to use
+      // This allows the frontend to bypass Neon Auth SDK validation in tests
+      localStorage.setItem('e2e-test-mode', 'true');
+      localStorage.setItem('e2e-test-user', JSON.stringify(data.user));
+    }, { token, user });
 
     // Also set as a cookie for backend API calls
     await context.addCookies([

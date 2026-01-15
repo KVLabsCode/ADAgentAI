@@ -60,9 +60,38 @@ function getInitialOrgId(): string | null {
   return null
 }
 
+// E2E Test Mode Detection
+// When running Playwright tests, we bypass Neon Auth SDK validation
+// and use the test user stored in localStorage by global.setup.ts
+function isE2ETestMode(): boolean {
+  if (typeof window === 'undefined') return false
+  return localStorage.getItem('e2e-test-mode') === 'true'
+}
+
+function getE2ETestUser(): { id: string; email: string; name: string } | null {
+  if (typeof window === 'undefined') return null
+  const userJson = localStorage.getItem('e2e-test-user')
+  if (!userJson) return null
+  try {
+    return JSON.parse(userJson)
+  } catch {
+    return null
+  }
+}
+
+function getE2ESessionToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('neon-auth.session_token')
+}
+
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const _router = useRouter()
   const { data: session, isPending, refetch } = authClient.useSession()
+
+  // E2E Test Mode: Check on mount if we should use test user
+  const [e2eTestMode] = useState(() => isE2ETestMode())
+  const [e2eTestUser] = useState(() => getE2ETestUser())
+
   // Initialize from localStorage synchronously to avoid cascading renders
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(getInitialOrgId)
 
@@ -85,21 +114,30 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const { data: orgList, isPending: isLoadingOrgs, refetch: refetchOrgs } = authClient.useListOrganizations()
   const { data: activeOrgData } = authClient.useActiveOrganization()
 
-  // Get user from Neon Auth session
+  // Get user from Neon Auth session OR from E2E test mode
   const neonUser = session?.user
 
   // Map to our User type
-  // neonUser.role comes from Neon Auth - can be set in Neon Console
+  // In E2E test mode, use the test user from localStorage
+  // Otherwise, use the Neon Auth session user
   const neonUserAny = neonUser as Record<string, unknown> | undefined
   const userRole = neonUserAny?.role === 'admin' ? 'admin' : 'user'
 
-  const user: User | null = neonUser ? {
-    id: neonUser.id,
-    email: neonUser.email || '',
-    name: neonUser.name || neonUser.email?.split('@')[0] || 'User',
-    avatar: neonUser.image || '',
-    role: userRole,
-  } : null
+  const user: User | null = e2eTestMode && e2eTestUser
+    ? {
+        id: e2eTestUser.id,
+        email: e2eTestUser.email,
+        name: e2eTestUser.name,
+        avatar: '',
+        role: 'user' as const,
+      }
+    : neonUser ? {
+        id: neonUser.id,
+        email: neonUser.email || '',
+        name: neonUser.name || neonUser.email?.split('@')[0] || 'User',
+        avatar: neonUser.image || '',
+        role: userRole,
+      } : null
 
   // Get user's role from active organization data
   // activeOrgData contains: { id, name, slug, logo, createdAt, members: [...] }
@@ -153,6 +191,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // Reusable function to check waitlist access
   const recheckWaitlistAccess = useCallback(async () => {
+    // E2E test mode: Bypass waitlist check - test user is already on waitlist
+    if (e2eTestMode && e2eTestUser) {
+      setHasWaitlistAccess(true)
+      setWaitlistAccessReason(null)
+      return
+    }
+
     if (!neonUser?.email) {
       setHasWaitlistAccess(null)
       setWaitlistAccessReason(null)
@@ -180,7 +225,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsCheckingWaitlist(false)
     }
-  }, [neonUser?.email])
+  }, [neonUser?.email, e2eTestMode, e2eTestUser])
 
   // Check waitlist access when user authenticates
   React.useEffect(() => {
@@ -190,6 +235,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Check ToS acceptance when user authenticates and has waitlist access
   React.useEffect(() => {
     async function checkTosStatus() {
+      // E2E test mode: Bypass ToS check - test user has already accepted ToS
+      if (e2eTestMode && e2eTestUser) {
+        setHasAcceptedTos(true)
+        return
+      }
+
       if (!neonUser?.id || !hasWaitlistAccess) {
         // Don't check ToS if not authenticated or no waitlist access
         return
@@ -227,7 +278,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     checkTosStatus()
-  }, [neonUser?.id, hasWaitlistAccess, session])
+  }, [neonUser?.id, hasWaitlistAccess, session, e2eTestMode, e2eTestUser])
 
   // Map organizations from Neon Auth hook
   // Include role for the active organization
@@ -309,7 +360,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // Get session token for backend API calls
   // Neon Auth provides the token in the session object
+  // In E2E test mode, return the token from localStorage
   const getAccessToken = useCallback(async (): Promise<string | null> => {
+    // E2E test mode: Return the session token from localStorage
+    if (e2eTestMode) {
+      return getE2ESessionToken()
+    }
+
     if (!session) {
       return null
     }
@@ -332,7 +389,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     return null
-  }, [session])
+  }, [session, e2eTestMode])
 
   // Select an organization (or null for personal scope)
   // Uses Neon Auth's organization.setActive() API
@@ -512,11 +569,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Platform admin check - uses role from Neon Auth (set in Neon Console)
   const isAdmin = user?.role === 'admin'
 
+  // In E2E test mode, we're authenticated if we have a test user
+  // Otherwise, check for Neon Auth session user
+  const isAuthenticated = e2eTestMode ? !!e2eTestUser : !!neonUser
+
+  // In E2E test mode, we're never loading (user is available immediately from localStorage)
+  const isLoading = e2eTestMode ? false : isPending
+
   const value: UserContextValue = {
     user,
     isAdmin,
-    isLoading: isPending,
-    isAuthenticated: !!neonUser,
+    isLoading,
+    isAuthenticated,
     signOut,
     refetch,
     getAccessToken,
