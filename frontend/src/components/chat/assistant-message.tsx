@@ -1075,7 +1075,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
   const toolGroups = processedEvents.filter(e => e.type === "tool_group")
 
   return (
-    <div className="flex gap-2.5 group">
+    <div className="flex gap-2.5 group" data-testid="assistant-message">
       {/* Agent Avatar - matches h-10 message height */}
       {/* Agent Avatar hidden */}
 

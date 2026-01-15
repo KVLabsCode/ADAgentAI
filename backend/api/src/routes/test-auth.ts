@@ -25,6 +25,13 @@ const TEST_USER = {
   name: "E2E Test User",
 };
 
+// Mock provider for E2E testing (enables chat functionality)
+const TEST_PROVIDER = {
+  id: "00000000-0000-0000-0000-e2e000000002",
+  publisherId: "pub-e2e-test-12345",
+  accountName: "E2E Test AdMob Account",
+};
+
 /**
  * Create a test session for E2E testing
  * POST /api/test-auth/session
@@ -83,7 +90,27 @@ testAuth.post("/session", async (c) => {
         updated_at = NOW()
     `);
 
-    console.log("[test-auth] Created test session for E2E testing");
+    // Add mock AdMob provider for E2E testing (enables chat functionality)
+    // Uses a fake access token - MCP calls will fail but we can test the UI flow
+    await db.execute(sql`
+      INSERT INTO connected_providers (id, user_id, provider, publisher_id, account_name, access_token, is_enabled, created_at, updated_at)
+      VALUES (
+        ${TEST_PROVIDER.id}::uuid,
+        ${TEST_USER.id},
+        'admob',
+        ${TEST_PROVIDER.publisherId},
+        ${TEST_PROVIDER.accountName},
+        'e2e-mock-token-not-valid',
+        true,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        is_enabled = true,
+        updated_at = NOW()
+    `);
+
+    console.log("[test-auth] Created test session and mock provider for E2E testing");
 
     return c.json({
       token: sessionToken,
