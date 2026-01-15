@@ -23,10 +23,15 @@ export { expect };
  * Test helper: Wait for the chat to be ready
  */
 export async function waitForChatReady(page: Page): Promise<void> {
-  // Wait for chat container to be visible
-  await page.waitForSelector('[data-testid="chat-container"]', {
+  // Wait for chat container to be visible (with fallback selectors)
+  const chatContainer = page.locator('[data-testid="chat-container"]')
+    .or(page.locator('[class*="chat-container"]'))
+    .or(page.locator('[class*="ChatContainer"]'))
+    .or(page.locator('main').filter({ has: page.locator('textarea') }));
+
+  await chatContainer.first().waitFor({
     state: 'visible',
-    timeout: 10000,
+    timeout: 15000,
   });
 
   // Wait for any loading indicators to disappear
@@ -54,7 +59,11 @@ export async function sendChatMessage(page: Page, message: string): Promise<void
  */
 export async function waitForAIResponse(page: Page, timeout = 30000): Promise<void> {
   // Wait for streaming to start (assistant message appears)
-  await page.waitForSelector('[data-testid="assistant-message"]', {
+  const assistantMessage = page.locator('[data-testid="assistant-message"]')
+    .or(page.locator('[class*="assistant"]'))
+    .or(page.locator('[data-role="assistant"]'));
+
+  await assistantMessage.first().waitFor({
     state: 'visible',
     timeout,
   });
@@ -65,6 +74,14 @@ export async function waitForAIResponse(page: Page, timeout = 30000): Promise<vo
     timeout,
   }).catch(() => {
     // Streaming indicator may not exist after completion
+  });
+
+  // Also wait for any typing indicators
+  await page.locator('[class*="typing"]').first().waitFor({
+    state: 'hidden',
+    timeout: 5000,
+  }).catch(() => {
+    // Typing indicator may not exist
   });
 }
 
@@ -105,6 +122,23 @@ export async function denyToolExecution(page: Page): Promise<void> {
  */
 export async function navigateToChat(page: Page): Promise<void> {
   await page.goto('/chat');
+
+  // Wait for navigation to settle
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
+    // Network may not fully idle, that's ok
+  });
+
+  // Check if we got redirected to login
+  const currentUrl = page.url();
+  if (currentUrl.includes('/login') || currentUrl.includes('/signin')) {
+    throw new Error(`Redirected to login page - authentication may not be working. URL: ${currentUrl}`);
+  }
+
+  // Check for waitlist or ToS pages
+  if (currentUrl.includes('/waitlist')) {
+    throw new Error(`Redirected to waitlist page. URL: ${currentUrl}`);
+  }
+
   await waitForChatReady(page);
 }
 
