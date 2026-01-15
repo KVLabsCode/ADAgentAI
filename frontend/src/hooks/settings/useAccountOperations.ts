@@ -6,7 +6,7 @@ import { authFetch } from "@/lib/api"
 interface UseAccountOperationsOptions {
   userEmail: string | null
   getAccessToken: () => Promise<string | null>
-  signOut: () => Promise<void>
+  signOut: () => void | Promise<void>
 }
 
 export function useAccountOperations({
