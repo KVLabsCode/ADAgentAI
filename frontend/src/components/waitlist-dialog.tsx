@@ -23,172 +23,46 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+import { useWaitlistFlow } from "@/hooks/useWaitlistFlow"
 
 interface WaitlistDialogProps {
   trigger?: React.ReactNode
   className?: string
 }
 
-type Step = "email" | "survey" | "success"
-
-// Define interface for OAuth message data
-interface OAuthMessageData {
-  success: boolean
-  email?: string
-  name?: string
-  picture?: string
-  error?: string
-}
-
 export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
   const [open, setOpen] = React.useState(false)
-  const [step, setStep] = React.useState<Step>("email")
-
-  // Google auth state
-  const [email, setEmail] = React.useState("")
-  const [name, setName] = React.useState("")
-  const [picture, setPicture] = React.useState<string | null>(null)
-  const [googleLoading, setGoogleLoading] = React.useState(false)
-
-  // Survey step state
-  const [role, setRole] = React.useState("")
-  const [useCase, setUseCase] = React.useState("")
-
-  // Submission state
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState("")
-  const [position, setPosition] = React.useState<number | null>(null)
-  const [referralCode, setReferralCode] = React.useState("")
-  const [copied, setCopied] = React.useState(false)
-
-  // Handle Google OAuth - redirect flow (popups don't work due to COOP)
-  const handleGoogleAuth = async () => {
-    setGoogleLoading(true)
-    setError("")
-
-    try {
-      // Store current URL to return to after OAuth
-      sessionStorage.setItem("waitlist_return_url", window.location.href)
-
-      // Get OAuth URL from backend
-      const initResponse = await fetch(`${API_URL}/api/waitlist/oauth/init`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ redirect: true }), // Signal we want redirect flow
-      })
-
-      if (!initResponse.ok) {
-        throw new Error("Failed to initialize authentication")
-      }
-
-      const { url } = await initResponse.json()
-
-      // Redirect to Google OAuth (full page redirect)
-      window.location.href = url
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to authenticate")
-      setGoogleLoading(false)
-    }
-  }
+  const {
+    step,
+    email,
+    name,
+    picture,
+    googleLoading,
+    role,
+    useCase,
+    loading,
+    error,
+    position,
+    referralCode,
+    copied,
+    setRole,
+    setUseCase,
+    handleGoogleAuth,
+    handleSubmit,
+    copyReferralLink,
+    resetForm,
+    goToEmailStep,
+    checkOAuthCallback,
+    isValid,
+  } = useWaitlistFlow()
 
   // Check for OAuth callback data on mount
   React.useEffect(() => {
-    const checkOAuthCallback = () => {
-      try {
-        const stored = sessionStorage.getItem("waitlist_oauth_result")
-        if (stored) {
-          sessionStorage.removeItem("waitlist_oauth_result")
-          const data = JSON.parse(stored) as OAuthMessageData
-
-          if (data.success && data.email) {
-            setEmail(data.email)
-            setName(data.name || "")
-            setPicture(data.picture || null)
-            setStep("survey")
-            setOpen(true) // Open the dialog
-          } else if (data.error) {
-            setError(data.error)
-            setOpen(true)
-          }
-        }
-      } catch (e) {
-        console.error("Failed to process OAuth callback:", e)
-      }
+    const shouldOpen = checkOAuthCallback()
+    if (shouldOpen) {
+      setOpen(true)
     }
-
-    checkOAuthCallback()
-  }, [])
-
-  // Handle final submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !role || !useCase) return
-
-    setLoading(true)
-    setError("")
-
-    try {
-      // Check if user already exists in Neon Auth
-      const checkResponse = await fetch(`${API_URL}/api/waitlist/check-existing/${encodeURIComponent(email)}`)
-      const { exists } = await checkResponse.json()
-
-      if (exists) {
-        setError("You already have an account! Please sign in instead.")
-        setLoading(false)
-        return
-      }
-
-      const urlParams = new URLSearchParams(window.location.search)
-      const refCode = urlParams.get("ref")
-
-      const response = await fetch(`${API_URL}/api/waitlist/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          name: name || undefined,
-          referralCode: refCode || undefined,
-          role,
-          useCase,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setStep("success")
-        setPosition(data.position)
-        setReferralCode(data.referralCode)
-      } else {
-        setError(data.error || "Failed to join waitlist")
-      }
-    } catch {
-      setError("Something went wrong. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const copyReferralLink = () => {
-    const link = `${window.location.origin}?ref=${referralCode}`
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const resetForm = () => {
-    setStep("email")
-    setEmail("")
-    setName("")
-    setPicture(null)
-    setRole("")
-    setUseCase("")
-    setError("")
-    setPosition(null)
-    setReferralCode("")
-  }
+  }, [checkOAuthCallback])
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -210,8 +84,8 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
             <VisuallyHidden.Root>
               <DialogTitle>Waitlist Confirmation</DialogTitle>
             </VisuallyHidden.Root>
-            <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <Check className="h-7 w-7 text-emerald-500" />
+            <div className="mx-auto w-14 h-14 rounded-full bg-success/10 flex items-center justify-center">
+              <Check className="h-7 w-7 text-success" />
             </div>
             <div className="space-y-1">
               <h3 className="text-xl font-semibold">You&apos;re in!</h3>
@@ -220,7 +94,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
               </p>
               {position && (
                 <p className="text-sm font-medium pt-2">
-                  Position <span className="text-emerald-500">#{position}</span> in line
+                  Position <span className="text-success">#{position}</span> in line
                 </p>
               )}
             </div>
@@ -364,7 +238,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setStep("email")}
+                  onClick={goToEmailStep}
                   className="h-8 px-2 text-xs text-muted-foreground shrink-0"
                 >
                   Change
@@ -442,7 +316,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={loading || !role || !useCase}
+                  disabled={loading || !isValid}
                 >
                   {loading ? (
                     <>

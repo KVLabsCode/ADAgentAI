@@ -58,15 +58,15 @@ function StatCard({
       {trend && trendValue && (
         <div className="mt-3 flex items-center gap-1.5 text-xs">
           {trend === "up" ? (
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+            <TrendingUp className="h-3.5 w-3.5 text-success" />
           ) : trend === "down" ? (
-            <TrendingDown className="h-3.5 w-3.5 text-rose-500" />
+            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
           ) : null}
           <span
             className={cn(
               "font-mono",
-              trend === "up" && "text-emerald-500",
-              trend === "down" && "text-rose-500",
+              trend === "up" && "text-success",
+              trend === "down" && "text-destructive",
               trend === "neutral" && "text-muted-foreground"
             )}
           >

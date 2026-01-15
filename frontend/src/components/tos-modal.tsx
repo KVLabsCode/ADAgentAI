@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import { Loader2, FileText, Shield, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -12,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useUser } from "@/hooks/use-user"
+import { useTosAcceptance } from "@/hooks/useTosAcceptance"
 import { cn } from "@/lib/utils"
 
 interface TosModalProps {
@@ -20,31 +20,21 @@ interface TosModalProps {
 
 export function TosModal({ open }: TosModalProps) {
   const { acceptTos, user } = useUser()
-  const [isAccepting, setIsAccepting] = React.useState(false)
-  const [agreedToTerms, setAgreedToTerms] = React.useState(false)
-  const [agreedToPrivacy, setAgreedToPrivacy] = React.useState(false)
-  const [marketingOptIn, setMarketingOptIn] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const canAccept = agreedToTerms && agreedToPrivacy
-
-  const handleAccept = async () => {
-    if (!canAccept) return
-
-    setIsAccepting(true)
-    setError(null)
-
-    try {
-      const success = await acceptTos(marketingOptIn)
-      if (!success) {
-        setError("Failed to accept terms. Please try again.")
-      }
-    } catch {
-      setError("An error occurred. Please try again.")
-    } finally {
-      setIsAccepting(false)
-    }
-  }
+  const {
+    isAccepting,
+    agreedToTerms,
+    agreedToPrivacy,
+    marketingOptIn,
+    error,
+    setAgreedToTerms,
+    setAgreedToPrivacy,
+    setMarketingOptIn,
+    toggleTerms,
+    togglePrivacy,
+    toggleMarketing,
+    canAccept,
+    handleAccept,
+  } = useTosAcceptance({ acceptTos })
 
   return (
     <Dialog open={open}>
@@ -72,7 +62,7 @@ export function TosModal({ open }: TosModalProps) {
               "flex items-start gap-3 rounded-lg border p-3 transition-colors cursor-pointer",
               agreedToTerms ? "border-primary/50 bg-primary/5" : "border-border hover:border-border/80"
             )}
-            onClick={() => setAgreedToTerms(!agreedToTerms)}
+            onClick={toggleTerms}
           >
             <Checkbox
               id="terms"
@@ -105,7 +95,7 @@ export function TosModal({ open }: TosModalProps) {
               "flex items-start gap-3 rounded-lg border p-3 transition-colors cursor-pointer",
               agreedToPrivacy ? "border-primary/50 bg-primary/5" : "border-border hover:border-border/80"
             )}
-            onClick={() => setAgreedToPrivacy(!agreedToPrivacy)}
+            onClick={togglePrivacy}
           >
             <Checkbox
               id="privacy"
@@ -139,7 +129,7 @@ export function TosModal({ open }: TosModalProps) {
               "flex items-start gap-3 rounded-lg border p-3 transition-colors cursor-pointer",
               marketingOptIn ? "border-primary/50 bg-primary/5" : "border-border/50 hover:border-border/80"
             )}
-            onClick={() => setMarketingOptIn(!marketingOptIn)}
+            onClick={toggleMarketing}
           >
             <Checkbox
               id="marketing"

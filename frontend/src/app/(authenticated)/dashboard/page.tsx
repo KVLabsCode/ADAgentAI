@@ -44,7 +44,7 @@ function formatRelativeDate(dateString: string): string {
 }
 
 export default function DashboardPage() {
-  const { user, getAccessToken, isLoading: isUserLoading } = useUser()
+  const { user, getAccessToken, isLoading: isUserLoading, selectedOrganizationId } = useUser()
   const [providers, setProviders] = React.useState<ApiProvider[]>([])
   const [recentChats, setRecentChats] = React.useState<ApiSession[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -54,8 +54,8 @@ export default function DashboardPage() {
       try {
         const accessToken = await getAccessToken()
         const [providersRes, sessionsRes] = await Promise.all([
-          authFetch(`${API_URL}/api/providers`, accessToken),
-          authFetch(`${API_URL}/api/chat/sessions`, accessToken),
+          authFetch(`${API_URL}/api/providers`, accessToken, {}, selectedOrganizationId),
+          authFetch(`${API_URL}/api/chat/sessions`, accessToken, {}, selectedOrganizationId),
         ])
 
         if (providersRes.ok) {
@@ -77,7 +77,7 @@ export default function DashboardPage() {
     if (!isUserLoading) {
       fetchData()
     }
-  }, [getAccessToken, isUserLoading])
+  }, [getAccessToken, isUserLoading, selectedOrganizationId])
 
   const userName = user?.name || user?.email?.split('@')[0] || 'User'
   const connectedProviders = providers.length

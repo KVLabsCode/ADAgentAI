@@ -22,8 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+import { useAuthenticatedWaitlistForm } from "@/hooks/useAuthenticatedWaitlistForm"
 
 interface AuthenticatedWaitlistDialogProps {
   email: string
@@ -39,69 +38,22 @@ export function AuthenticatedWaitlistDialog({
   onSuccess
 }: AuthenticatedWaitlistDialogProps) {
   const [open, setOpen] = React.useState(false)
-  const [role, setRole] = React.useState("")
-  const [useCase, setUseCase] = React.useState("")
-  const [submitted, setSubmitted] = React.useState(false)
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState("")
-  const [position, setPosition] = React.useState<number | null>(null)
-  const [referralCode, setReferralCode] = React.useState("")
-  const [copied, setCopied] = React.useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!role || !useCase) return
-
-    setLoading(true)
-    setError("")
-
-    try {
-      const urlParams = new URLSearchParams(window.location.search)
-      const refCode = urlParams.get("ref")
-
-      const response = await fetch(`${API_URL}/api/waitlist/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          referralCode: refCode || undefined,
-          role,
-          useCase,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setSubmitted(true)
-        setPosition(data.position)
-        setReferralCode(data.referralCode)
-        onSuccess?.()
-      } else {
-        setError(data.error || "Failed to join waitlist")
-      }
-    } catch {
-      setError("Something went wrong. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const copyReferralLink = () => {
-    const link = `${window.location.origin}?ref=${referralCode}`
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const resetForm = () => {
-    setRole("")
-    setUseCase("")
-    setSubmitted(false)
-    setError("")
-    setPosition(null)
-    setReferralCode("")
-  }
+  const {
+    role,
+    useCase,
+    submitted,
+    loading,
+    error,
+    position,
+    referralCode,
+    copied,
+    setRole,
+    setUseCase,
+    handleSubmit,
+    copyReferralLink,
+    resetForm,
+    isValid,
+  } = useAuthenticatedWaitlistForm({ email, onSuccess })
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -121,8 +73,8 @@ export function AuthenticatedWaitlistDialog({
             <VisuallyHidden.Root>
               <DialogTitle>Waitlist Confirmation</DialogTitle>
             </VisuallyHidden.Root>
-            <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <Check className="h-7 w-7 text-emerald-500" />
+            <div className="mx-auto w-14 h-14 rounded-full bg-success/10 flex items-center justify-center">
+              <Check className="h-7 w-7 text-success" />
             </div>
             <div className="space-y-1">
               <h3 className="text-xl font-semibold">You&apos;re in!</h3>
@@ -131,7 +83,7 @@ export function AuthenticatedWaitlistDialog({
               </p>
               {position && (
                 <p className="text-sm font-medium pt-2">
-                  Position <span className="text-emerald-500">#{position}</span> in line
+                  Position <span className="text-success">#{position}</span> in line
                 </p>
               )}
             </div>
@@ -265,7 +217,7 @@ export function AuthenticatedWaitlistDialog({
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={loading || !role || !useCase}
+                  disabled={loading || !isValid}
                 >
                   {loading ? (
                     <>

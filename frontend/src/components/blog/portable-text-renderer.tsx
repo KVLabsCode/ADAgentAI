@@ -49,7 +49,7 @@ const components: PortableTextComponents = {
   listItem: {
     bullet: ({ children }) => (
       <li className="text-sm text-muted-foreground leading-relaxed flex gap-2">
-        <span className="text-emerald-500 mt-1">*</span>
+        <span className="text-success mt-1">*</span>
         <span>{children}</span>
       </li>
     ),
@@ -72,7 +72,7 @@ const components: PortableTextComponents = {
       </code>
     ),
     highlight: ({ children }) => (
-      <mark className="bg-yellow-200/50 dark:bg-yellow-900/50 px-1 rounded">
+      <mark className="bg-warning/20 text-foreground px-1 rounded">
         {children}
       </mark>
     ),

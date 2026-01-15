@@ -1,0 +1,6 @@
+export { OrganizationSection } from "./OrganizationSection"
+export { AccountSection } from "./AccountSection"
+export { ChatSettingsSection } from "./ChatSettingsSection"
+export { AppearanceSection } from "./AppearanceSection"
+export { NotificationsSection } from "./NotificationsSection"
+export { PrivacySection } from "./PrivacySection"

@@ -142,9 +142,9 @@ interface StatCardProps {
 
 const VALUE_COLORS = {
   default: "text-foreground",
-  success: "text-emerald-500",
-  warning: "text-amber-500",
-  error: "text-rose-500",
+  success: "text-success",
+  warning: "text-warning",
+  error: "text-destructive",
 }
 
 function StatCard({
@@ -178,8 +178,8 @@ function StatCard({
       {trend && trendValue && (
         <p className={cn(
           "text-[10px] mt-1.5 font-mono",
-          trend === "up" && "text-emerald-500",
-          trend === "down" && "text-rose-500",
+          trend === "up" && "text-success",
+          trend === "down" && "text-destructive",
           trend === "neutral" && "text-muted-foreground"
         )}>
           {trendValue}
@@ -229,7 +229,7 @@ function ConfigField({
       <div>
         <p className={cn(
           "text-xs font-medium",
-          highlight ? "text-amber-500" : "text-foreground"
+          highlight ? "text-warning" : "text-foreground"
         )}>
           {label}
         </p>
@@ -290,10 +290,10 @@ interface StatusBadgeProps {
 }
 
 const STATUS_STYLES = {
-  success: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
-  error: "bg-rose-500/10 text-rose-500 border-rose-500/30",
-  warning: "bg-amber-500/10 text-amber-500 border-amber-500/30",
-  pending: "bg-blue-500/10 text-blue-500 border-blue-500/30",
+  success: "bg-success/10 text-success border-success/30",
+  error: "bg-destructive/10 text-destructive border-destructive/30",
+  warning: "bg-warning/10 text-warning border-warning/30",
+  pending: "bg-info/10 text-info border-info/30",
   info: "bg-muted text-muted-foreground border-border/50",
 }
 
@@ -350,18 +350,18 @@ function ErrorCard({
 }: ErrorCardProps) {
   return (
     <div className={cn(
-      "rounded border border-rose-500/30 bg-rose-500/5 px-4 py-4",
+      "rounded border border-destructive/30 bg-destructive/5 px-4 py-4",
       className
     )}>
       <div className="flex items-start gap-3">
         <div className="flex-1">
-          <p className="text-sm font-medium text-rose-500">{title}</p>
+          <p className="text-sm font-medium text-destructive">{title}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{message}</p>
         </div>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="text-xs text-rose-500 hover:text-rose-400 font-medium"
+            className="text-xs text-destructive hover:text-destructive/80 font-medium"
           >
             Retry
           </button>
@@ -385,8 +385,8 @@ function StatusMessage({ type, message, className }: StatusMessageProps) {
     <div className={cn(
       "flex items-center gap-2 px-3 py-2 rounded text-xs",
       type === "success"
-        ? "bg-emerald-500/10 text-emerald-500"
-        : "bg-rose-500/10 text-rose-500",
+        ? "bg-success/10 text-success"
+        : "bg-destructive/10 text-destructive",
       className
     )}>
       {type === "success" ? (

@@ -158,3 +158,23 @@ Lightweight LLM call classifies user queries to route to appropriate specialists
 - `ANTHROPIC_API_KEY` - LLM provider
 - `API_URL`, `INTERNAL_API_KEY` - API communication
 
+## Code Style
+
+See documentation for detailed guidelines:
+- `docs/separation-of-concerns.md` - Component/hook patterns
+- `docs/theme.md` - Design tokens and colors
+
+### Quick Reference
+
+**Separation of Concerns**: Components render UI, hooks handle logic. Extract when 3+ state variables.
+
+**Design Tokens**: Use `text-success`, `text-destructive`, `text-warning` instead of hardcoded colors.
+
+**File Size**: Pages < 200 lines, Components < 300 lines, Hooks < 150 lines.
+
+**Organization Context**: Pass `selectedOrganizationId` to API calls:
+```tsx
+const { selectedOrganizationId } = useUser()
+await authFetch('/api/endpoint', token, {}, selectedOrganizationId)
+```
+
