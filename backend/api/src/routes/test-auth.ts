@@ -37,47 +37,50 @@ testAuth.post("/session", async (c) => {
   }
 
   try {
-    // Create or get test user
+    // Create or get test user in neon_auth schema
     await db.execute(sql`
-      INSERT INTO neon_auth."user" (id, email, name, "emailVerified", role)
-      VALUES (${TEST_USER.id}, ${TEST_USER.email}, ${TEST_USER.name}, true, 'user')
+      INSERT INTO neon_auth."user" (id, email, name, "emailVerified", role, "createdAt", "updatedAt")
+      VALUES (${TEST_USER.id}, ${TEST_USER.email}, ${TEST_USER.name}, true, 'user', NOW(), NOW())
       ON CONFLICT (id) DO UPDATE SET
         email = EXCLUDED.email,
-        name = EXCLUDED.name
+        name = EXCLUDED.name,
+        "updatedAt" = NOW()
     `);
 
     // Generate session token
     const sessionToken = randomBytes(32).toString("hex");
+    const sessionId = randomBytes(16).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create session
+    // Create session in neon_auth schema
     await db.execute(sql`
       INSERT INTO neon_auth.session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
       VALUES (
-        ${randomBytes(16).toString("hex")},
+        ${sessionId},
         ${sessionToken},
         ${TEST_USER.id},
-        ${expiresAt.toISOString()},
+        ${expiresAt.toISOString()}::timestamp,
         NOW(),
         NOW()
       )
     `);
 
-    // Also add to waitlist with approved status so tests can access the app
+    // Add to waitlist with 'joined' status (valid enum value) so tests can access the app
     await db.execute(sql`
-      INSERT INTO waitlist (email, status, approved_at)
-      VALUES (${TEST_USER.email}, 'approved', NOW())
+      INSERT INTO waitlist (email, status, "joinedAt", "createdAt")
+      VALUES (${TEST_USER.email}, 'joined', NOW(), NOW())
       ON CONFLICT (email) DO UPDATE SET
-        status = 'approved',
-        approved_at = COALESCE(waitlist.approved_at, NOW())
+        status = 'joined',
+        "joinedAt" = COALESCE(waitlist."joinedAt", NOW())
     `);
 
-    // Add ToS acceptance for test user
+    // Add user preferences with ToS acceptance for test user
     await db.execute(sql`
-      INSERT INTO tos_acceptance (user_id, accepted_at, tos_version)
-      VALUES (${TEST_USER.id}, NOW(), '1.0')
-      ON CONFLICT (user_id) DO UPDATE SET
-        accepted_at = NOW()
+      INSERT INTO user_preferences ("userId", "tosAcceptedAt", "tosVersion", "createdAt", "updatedAt")
+      VALUES (${TEST_USER.id}, NOW(), '1.0', NOW(), NOW())
+      ON CONFLICT ("userId") DO UPDATE SET
+        "tosAcceptedAt" = NOW(),
+        "updatedAt" = NOW()
     `);
 
     console.log("[test-auth] Created test session for E2E testing");
@@ -89,7 +92,7 @@ testAuth.post("/session", async (c) => {
     });
   } catch (error) {
     console.error("[test-auth] Failed to create test session:", error);
-    return c.json({ error: "Failed to create test session" }, 500);
+    return c.json({ error: "Failed to create test session", details: String(error) }, 500);
   }
 });
 
