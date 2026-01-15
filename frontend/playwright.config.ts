@@ -13,6 +13,10 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
 
+  // Global setup - runs once before all tests to set up auth state
+  globalSetup: './tests/e2e/global.setup.ts',
+  globalTeardown: './tests/e2e/global.teardown.ts',
+
   // Run tests in files in parallel
   fullyParallel: true,
 
@@ -54,26 +58,14 @@ export default defineConfig({
 
   // Configure projects for major browsers
   projects: [
-    // Setup project for authentication
-    {
-      name: 'setup',
-      testMatch: /global\.setup\.ts/,
-      teardown: 'teardown',
-    },
-    {
-      name: 'teardown',
-      testMatch: /global\.teardown\.ts/,
-    },
-
-    // Test projects
+    // Desktop Chrome
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Use authenticated state from setup
+        // Use authenticated state from global setup
         storageState: 'tests/e2e/.auth/user.json',
       },
-      dependencies: ['setup'],
     },
 
     // Mobile viewport tests
@@ -83,7 +75,6 @@ export default defineConfig({
         ...devices['Pixel 5'],
         storageState: 'tests/e2e/.auth/user.json',
       },
-      dependencies: ['setup'],
     },
   ],
 
