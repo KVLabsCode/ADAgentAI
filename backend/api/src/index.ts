@@ -21,6 +21,7 @@ import internalRoutes from "./routes/internal";
 import adminUsageRoutes from "./routes/admin/usage";
 import adminConversationsRoutes from "./routes/admin/conversations";
 import adminConfigRoutes from "./routes/admin/config";
+import testAuthRoutes from "./routes/test-auth";
 
 // Initialize observability (as early as possible)
 initSentry();
@@ -129,6 +130,9 @@ api.route("/internal", internalRoutes);
 api.route("/admin/usage", adminUsageRoutes);
 api.route("/admin/conversations", adminConversationsRoutes);
 api.route("/admin/config", adminConfigRoutes);
+
+// Test auth route (only enabled in CI/test environments)
+api.route("/test-auth", testAuthRoutes);
 
 // Webhook routes (outside /api for cleaner URLs)
 app.route("/webhooks", webhookRoutes);

@@ -13,27 +13,9 @@ env:
   PLAYWRIGHT_BASE_URL: http://localhost:3000
 
 jobs:
-  check-secrets:
-    name: Check E2E Secrets
-    runs-on: ubuntu-latest
-    outputs:
-      has-credentials: ${{ steps.check.outputs.has-credentials }}
-    steps:
-      - name: Check for test credentials
-        id: check
-        run: |
-          if [ -n "${{ secrets.PLAYWRIGHT_TEST_EMAIL }}" ] && [ -n "${{ secrets.PLAYWRIGHT_TEST_PASSWORD }}" ]; then
-            echo "has-credentials=true" >> $GITHUB_OUTPUT
-          else
-            echo "has-credentials=false" >> $GITHUB_OUTPUT
-            echo "::warning::E2E tests skipped: PLAYWRIGHT_TEST_EMAIL and PLAYWRIGHT_TEST_PASSWORD secrets not configured"
-          fi
-
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
-    needs: check-secrets
-    if: needs.check-secrets.outputs.has-credentials == 'true'
     timeout-minutes: 30
 
     steps:
@@ -82,19 +64,20 @@ jobs:
           # Wait for services to be ready
           bunx wait-on http://localhost:3000 http://localhost:3001 --timeout 120000
         env:
+          NODE_ENV: test
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           BETTER_AUTH_URL: http://localhost:3001
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+          NEON_AUTH_URL: ${{ secrets.NEON_AUTH_URL }}
 
       - name: Run Playwright tests
         working-directory: frontend
         run: bunx playwright test
         env:
-          PLAYWRIGHT_TEST_EMAIL: ${{ secrets.PLAYWRIGHT_TEST_EMAIL }}
-          PLAYWRIGHT_TEST_PASSWORD: ${{ secrets.PLAYWRIGHT_TEST_PASSWORD }}
+          NEXT_PUBLIC_API_URL: http://localhost:3001
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
