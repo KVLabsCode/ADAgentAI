@@ -51,9 +51,12 @@ test.describe('Tool Approval - Hybrid Integration', () => {
       tool_input: { name: 'Test Ad Unit', app_id: 'test-app-123' },
     });
 
-    // Mock resume endpoint for after approval
+    // Mock resume endpoint for after approval - must emit tool events for "Allowed" badge
     await mockResumeSSE(page, {
       result: 'Ad unit created successfully.',
+      toolName: 'admob_create_ad_unit',
+      toolInput: { name: 'Test Ad Unit', app_id: 'test-app-123' },
+      toolResult: { success: true, ad_unit_id: 'ca-app-pub-123/456' },
     });
 
     // Step 3: Navigate and send message (triggers mocked SSE)
@@ -178,7 +181,12 @@ test.describe('Tool Approval - Hybrid Integration', () => {
       tool_input: { name: 'Original Name', app_id: 'app-123' },
     });
 
-    await mockResumeSSE(page, { result: 'Ad unit created with modifications.' });
+    await mockResumeSSE(page, {
+      result: 'Ad unit created with modifications.',
+      toolName: 'admob_create_ad_unit',
+      toolInput: { name: 'Original Name', app_id: 'app-123' },
+      toolResult: { success: true },
+    });
 
     await navigateToChat(page);
     await sendChatMessage(page, 'create ad unit');
@@ -241,7 +249,12 @@ test.describe('Tool Approval - Hybrid Integration', () => {
       tool_input: { name: 'First Tool' },
     });
 
-    await mockResumeSSE(page, { result: 'First tool completed.' });
+    await mockResumeSSE(page, {
+      result: 'First tool completed.',
+      toolName: 'admob_create_ad_unit',
+      toolInput: { name: 'First Tool' },
+      toolResult: { success: true },
+    });
 
     await navigateToChat(page);
     await sendChatMessage(page, 'create first ad unit');
@@ -429,7 +442,19 @@ test.describe('Tool Approval - Entity Name Resolution', () => {
       },
     });
 
-    await mockResumeSSE(page, { result: 'Batch operation completed.' });
+    await mockResumeSSE(page, {
+      result: 'Batch operation completed.',
+      toolName: 'admob_batch_ad_unit_ids',
+      toolInput: {
+        ad_unit_ids: [
+          'ca-app-pub-123/real-unit-1',
+          'ca-app-pub-123/real-unit-2',
+          'ca-app-pub-999/hallucinated-123',
+        ],
+        account_id: 'pub-123',
+      },
+      toolResult: { success: true, processed: 3 },
+    });
 
     await navigateToChat(page);
     await sendChatMessage(page, 'batch update ad units');
@@ -516,7 +541,12 @@ test.describe('Tool Approval - Entity Name Resolution', () => {
       },
     });
 
-    await mockResumeSSE(page, { result: 'Created.' });
+    await mockResumeSSE(page, {
+      result: 'Created.',
+      toolName: 'admob_create_ad_unit',
+      toolInput: { name: 'Test Unit', app_id: 'ca-app-pub-fake/hallucinated-app' },
+      toolResult: { success: true },
+    });
 
     await navigateToChat(page);
     await sendChatMessage(page, 'create ad unit');
@@ -578,7 +608,15 @@ test.describe('Tool Approval - Entity Name Resolution', () => {
       },
     });
 
-    await mockResumeSSE(page, { result: 'Done.' });
+    await mockResumeSSE(page, {
+      result: 'Done.',
+      toolName: 'admob_batch_ad_unit_ids',
+      toolInput: {
+        ad_unit_ids: ['ca-app-pub-123/unit-1', 'ca-app-pub-123/unit-2'],
+        account_id: 'pub-123',
+      },
+      toolResult: { success: true },
+    });
 
     await navigateToChat(page);
     await sendChatMessage(page, 'batch update ad units');

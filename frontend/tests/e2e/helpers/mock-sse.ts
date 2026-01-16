@@ -60,25 +60,48 @@ export async function mockApprovalSSE(
 }
 
 /**
- * Mock the /chat/resume endpoint to emit a completion event.
+ * Mock the /chat/resume endpoint to emit completion events.
  * Called after an approval is submitted to continue the stream.
+ *
+ * For an approval flow to show "Allowed", the resume must emit:
+ * 1. tool event - the tool being executed
+ * 2. tool_result event - result of the tool
+ * 3. result event - final LLM response
+ * 4. done event
  */
 export async function mockResumeSSE(
   page: Page,
-  options: { result?: string; toolResult?: Record<string, unknown> } = {}
+  options: {
+    result?: string;
+    toolName?: string;
+    toolInput?: Record<string, unknown>;
+    toolResult?: Record<string, unknown>;
+  } = {}
 ): Promise<void> {
-  const { result = 'Operation completed successfully.', toolResult } = options;
+  const {
+    result = 'Operation completed successfully.',
+    toolName = 'admob_create_ad_unit',
+    toolInput = {},
+    toolResult = { success: true, message: 'Operation completed' },
+  } = options;
 
   await page.route('**/chat/resume', async (route: Route) => {
     const events: string[] = [];
 
-    // Emit tool result if provided
-    if (toolResult) {
-      events.push(formatSSEEvent('tool_result', {
-        type: 'tool_result',
-        content: JSON.stringify(toolResult),
-      }));
-    }
+    // Emit tool event (tool being executed after approval)
+    events.push(formatSSEEvent('tool', {
+      type: 'tool',
+      tool: toolName,
+      input: JSON.stringify(toolInput),
+      approved: true,
+    }));
+
+    // Emit tool result event
+    events.push(formatSSEEvent('tool_result', {
+      type: 'tool_result',
+      tool: toolName,
+      content: JSON.stringify(toolResult),
+    }));
 
     // Emit final result
     events.push(formatSSEEvent('result', {
