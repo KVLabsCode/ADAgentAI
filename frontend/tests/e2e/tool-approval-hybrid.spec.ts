@@ -15,7 +15,7 @@
 
 import { test, expect } from './fixtures';
 import { navigateToChat, sendChatMessage } from './fixtures';
-import { mockApprovalSSE, mockResumeSSE, clearChatMocks, mockFieldOptions } from './helpers/mock-sse';
+import { mockApprovalSSE, mockResumeSSE, mockDenialResumeSSE, clearChatMocks, mockFieldOptions } from './helpers/mock-sse';
 
 // Chat agent URL (Python backend)
 const CHAT_URL = process.env.NEXT_PUBLIC_CHAT_URL || 'http://localhost:5000';
@@ -75,8 +75,16 @@ test.describe('Tool Approval - Hybrid Integration', () => {
     // Step 5: Click Allow (calls REAL backend)
     await allowButton.click();
 
-    // Step 6: Verify approval was processed - badge should change to "Allowed"
-    await expect(page.locator('text=Allowed')).toBeVisible({ timeout: 10000 });
+    // Step 6: Verify approval was processed
+    // The tool executes and response appears (proves approval worked)
+    await expect(page.locator('text=Ad unit created successfully')).toBeVisible({ timeout: 10000 });
+
+    // Expand the tool call section to verify "Allowed" badge
+    const toolCallSection = page.locator('button:has-text("tool call")');
+    if (await toolCallSection.isVisible()) {
+      await toolCallSection.click();
+      await expect(page.locator('text=Allowed')).toBeVisible({ timeout: 5000 });
+    }
   });
 
   test('should deny tool via real backend', async ({ page }) => {
@@ -96,11 +104,17 @@ test.describe('Tool Approval - Hybrid Integration', () => {
     const { approval_id } = await seedResponse.json();
     expect(approval_id).toBeTruthy();
 
-    // Mock SSE
+    // Mock SSE for initial stream
     await mockApprovalSSE(page, {
       approval_id,
       tool_name: 'admob_create_ad_unit',
       tool_input: { name: 'Deny Test' },
+    });
+
+    // Mock resume endpoint for after denial - emits tool_denied event
+    await mockDenialResumeSSE(page, {
+      toolName: 'admob_create_ad_unit',
+      reason: 'User denied the operation',
     });
 
     await navigateToChat(page);

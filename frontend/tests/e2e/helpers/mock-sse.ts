@@ -89,24 +89,83 @@ export async function mockResumeSSE(
     const events: string[] = [];
 
     // Emit tool event (tool being executed after approval)
+    // Field names must match what api.ts handleSSEEvent expects:
+    // - tool: tool name
+    // - input_preview: shortened input for display
+    // - input_full: full JSON input
+    // - approved: boolean
     events.push(formatSSEEvent('tool', {
       type: 'tool',
       tool: toolName,
-      input: JSON.stringify(toolInput),
+      input_preview: JSON.stringify(toolInput).slice(0, 100),
+      input_full: JSON.stringify(toolInput),
       approved: true,
     }));
 
     // Emit tool result event
+    // Field names must match what api.ts handleSSEEvent expects:
+    // - preview: shortened result for display
+    // - full: full JSON result
+    // - data_type: 'json' | 'json_list' | 'text'
     events.push(formatSSEEvent('tool_result', {
       type: 'tool_result',
-      tool: toolName,
-      content: JSON.stringify(toolResult),
+      preview: JSON.stringify(toolResult).slice(0, 100),
+      full: JSON.stringify(toolResult),
+      data_type: 'json',
     }));
 
     // Emit final result
     events.push(formatSSEEvent('result', {
       type: 'result',
       content: result,
+    }));
+
+    // Emit done event
+    events.push(formatSSEEvent('done', { type: 'done' }));
+
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+      body: events.join(''),
+    });
+  });
+}
+
+/**
+ * Mock the /chat/resume endpoint for denial case.
+ * Emits tool_denied event instead of tool/tool_result.
+ */
+export async function mockDenialResumeSSE(
+  page: Page,
+  options: {
+    toolName?: string;
+    reason?: string;
+  } = {}
+): Promise<void> {
+  const {
+    toolName = 'admob_create_ad_unit',
+    reason = 'User denied the operation',
+  } = options;
+
+  await page.route('**/chat/resume', async (route: Route) => {
+    const events: string[] = [];
+
+    // Emit tool_denied event
+    // Field names must match what api.ts handleSSEEvent expects
+    events.push(formatSSEEvent('tool_denied', {
+      type: 'tool_denied',
+      tool_name: toolName,
+      reason: reason,
+    }));
+
+    // Emit result event indicating denial
+    events.push(formatSSEEvent('result', {
+      type: 'result',
+      content: `The ${toolName} operation was denied by the user.`,
     }));
 
     // Emit done event
@@ -132,6 +191,15 @@ function buildApprovalSSE(
   options: { includeRoutingEvent: boolean; agentType: string }
 ): string {
   const events: string[] = [];
+
+  // Stream ID event - REQUIRED for frontend to track stream and call resume
+  // Without this, currentStreamIdRef.current stays null and resumeStream is skipped
+  events.push(
+    formatSSEEvent('stream_id', {
+      type: 'stream_id',
+      stream_id: `test-stream-${approval.approval_id}`,
+    })
+  );
 
   // Optional routing event
   if (options.includeRoutingEvent) {
