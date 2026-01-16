@@ -16,6 +16,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ADAgentAI",
   description: "AI-powered ad platform management",
+  icons: {
+    icon: [
+      { url: "/icon-light.svg", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark.svg", media: "(prefers-color-scheme: dark)" },
+    ],
+    apple: [{ url: "/apple-icon.svg" }],
+  },
 };
 
 export default function RootLayout({
