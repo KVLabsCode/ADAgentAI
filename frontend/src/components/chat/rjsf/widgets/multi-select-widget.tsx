@@ -223,6 +223,10 @@ export function MultiSelectWidget(props: WidgetProps) {
           selectedItems.map((item) => (
             <span
               key={item.id}
+              data-testid="entity-chip"
+              data-entity-id={item.id}
+              data-entity-name={item.name}
+              data-is-resolved={item.name !== item.id}
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0 text-[10px]",
                 "bg-secondary text-secondary-foreground border-transparent"
@@ -309,6 +313,10 @@ export function MultiSelectWidget(props: WidgetProps) {
                   <button
                     key={item.id}
                     type="button"
+                    data-testid="dropdown-option"
+                    data-option-id={item.id}
+                    data-option-name={item.name}
+                    data-option-selected={isSelected}
                     onClick={() => !isDisabled && toggleItem(item.id)}
                     disabled={isDisabled as boolean}
                     className={cn(

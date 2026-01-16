@@ -81,6 +81,7 @@ jobs:
           bunx wait-on http://localhost:3000 http://localhost:3001 http://localhost:5000/health --timeout 120000
         env:
           NODE_ENV: test
+          E2E_TESTING: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           BETTER_AUTH_URL: http://localhost:3001

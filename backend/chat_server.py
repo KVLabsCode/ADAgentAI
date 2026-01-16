@@ -8,6 +8,7 @@ Uses modular chat/ package for:
 - Dangerous tool approval workflow with interrupt()
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -57,7 +58,7 @@ from chat import (
     cleanup_approval_files,
     validate_user_session,
 )
-from chat.approval.handlers import get_pending_approval
+from chat.approval.handlers import get_pending_approval, create_pending_approval
 from chat.approval.models import PendingApproval
 from chat.streaming.state import get_pending_result, consume_pending_result, cleanup_old_pending_results
 from threading import Lock
@@ -333,18 +334,53 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
 @app.get("/chat/pending-approvals")
 async def get_pending_approvals_list():
     """Debug endpoint to list all pending approvals."""
-    from chat.approval.handlers import _pending_approvals, _approval_lock
-    with _approval_lock:
-        return {
-            "pending": [
-                {
-                    "id": aid,
-                    "tool": approval.tool_name,
-                    "created_at": approval.created_at.isoformat(),
-                }
-                for aid, approval in _pending_approvals.items()
-            ]
-        }
+    from chat.approval.handlers import _get_all_approvals
+    approvals = _get_all_approvals()
+    return {
+        "pending": [
+            {
+                "id": aid,
+                "tool": data.get("tool_name", "unknown"),
+                "created_at": data.get("created_at", 0),
+            }
+            for aid, data in approvals.items()
+        ]
+    }
+
+
+class TestSeedApprovalRequest(BaseModel):
+    """Request body for test seed approval endpoint."""
+    tool_name: str = "admob_create_ad_unit"
+    tool_input: Optional[dict] = None
+
+
+@app.post("/test/seed-approval")
+async def seed_approval(body: TestSeedApprovalRequest):
+    """Test-only: Create a pending approval for E2E testing.
+
+    This endpoint is only available when E2E_TESTING=true environment variable is set.
+    Used by Playwright tests to pre-seed approvals that can then be resolved via
+    the real /chat/approve-tool endpoint.
+    """
+    if not os.environ.get("E2E_TESTING"):
+        raise HTTPException(
+            status_code=403,
+            detail="Only available in test mode (E2E_TESTING=true)"
+        )
+
+    # Convert dict to JSON string as expected by create_pending_approval
+    tool_input_str = json.dumps(body.tool_input or {"name": "Test Ad Unit"})
+
+    approval_id = create_pending_approval(
+        tool_name=body.tool_name,
+        tool_input=tool_input_str,
+    )
+
+    return {
+        "approval_id": approval_id,
+        "tool_name": body.tool_name,
+        "tool_input": body.tool_input,
+    }
 
 
 @app.get("/chat/result/{stream_id}")
