@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 
 interface LogoProps {
@@ -14,7 +15,26 @@ const sizes = {
   lg: { icon: "h-10 w-10", name: "text-lg", gap: "gap-3" },
 }
 
-function LogoSvg({ className }: { className?: string }) {
+// Wide spacing version (D further from backslash)
+function LogoSvgWide({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 512 512"
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn("fill-current", className)}
+    >
+      <path
+        d="M 113.431 145.841 L 163.803 145.841 L 251.634 366.159 L 203.467 366.159 L 185.017 319.878 L 92.217 319.878 L 73.767 366.159 L 25.600 366.159 Z M 138.617 201.527 L 108.517 278.990 L 168.717 278.990 Z"
+        fillRule="evenodd"
+      />
+      <path d="M 210.476 145.841 L 258.643 145.841 L 346.474 366.159 L 298.307 366.159 Z" />
+      <path d="M 288.410 145.841 L 376.241 145.841 A 110.159 110.159 0 0 1 376.241 366.159 L 376.241 366.159 L 357.039 317.993 L 376.241 317.993 A 61.993 61.993 0 0 0 376.241 194.007 L 307.612 194.007 Z" />
+    </svg>
+  )
+}
+
+// Tight spacing version (D closer to backslash)
+function LogoSvgTight({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 512 512"
@@ -31,23 +51,37 @@ function LogoSvg({ className }: { className?: string }) {
   )
 }
 
+// Default export uses wide version
+function LogoSvg({ className, variant = "wide" }: { className?: string; variant?: "wide" | "tight" }) {
+  return variant === "wide"
+    ? <LogoSvgWide className={className} />
+    : <LogoSvgTight className={className} />
+}
+
 export function Logo({ size = "md", showText = true, className }: LogoProps) {
+  const [variant, setVariant] = useState<"wide" | "tight">("wide")
   const s = sizes[size]
 
   return (
     <div className={cn("flex items-center", s.gap, className)}>
-      <LogoSvg className={cn(s.icon, "text-foreground")} />
+      <LogoSvg className={cn(s.icon, "text-foreground")} variant={variant} />
       {showText && (
         <span className={cn("font-semibold tracking-tight", s.name)}>
           ADAgentAI
         </span>
       )}
+      {/* Temporary toggle dot - remove later */}
+      <button
+        onClick={() => setVariant(v => v === "wide" ? "tight" : "wide")}
+        className="ml-1 h-2 w-2 rounded-full bg-muted-foreground/30 hover:bg-muted-foreground/50 transition-colors"
+        title={`Current: ${variant} (click to toggle)`}
+      />
     </div>
   )
 }
 
 export function LogoIcon({ className }: { className?: string }) {
-  return <LogoSvg className={cn("h-8 w-8 text-foreground", className)} />
+  return <LogoSvgWide className={cn("h-8 w-8 text-foreground", className)} />
 }
 
-export { LogoSvg }
+export { LogoSvg, LogoSvgWide, LogoSvgTight }
