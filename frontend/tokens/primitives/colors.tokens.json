@@ -90,6 +90,27 @@
     },
     "white": { "$value": "#ffffff" },
     "black": { "$value": "#000000" },
-    "transparent": { "$value": "#00000000" }
+    "transparent": { "$value": "#00000000" },
+
+    "surface": {
+      "$description": "Background surface colors",
+      "0": { "$value": "#08090a" },
+      "1": { "$value": "#1c1c1f" },
+      "2": { "$value": "#232326" },
+      "3": { "$value": "#28282c" }
+    },
+    "content": {
+      "$description": "Text content colors",
+      "1": { "$value": "#f7f8f8" },
+      "2": { "$value": "#b4bcd0" },
+      "3": { "$value": "#8a8f98" },
+      "4": { "$value": "#86848d" }
+    },
+    "edge": {
+      "$description": "Border colors (translucent)",
+      "1": { "$value": "rgba(255, 255, 255, 0.08)" },
+      "2": { "$value": "rgba(255, 255, 255, 0.12)" },
+      "3": { "$value": "rgba(255, 255, 255, 0.15)" }
+    }
   }
 }
