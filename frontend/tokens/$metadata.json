@@ -1,0 +1,7 @@
+{
+  "tokenSetOrder": [
+    "primitives",
+    "semantic-light",
+    "semantic-dark"
+  ]
+}
