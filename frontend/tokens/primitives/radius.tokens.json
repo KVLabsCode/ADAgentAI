@@ -1,0 +1,15 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "$description": "Border radius scale from Linear",
+  "radius": {
+    "$type": "dimension",
+    "none": { "$value": "0px" },
+    "sm": { "$value": "4px", "$description": "Small elements" },
+    "md": { "$value": "5px", "$description": "Buttons, pills, tabs" },
+    "lg": { "$value": "6px", "$description": "Cards" },
+    "xl": { "$value": "8px", "$description": "Modals, large cards" },
+    "2xl": { "$value": "12px" },
+    "3xl": { "$value": "16px" },
+    "full": { "$value": "9999px", "$description": "Fully rounded (pills)" }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "$description": "Responsive breakpoints from Linear",
+  "breakpoint": {
+    "$type": "dimension",
+    "phone": { "$value": "640px" },
+    "tablet": { "$value": "768px" },
+    "laptop": { "$value": "1024px" },
+    "desktop": { "$value": "1280px" },
+    "large": { "$value": "1400px" },
+    "xlarge": { "$value": "1800px" }
+  }
+}

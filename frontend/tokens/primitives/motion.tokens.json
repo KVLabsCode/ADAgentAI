@@ -1,0 +1,21 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "$description": "Motion/animation primitives from Linear",
+  "duration": {
+    "$type": "duration",
+    "instant": { "$value": "0ms" },
+    "quick": { "$value": "100ms", "$description": "Hover states, micro-interactions" },
+    "normal": { "$value": "200ms" },
+    "regular": { "$value": "250ms", "$description": "Standard transitions" },
+    "slow": { "$value": "350ms", "$description": "Complex animations" },
+    "slower": { "$value": "500ms" }
+  },
+  "easing": {
+    "$type": "cubicBezier",
+    "linear": { "$value": [0, 0, 1, 1] },
+    "ease": { "$value": [0.25, 0.1, 0.25, 1] },
+    "easeIn": { "$value": [0.42, 0, 1, 1] },
+    "easeOut": { "$value": [0, 0, 0.58, 1] },
+    "easeInOut": { "$value": [0.42, 0, 0.58, 1] }
+  }
+}

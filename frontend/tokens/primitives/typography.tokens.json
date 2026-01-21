@@ -1,0 +1,48 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "$description": "Typography primitives from Linear",
+  "fontFamily": {
+    "$type": "fontFamily",
+    "sans": { "$value": ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"] },
+    "mono": { "$value": ["JetBrains Mono", "Menlo", "Monaco", "Consolas", "monospace"] }
+  },
+  "fontSize": {
+    "$type": "dimension",
+    "micro": { "$value": "11px", "$description": "Axis labels, tiny text" },
+    "mini": { "$value": "12px", "$description": "Buttons, tabs, badges" },
+    "small": { "$value": "13px", "$description": "Body text, inputs" },
+    "regular": { "$value": "14px", "$description": "Default body" },
+    "medium": { "$value": "15px", "$description": "Section headings" },
+    "large": { "$value": "16px", "$description": "Modal titles, stat labels" },
+    "xl": { "$value": "18px" },
+    "2xl": { "$value": "20px", "$description": "Title 3" },
+    "3xl": { "$value": "24px", "$description": "Title 2, page titles" },
+    "4xl": { "$value": "36px", "$description": "Title 1, hero text" }
+  },
+  "fontWeight": {
+    "$type": "number",
+    "light": { "$value": 300 },
+    "normal": { "$value": 400 },
+    "book": { "$value": 450, "$description": "Linear's default weight" },
+    "medium": { "$value": 500, "$description": "Buttons, headings" },
+    "semibold": { "$value": 600 },
+    "bold": { "$value": 700 }
+  },
+  "lineHeight": {
+    "$type": "number",
+    "none": { "$value": 1 },
+    "tight": { "$value": 1.25 },
+    "snug": { "$value": 1.375 },
+    "normal": { "$value": 1.5 },
+    "relaxed": { "$value": 1.625 },
+    "loose": { "$value": 2 }
+  },
+  "letterSpacing": {
+    "$type": "dimension",
+    "tighter": { "$value": "-0.05em" },
+    "tight": { "$value": "-0.025em" },
+    "normal": { "$value": "0em" },
+    "wide": { "$value": "0.025em" },
+    "wider": { "$value": "0.05em" }
+  }
+}

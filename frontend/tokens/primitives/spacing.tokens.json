@@ -1,0 +1,23 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "$description": "Spacing scale - Linear's product app uses these exact values",
+  "spacing": {
+    "$type": "dimension",
+    "0": { "$value": "0px" },
+    "px": { "$value": "1px" },
+    "0.5": { "$value": "2px", "$description": "Tight inline, KBD elements" },
+    "1": { "$value": "4px", "$description": "Icon + text gaps" },
+    "1.5": { "$value": "6px", "$description": "Badge groups" },
+    "2": { "$value": "8px", "$description": "Standard spacing" },
+    "3": { "$value": "12px", "$description": "Form groups, settings rows" },
+    "4": { "$value": "16px", "$description": "Section content" },
+    "5": { "$value": "20px", "$description": "Large sections" },
+    "6": { "$value": "24px", "$description": "Major breaks" },
+    "8": { "$value": "32px" },
+    "10": { "$value": "40px", "$description": "Page padding" },
+    "12": { "$value": "48px", "$description": "Section breaks" },
+    "16": { "$value": "64px", "$description": "Page sections, title to content" },
+    "20": { "$value": "80px" },
+    "24": { "$value": "96px" }
+  }
+}

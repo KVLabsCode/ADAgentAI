@@ -1,0 +1,95 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "$description": "Primitive color palette - raw values, not for direct use in components",
+  "color": {
+    "$type": "color",
+    "gray": {
+      "$description": "Gray scale with purple undertone (hue 272)",
+      "50": { "$value": "#fafafb" },
+      "100": { "$value": "#f4f4f6" },
+      "200": { "$value": "#e4e4e8" },
+      "300": { "$value": "#d1d1d8" },
+      "400": { "$value": "#9d9da8" },
+      "500": { "$value": "#6b6b78" },
+      "600": { "$value": "#4a4a54" },
+      "700": { "$value": "#2d2d34" },
+      "800": { "$value": "#1c1c22" },
+      "850": { "$value": "#151519" },
+      "900": { "$value": "#0d0d10" },
+      "950": { "$value": "#08080a" }
+    },
+    "purple": {
+      "$description": "Accent purple (hue 288)",
+      "50": { "$value": "#f5f0ff" },
+      "100": { "$value": "#ebe0ff" },
+      "200": { "$value": "#d4bfff" },
+      "300": { "$value": "#b794ff" },
+      "400": { "$value": "#9966ff" },
+      "500": { "$value": "#7c3aed" },
+      "600": { "$value": "#6d28d9" },
+      "700": { "$value": "#5b21b6" },
+      "800": { "$value": "#4c1d95" },
+      "900": { "$value": "#3b1777" }
+    },
+    "green": {
+      "$description": "Success colors",
+      "50": { "$value": "#ecfdf5" },
+      "100": { "$value": "#d1fae5" },
+      "200": { "$value": "#a7f3d0" },
+      "300": { "$value": "#6ee7b7" },
+      "400": { "$value": "#34d399" },
+      "500": { "$value": "#10b981" },
+      "600": { "$value": "#059669" },
+      "700": { "$value": "#047857" },
+      "800": { "$value": "#065f46" },
+      "900": { "$value": "#064e3b" }
+    },
+    "red": {
+      "$description": "Error/destructive colors",
+      "50": { "$value": "#fef2f2" },
+      "100": { "$value": "#fee2e2" },
+      "200": { "$value": "#fecaca" },
+      "300": { "$value": "#fca5a5" },
+      "400": { "$value": "#f87171" },
+      "500": { "$value": "#ef4444" },
+      "600": { "$value": "#dc2626" },
+      "700": { "$value": "#b91c1c" },
+      "800": { "$value": "#991b1b" },
+      "900": { "$value": "#7f1d1d" }
+    },
+    "amber": {
+      "$description": "Warning colors",
+      "50": { "$value": "#fffbeb" },
+      "100": { "$value": "#fef3c7" },
+      "200": { "$value": "#fde68a" },
+      "300": { "$value": "#fcd34d" },
+      "400": { "$value": "#fbbf24" },
+      "500": { "$value": "#f59e0b" },
+      "600": { "$value": "#d97706" },
+      "700": { "$value": "#b45309" },
+      "800": { "$value": "#92400e" },
+      "900": { "$value": "#78350f" }
+    },
+    "blue": {
+      "$description": "Info colors",
+      "50": { "$value": "#eff6ff" },
+      "100": { "$value": "#dbeafe" },
+      "200": { "$value": "#bfdbfe" },
+      "300": { "$value": "#93c5fd" },
+      "400": { "$value": "#60a5fa" },
+      "500": { "$value": "#3b82f6" },
+      "600": { "$value": "#2563eb" },
+      "700": { "$value": "#1d4ed8" },
+      "800": { "$value": "#1e40af" },
+      "900": { "$value": "#1e3a8a" }
+    },
+    "yellow": {
+      "$description": "Chart/highlight colors (hue 85)",
+      "400": { "$value": "#facc15" },
+      "500": { "$value": "#eab308" }
+    },
+    "white": { "$value": "#ffffff" },
+    "black": { "$value": "#000000" },
+    "transparent": { "$value": "#00000000" }
+  }
+}
