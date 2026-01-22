@@ -19,12 +19,12 @@ import {
   Wrench,
   ArrowRight,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Button } from "@/atoms/button"
+import { Input } from "@/atoms/input"
+import { Textarea } from "@/atoms/textarea"
+import { Badge } from "@/atoms/badge"
+import { Label } from "@/atoms/label"
+import { Switch } from "@/atoms/switch"
 import {
   Dialog,
   DialogContent,
@@ -32,21 +32,21 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/molecules/dialog"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/molecules/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/molecules/tabs"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/molecules/collapsible"
+import { Skeleton } from "@/atoms/skeleton"
 import { cn } from "@/lib/utils"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -153,11 +153,17 @@ export default function CrewAIConfigPage() {
     return tasks.filter(t => t.agent === agentKey)
   }, [tasks])
 
+  // Memoized agent lookup Map for O(1) access instead of O(n) .find() calls
+  const agentsByKey = useMemo(() =>
+    new Map(agents.map(a => [a.key, a])),
+    [agents]
+  )
+
   // Helper to get coordinated agents (for orchestrators)
   const getCoordinatedAgents = useCallback((agent: Agent): Agent[] => {
     if (!agent.coordinates) return []
-    return agent.coordinates.map(key => agents.find(a => a.key === key)).filter(Boolean) as Agent[]
-  }, [agents])
+    return agent.coordinates.map(key => agentsByKey.get(key)).filter(Boolean) as Agent[]
+  }, [agentsByKey])
 
   // Memoized capability options based on selected service
   const capabilityOptions = useMemo(() => {
@@ -337,7 +343,7 @@ export default function CrewAIConfigPage() {
 
   // Group tasks by assigned agent's service
   const getTaskService = (task: Task) => {
-    const agent = agents.find((a) => a.key === task.agent)
+    const agent = agentsByKey.get(task.agent)
     return agent?.service || "other"
   }
   const admobTasks = tasks.filter((t) => getTaskService(t) === "admob")
@@ -411,7 +417,7 @@ export default function CrewAIConfigPage() {
   }
 
   const renderTaskItem = (task: Task) => {
-    const linkedAgent = agents.find((a) => a.key === task.agent)
+    const linkedAgent = agentsByKey.get(task.agent)
     return (
       <div
         key={task.key}
@@ -824,7 +830,7 @@ export default function CrewAIConfigPage() {
                   </Label>
                   <div className="flex flex-wrap gap-1">
                     {(() => {
-                      const agent = agents.find(a => a.key === editedTask.agent)
+                      const agent = agentsByKey.get(editedTask.agent || "")
                       if (!agent) return null
                       const tools = getAgentTools(agent)
                       if (tools.length === 0) {

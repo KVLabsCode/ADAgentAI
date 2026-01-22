@@ -1,6 +1,3 @@
-"use client"
-
-import { useState } from "react"
 import { cn } from "@/lib/utils"
 
 interface LogoProps {
@@ -59,23 +56,16 @@ function LogoSvg({ className, variant = "wide" }: { className?: string; variant?
 }
 
 export function Logo({ size = "md", showText = true, className }: LogoProps) {
-  const [variant, setVariant] = useState<"wide" | "tight">("wide")
   const s = sizes[size]
 
   return (
     <div className={cn("flex items-center", s.gap, className)}>
-      <LogoSvg className={cn(s.icon, "text-foreground")} variant={variant} />
+      <LogoSvgWide className={cn(s.icon, "text-foreground")} />
       {showText && (
         <span className={cn("font-semibold tracking-tight", s.name)}>
           ADAgentAI
         </span>
       )}
-      {/* Temporary toggle dot - remove later */}
-      <button
-        onClick={() => setVariant(v => v === "wide" ? "tight" : "wide")}
-        className="ml-1 h-2 w-2 rounded-full bg-muted-foreground/30 hover:bg-muted-foreground/50 transition-colors"
-        title={`Current: ${variant} (click to toggle)`}
-      />
     </div>
   )
 }

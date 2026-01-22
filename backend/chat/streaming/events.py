@@ -12,6 +12,7 @@ class EventType(str, Enum):
     AGENT = "agent"
     THINKING = "thinking"  # Match frontend expected type
     TOOL = "tool"
+    TOOL_EXECUTING = "tool_executing"  # Tool is currently running (for progress UI)
     TOOL_RESULT = "tool_result"
     TOOL_APPROVAL_REQUIRED = "tool_approval_required"
     TOOL_DENIED = "tool_denied"
@@ -64,6 +65,13 @@ class ErrorEvent(BaseModel):
 class DoneEvent(BaseModel):
     """Event sent when stream completes."""
     type: str = EventType.DONE
+
+
+class ToolExecutingEvent(BaseModel):
+    """Event sent when a tool starts executing (for progress UI)."""
+    type: str = EventType.TOOL_EXECUTING
+    tool_name: str
+    message: str = "Executing..."  # Progress message to display
 
 
 class ToolApprovalRequiredEvent(BaseModel):

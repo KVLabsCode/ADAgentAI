@@ -3,6 +3,7 @@
 import * as React from "react"
 import type { Message, StreamEventItem, RJSFSchema } from "@/lib/types"
 import { approveTool, resumeStream } from "@/lib/api"
+import { extractMcpContent } from "@/lib/step-utils"
 
 // Extract pending approval states from messages
 // Returns Map<approvalId, boolean | null> where null = still pending
@@ -92,7 +93,6 @@ export function useChatApprovals({
         const assistantId = currentAssistantIdRef.current
         const accessToken = await getAccessToken()
 
-        console.log(`[ChatApprovals] Resuming stream: ${streamId}`)
         setIsLoading(true)
 
         let finalContent = ""
@@ -110,12 +110,30 @@ export function useChatApprovals({
           resumeEvents.push(...existingMessage.events)
         }
 
+        // Find the tool name from the SPECIFIC approval event we're resuming (match by approvalId)
+        // This is needed because onToolResult may be called without a preceding onToolCall
+        // (the tool was already called before approval was requested)
         let lastToolName = "unknown"
+        for (const e of resumeEvents) {
+          if (e.type === "tool_approval_required" && e.approval_id === approvalId) {
+            lastToolName = e.tool_name
+            break
+          }
+        }
 
         await resumeStream(
           streamId,
           approved,
           {
+            onToolExecuting: (toolName, message) => {
+              // Add tool_executing event for progress UI
+              resumeEvents.push({ type: "tool_executing", tool_name: toolName, message })
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId ? { ...m, events: [...resumeEvents] } : m
+                )
+              )
+            },
             onThinking: (thinkingContent) => {
               resumeEvents.push({ type: "thinking", content: thinkingContent })
               setMessages(prev =>
@@ -145,6 +163,8 @@ export function useChatApprovals({
               if (dataType === "json" || dataType === "json_list") {
                 try {
                   toolResult = JSON.parse(full || preview)
+                  // Extract actual content from MCP content blocks if present
+                  toolResult = extractMcpContent(toolResult)
                 } catch {
                   toolResult = preview
                 }
@@ -169,6 +189,8 @@ export function useChatApprovals({
             },
             onResult: (resultContent) => {
               finalContent = resultContent
+              // Push result event so assistant-message can extract final content
+              resumeEvents.push({ type: "result", content: resultContent })
               setMessages(prev =>
                 prev.map(m =>
                   m.id === assistantId
@@ -210,7 +232,8 @@ export function useChatApprovals({
           },
           accessToken,
           modifiedParams,
-          abortControllerRef.current?.signal
+          abortControllerRef.current?.signal,
+          lastToolName  // Pass tool name for progress streaming
         )
 
         setIsLoading(false)

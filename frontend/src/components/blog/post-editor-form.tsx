@@ -5,18 +5,18 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Save, Send } from "lucide-react"
 import Link from "next/link"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/atoms/button"
+import { Input } from "@/atoms/input"
+import { Label } from "@/atoms/label"
+import { Textarea } from "@/atoms/textarea"
+import { Checkbox } from "@/atoms/checkbox"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/molecules/select"
 import { RichTextEditor } from "./rich-text-editor"
 import { useSavePost } from "@/hooks/use-blog-posts"
 import { useUser } from "@/hooks/use-user"

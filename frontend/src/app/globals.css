@@ -1,15 +1,41 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@neondatabase/auth/ui/tailwind";
+@import "../styles/tokens.css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-marketing: var(--background-marketing, var(--background));
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Design system tokens as Tailwind utilities */
+  --color-card-section: var(--card-bg);
+  --color-card-section-border: var(--card-border);
+  --color-card-header-border: var(--card-header-border);
+  --color-item-divider: var(--item-divider);
+
+  /* Context badge colors */
+  --color-badge-provider: var(--badge-provider);
+  --color-badge-app: var(--badge-app);
+  --color-badge-entity: var(--badge-entity);
+  --color-badge-setting: var(--badge-setting);
+
+  /* List and input colors */
+  --color-list-section-bg: var(--list-section-bg);
+  --color-input-bg: var(--input-bg);
+  --color-input-border: var(--input-border);
+
+  /* Status badge colors */
+  --color-badge-draft-bg: var(--badge-draft-bg);
+  --color-badge-published-bg: var(--badge-published-bg);
+  --color-badge-success-bg: var(--badge-success-bg);
+  --color-badge-error-bg: var(--badge-error-bg);
+  --color-badge-warning-bg: var(--badge-warning-bg);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -53,11 +79,114 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Page max-width utilities - uses CSS variables from :root */
+  --max-width-page-sm: var(--page-max-width-sm);
+  --max-width-page-default: var(--page-max-width-default);
+  --max-width-page-lg: var(--page-max-width-lg);
+  --max-width-page-xl: var(--page-max-width-xl);
 }
 
 :root {
   --sidebar-width: 16rem;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
+
+  /* ==========================================================================
+     DESIGN TOKENS - Linear design system (exact values from Linear)
+     Source: linear_reverse/tokens.json, linear_reverse/authenticated/PATTERNS.md
+     ========================================================================== */
+
+  /* Page Layout - Visual match to Linear */
+  --page-padding: 56px;            /* Linear: ~53-58px content offset from main edge */
+  --page-padding-md: 56px;         /* Linear: same horizontal padding on all sizes */
+  --page-top-gap: 64px;            /* VERIFIED: Linear uses 64px from content area top to title */
+  /* Page max-widths include padding (56px each side) so content matches Linear */
+  /* Content width = max-width - (2 * page-padding) */
+  --page-max-width-sm: 592px;      /* 480px content + 112px padding */
+  --page-max-width-default: 752px; /* 640px content + 112px padding (Linear: contentMax 640px) */
+  --page-max-width-lg: 912px;      /* 800px content + 112px padding */
+  --page-max-width-xl: 1136px;     /* 1024px content + 112px padding */
+  /* Explicit content max-width for cards - VERIFIED: Linear cards are exactly 640px */
+  --content-max-width: 640px;
+
+  /* Section Spacing - VERIFIED from Linear browser extraction 2026-01-21 */
+  --title-to-section: 32px;        /* Ground truth: 32px from title bottom to first section */
+  --section-gap: 32px;             /* Gap between sections - reduced from 48px for tighter layout */
+  --section-header-mb: 17px;       /* Ground truth: ~17px from h3 to ul */
+
+  /* Card Tokens - Linear-style */
+  --card-radius: 8px;
+  --card-border: oklch(0.92 0.004 286.32 / 40%);
+  --card-bg: oklch(1 0 0 / 50%);
+  --card-header-border: oklch(0.92 0.004 286.32 / 30%);
+
+  /* Item/Field Tokens - VERIFIED from Linear browser extraction */
+  --item-padding-x: 16px;          /* Ground truth: padding 12px 16px */
+  --item-padding-y: 12px;          /* Ground truth: padding 12px 16px */
+  --item-min-height: 60px;         /* Ground truth: min-height 60px */
+  --item-gap: 12px;                /* Ground truth: gap 12px */
+  --item-border-radius: 6px;       /* Ground truth: li border-radius 6px */
+  --item-divider: oklch(0.92 0.004 286.32 / 30%);
+
+  /* List/Card container - VERIFIED: Linear uses transparent backgrounds */
+  --list-bg: transparent;          /* Ground truth: rgba(0,0,0,0) */
+  --list-border-radius: 0px;       /* Ground truth: ul has 0px border-radius */
+
+  /* Typography Tokens - VERIFIED from Linear browser extraction 2026-01-21 */
+  --text-page-title: 24px;         /* Ground truth: 24px, weight 500, line-height 32px */
+  --text-section-title: 15px;      /* Ground truth: 15px, weight 450, line-height 23px */
+  --text-label: 13px;              /* Ground truth: 13px, weight 500, color white */
+  --text-description: 12px;        /* Ground truth: 12px, weight 450, color muted */
+  --text-small: 12px;              /* Linear: font-size-mini: 12px */
+  --line-height-title: 32px;       /* Ground truth: title line-height */
+  --line-height-section: 23px;     /* Ground truth: h3 line-height */
+  --line-height-label: 16px;       /* Compact line-height for labels */
+  --line-height-description: 16px; /* Compact line-height for descriptions */
+
+  /* Font weights - adjusted for Geist font (renders lighter than Inter) */
+  --font-weight-normal: 450;       /* Linear: 450, kept for descriptions */
+  --font-weight-section: 500;      /* Linear: 450, bumped to 500 for Geist to match Inter's visual weight */
+  --font-weight-medium: 500;       /* Linear: fontWeight medium (labels, page title) */
+
+  /* Button Tokens - Design system small button */
+  --btn-height-sm: 32px;
+  --btn-padding-x: 14px;
+  --btn-radius: 5px;
+  --btn-font-size: 13px;
+  --btn-font-weight: 500;
+  --btn-border-width: 0.8px;
+  --btn-ghost-color: oklch(0.4 0.01 285);        /* Light mode: darker text */
+  --btn-ghost-hover-bg: oklch(0.92 0.004 286.32); /* Light mode: subtle hover */
+
+  /* Input Tokens - VERIFIED from Linear MCP extraction 2026-01-21 */
+  --input-height: 32px;              /* Linear: 32px */
+  --input-padding-x: 12px;           /* Linear: 12px */
+  --input-padding-y: 6px;            /* Linear: 6px */
+  --input-radius: 5px;               /* Linear: 5px */
+  --input-font-size: 13px;           /* Linear: 13px */
+  --input-border-width: 0.8px;       /* Linear: 0.8px */
+
+  /* Typography colors - light mode */
+  --text-color-label: oklch(0.141 0.005 285.823);  /* foreground color for labels */
+  --text-color-description: oklch(0.552 0.016 285.938); /* muted-foreground for descriptions */
+
+  /* List tokens - light mode */
+  --list-section-bg: oklch(0.96 0.002 286);     /* Light: subtle gray for section headers */
+  --input-bg: oklch(1 0 0);                     /* Light: white input background */
+  --input-border: oklch(0.9 0.004 286);         /* Light: subtle border */
+
+  /* Badge tokens - status badges (light mode) */
+  --badge-draft-bg: oklch(0.7 0.12 288 / 0.15); /* Light: subtle purple tint */
+  --badge-published-bg: oklch(0.7 0.15 145 / 0.15); /* Light: subtle green tint */
+  --badge-success-bg: oklch(0.7 0.15 145 / 0.15);   /* Light: green success */
+  --badge-error-bg: oklch(0.65 0.2 25 / 0.15);      /* Light: red error */
+  --badge-warning-bg: oklch(0.8 0.15 85 / 0.15);    /* Light: amber warning */
+
+  /* Context badge colors - sleek muted tones */
+  --badge-provider: oklch(0.65 0.15 280);
+  --badge-app: oklch(0.65 0.15 200);
+  --badge-entity: oklch(0.65 0.15 145);
+  --badge-setting: oklch(0.55 0.1 285);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -99,44 +228,86 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.696 0.17 145);
-  --success-foreground: oklch(0.141 0.005 285.823);
-  --warning: oklch(0.828 0.189 84.429);
-  --warning-foreground: oklch(0.141 0.005 285.823);
-  --info: oklch(0.65 0.2 250);
-  --info-foreground: oklch(1 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  /* Card tokens - VERIFIED from Linear browser extraction 2026-01-21 */
+  /* Linear section wrapper: background lch(8.3 1.867 272), border 0.8px solid lch(19.66 4.707 272) */
+  --card-bg: lch(8.3 1.867 272);
+  --card-border: lch(19.66 4.707 272);
+  --card-border-width: 0.8px;
+  --card-radius: 7px;                  /* Linear uses 7px, not 8px */
+  --card-header-border: lch(19.66 4.707 272);
+  --item-divider: lch(35 4 272);        /* Divider - visible on dark background */
+
+  /* List tokens - VERIFIED from Linear browser extraction */
+  --list-section-bg: lch(10.633 3.033 272);  /* Linear: grouped list section headers */
+  --input-bg: lch(4.8 0.7 272);              /* Linear: input background (same as page) */
+  --input-border: lch(19 3.54 272);          /* Linear: input border color */
+
+  /* Badge tokens - status badges */
+  --badge-draft-bg: lch(48 59.31 288.43 / 0.2);  /* Purple tint for draft status */
+  --badge-published-bg: lch(from var(--success) l c h / 0.2);  /* Success tint for published */
+  --badge-success-bg: lch(from var(--success) l c h / 0.2);    /* Green success */
+  --badge-error-bg: lch(from var(--destructive) l c h / 0.2);  /* Red error */
+  --badge-warning-bg: lch(from var(--warning) l c h / 0.2);    /* Amber warning */
+
+  /* Typography colors - VERIFIED from Linear browser extraction 2026-01-21 */
+  --text-color-label: lch(100 0 272);           /* Ground truth: label color (white) */
+  --text-color-description: lch(63.975 1.933 272); /* Ground truth: description color (muted) */
+
+  /* Button colors - dark mode - VERIFIED from Linear browser extraction 2026-01-21 */
+  --btn-ghost-color: lch(90.994 1.933 272);     /* Linear: button text color */
+  --btn-ghost-hover-bg: lch(19.66 4.707 272);   /* Subtle hover background */
+
+  /* Context badge colors - dark mode */
+  --badge-provider: oklch(0.7 0.12 280);
+  --badge-app: oklch(0.7 0.12 200);
+  --badge-entity: oklch(0.7 0.12 145);
+  --badge-setting: oklch(0.6 0.08 285);
+
+  /* App background - VERIFIED from Linear browser extraction 2026-01-21 */
+  /* Linear uses lch(4.8 0.7 272) - very dark with minimal blue, NOT blue-tinted */
+  --background: lch(4.8 0.7 272);
+
+  /* Marketing/public pages background - pitch black like Linear homepage */
+  --background-marketing: #08090a;
+  --foreground: var(--color-content-1);
+  --card: var(--color-surface-1);
+  --card-foreground: var(--color-content-1);
+  --popover: var(--color-surface-1);
+  --popover-foreground: var(--color-content-1);
+  --primary: var(--color-gray-50);
+  --primary-foreground: var(--color-gray-900);
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-content-1);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-content-3);
+  --accent: var(--color-surface-2);
+  --accent-foreground: var(--color-content-1);
+  --destructive: var(--color-red-500);
+  --destructive-foreground: var(--color-white);
+  --success: var(--color-green-500);
+  --success-foreground: var(--color-white);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-gray-900);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-white);
+  --border: var(--color-edge-1);
+  --input: var(--color-edge-2);
+  --ring: var(--color-edge-3);
+  --chart-1: var(--color-purple-400);
+  --chart-2: var(--color-green-400);
+  --chart-3: var(--color-blue-400);
+  --chart-4: var(--color-amber-400);
+  --chart-5: var(--color-red-400);
+
+  /* Sidebar - keeping existing gray tokens (unchanged) */
+  --sidebar: var(--color-gray-900);
+  --sidebar-foreground: var(--color-gray-50);
+  --sidebar-primary: var(--color-gray-50);
+  --sidebar-primary-foreground: var(--color-gray-900);
+  --sidebar-accent: var(--color-gray-800);
+  --sidebar-accent-foreground: var(--color-gray-50);
+  --sidebar-border: var(--color-gray-800);
+  --sidebar-ring: var(--color-gray-700);
 }
 
 @layer base {
@@ -147,6 +318,104 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Shimmer animation for skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Badge pop-in animation */
+@keyframes badge-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Slide up fade in for popover content */
+@keyframes slide-up-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Collapsible animations for Radix Collapsible */
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  .animate-shimmer {
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  .animate-badge-in {
+    animation: badge-in 0.15s ease-out;
+  }
+
+  .animate-slide-up-fade {
+    animation: slide-up-fade 0.15s ease-out;
+  }
+
+  .animate-collapsible-down {
+    animation: collapsible-down 0.2s ease-out;
+  }
+
+  .animate-collapsible-up {
+    animation: collapsible-up 0.2s ease-out;
+  }
+}
+
+/* ==========================================================================
+   INSET DIVIDERS - Linear-style dividers with 16px inset on both sides
+   Uses ::before pseudo-element instead of border for inset effect
+   VERIFIED from Linear browser extraction 2026-01-21
+   ========================================================================== */
+.divide-inset > *:not(:first-child) {
+  position: relative;
+}
+
+.divide-inset > *:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--divider-inset, 16px);
+  right: var(--divider-inset, 16px);
+  height: 1px;
+  background-color: var(--item-divider);
 }
 
 /* Custom Scrollbar Styling */
@@ -251,4 +520,99 @@
   .scrollbar-thin:hover {
     scrollbar-color: rgba(113, 113, 122, 0.5) transparent;
   }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY MODES
+   ========================================================================== */
+
+/* Reduced Motion - respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High Contrast Mode - increase contrast for accessibility */
+@media (prefers-contrast: high) {
+  :root {
+    --border: oklch(0.5 0 0);
+    --ring: oklch(0 0 0);
+    --muted-foreground: oklch(0.3 0 0);
+  }
+  .dark {
+    --border: oklch(0.7 0 0);
+    --ring: oklch(1 0 0);
+    --muted-foreground: oklch(0.8 0 0);
+  }
+}
+
+/* Forced Colors Mode (Windows High Contrast) */
+@media (forced-colors: active) {
+  button,
+  [role="button"],
+  [data-slot="button"] {
+    border: 2px solid currentColor;
+  }
+
+  [data-slot="card"],
+  .card {
+    border: 1px solid CanvasText;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  :focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* ==========================================================================
+   MULTI-BRAND THEMING
+   Brands can override accent colors, fonts, and other brand-specific values
+   ========================================================================== */
+
+/* Default brand (ADAgent) */
+:root {
+  --brand-primary: var(--primary);
+  --brand-primary-hover: oklch(from var(--primary) calc(l - 0.1) c h);
+  --brand-accent: var(--accent);
+  --brand-font-heading: var(--font-geist-sans);
+  --brand-font-body: var(--font-geist-sans);
+  --brand-radius: var(--radius);
+}
+
+/* Brand: Corporate Blue */
+[data-brand="corporate"] {
+  --brand-primary: oklch(0.55 0.2 250);
+  --brand-primary-hover: oklch(0.45 0.2 250);
+  --brand-accent: oklch(0.6 0.15 200);
+  --brand-font-heading: "Helvetica Neue", system-ui, sans-serif;
+  --brand-radius: 0.25rem;
+}
+
+/* Brand: Startup Purple */
+[data-brand="startup"] {
+  --brand-primary: oklch(0.55 0.25 290);
+  --brand-primary-hover: oklch(0.45 0.25 290);
+  --brand-accent: oklch(0.7 0.2 330);
+  --brand-font-heading: "Poppins", system-ui, sans-serif;
+  --brand-radius: 1rem;
+}
+
+/* Brand: Minimal */
+[data-brand="minimal"] {
+  --brand-primary: oklch(0.2 0 0);
+  --brand-primary-hover: oklch(0.3 0 0);
+  --brand-accent: oklch(0.2 0 0);
+  --brand-font-heading: "Space Grotesk", system-ui, sans-serif;
+  --brand-radius: 0;
 }

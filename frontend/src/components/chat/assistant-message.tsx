@@ -4,26 +4,29 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree, Loader2, Bot } from "lucide-react"
+import { Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/atoms/button"
+import { Badge } from "@/atoms/badge"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/molecules/collapsible"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/molecules/tooltip"
 import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, StreamEventItem, RJSFSchema } from "@/lib/types"
 import { RJSFParameterForm } from "./rjsf"
 import { JsonTreeView } from "./json-tree-view"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from "@/molecules/scroll-area"
+import { StepsTimeline, TimelinePausedIndicator } from "./steps-timeline"
+import { FinalAnswerBlock } from "./final-answer-block"
+import { Tool } from "@/organisms/tool"
 
 interface AssistantMessageProps {
   message: Message
@@ -126,15 +129,15 @@ function getToolMetadata(mcpToolName: string): ToolMetadata {
   return { displayName, category, operationType, riskLevel, entityType, docUrl }
 }
 
-// Risk level styling
-const RISK_STYLES = {
+// Risk level styling (reserved for future use)
+const _RISK_STYLES = {
   low: { bg: "bg-emerald-500/20", text: "text-emerald-400", border: "border-emerald-500/30" },
   medium: { bg: "bg-amber-500/20", text: "text-amber-400", border: "border-amber-500/30" },
   high: { bg: "bg-red-500/20", text: "text-red-400", border: "border-red-500/30" },
 }
 
-// Operation type styling
-const OP_STYLES = {
+// Operation type styling (reserved for future use)
+const _OP_STYLES = {
   Create: { bg: "bg-emerald-500/20", text: "text-emerald-400" },
   Update: { bg: "bg-amber-500/20", text: "text-amber-400" },
   Delete: { bg: "bg-red-500/20", text: "text-red-400" },
@@ -142,38 +145,35 @@ const OP_STYLES = {
   Action: { bg: "bg-sky-500/20", text: "text-sky-400" },
 }
 
+// Keywords that indicate write operations - hoisted for O(1) lookup
+const WRITE_OPERATION_KEYWORDS = [
+  "create", "update", "patch", "delete", "batch",
+  "activate", "deactivate", "archive", "submit",
+  "allow", "block", "cancel", "stop", "run_networks_reports"
+] as const
+
 // Check if a tool requires approval (write operation) - dynamic detection
 function isWriteOperation(toolName: string): boolean {
   const name = toolName.toLowerCase()
-  return (
-    name.includes("create") ||
-    name.includes("update") ||
-    name.includes("patch") ||
-    name.includes("delete") ||
-    name.includes("batch") ||
-    name.includes("activate") ||
-    name.includes("deactivate") ||
-    name.includes("archive") ||
-    name.includes("submit") ||
-    name.includes("allow") ||
-    name.includes("block") ||
-    name.includes("cancel") ||
-    name.includes("stop") ||
-    name.includes("run_networks_reports") // Report runs modify state
-  )
+  return WRITE_OPERATION_KEYWORDS.some(keyword => name.includes(keyword))
 }
+
+// Keywords grouped by operation type for icon selection
+const DELETE_KEYWORDS = ["delete", "archive", "remove"] as const
+const CREATE_KEYWORDS = ["create", "add", "new"] as const
+const UPDATE_KEYWORDS = ["update", "patch", "edit", "modify", "activate", "deactivate"] as const
 
 // Get appropriate icon for tool based on operation type
 function getToolIcon(toolName: string): { icon: React.ComponentType<{ className?: string }>; type: "read" | "create" | "update" | "delete" } {
   const name = toolName.toLowerCase()
 
-  if (name.includes("delete") || name.includes("archive") || name.includes("remove")) {
+  if (DELETE_KEYWORDS.some(k => name.includes(k))) {
     return { icon: Trash2, type: "delete" }
   }
-  if (name.includes("create") || name.includes("add") || name.includes("new")) {
+  if (CREATE_KEYWORDS.some(k => name.includes(k))) {
     return { icon: Plus, type: "create" }
   }
-  if (name.includes("update") || name.includes("patch") || name.includes("edit") || name.includes("modify") || name.includes("activate") || name.includes("deactivate")) {
+  if (UPDATE_KEYWORDS.some(k => name.includes(k))) {
     return { icon: PenLine, type: "update" }
   }
   // Default to read/fetch icon
@@ -494,7 +494,7 @@ function AgentResponseBlock({ content, isStreaming, messageId }: { content: stri
   )
 }
 
-// Tool Approval Required - auto-expanded with editable parameters and metadata
+// Tool Approval Required - uses Tool component with approval slot
 interface ToolApprovalBlockProps {
   approvalId: string
   toolName: string
@@ -507,41 +507,18 @@ interface ToolApprovalBlockProps {
 }
 
 function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending, isExecuting = false, isDenied = false }: ToolApprovalBlockProps) {
-  const [isOpen, setIsOpen] = React.useState(isPending) // Only expand when pending
-
-  // Auto-collapse when transitioning from pending to executing/denied
-  React.useEffect(() => {
-    if (!isPending && (isExecuting || isDenied)) {
-      setIsOpen(false)
-    }
-  }, [isPending, isExecuting, isDenied])
-
-  // Debug: Log all inputs to trace data flow
-  console.log("[ToolApprovalBlock] toolName:", toolName)
-  console.log("[ToolApprovalBlock] toolInput RAW:", toolInput)
-  console.log("[ToolApprovalBlock] toolInput type:", typeof toolInput)
-  console.log("[ToolApprovalBlock] parameterSchema:", parameterSchema ? "YES" : "NO", parameterSchema)
-
   // Get tool metadata for enhanced display
   const metadata = React.useMemo(() => getToolMetadata(toolName), [toolName])
-  const _riskStyle = RISK_STYLES[metadata.riskLevel]
-  const opStyle = OP_STYLES[metadata.operationType]
-
-  // Get appropriate icon for this tool type
-  const toolIcon = getToolIcon(toolName)
-  const ToolIconComponent = metadata.riskLevel === "high" ? AlertTriangle : toolIcon.icon
 
   // Parse initial values from tool input and normalize structure
   const initialValues = React.useMemo(() => {
     try {
       const parsed = JSON.parse(toolInput) as Record<string, unknown>
-      console.log("[ToolApprovalBlock] initialValues RAW PARSED:", parsed)
 
       // Unwrap "params" wrapper if present (LLM often wraps args in params)
       let values = parsed
       if (parsed.params && typeof parsed.params === "object") {
         values = parsed.params as Record<string, unknown>
-        console.log("[ToolApprovalBlock] Unwrapped params:", values)
       }
 
       // Flatten "targeting" object if present (AdMob mediation groups use this)
@@ -551,10 +528,9 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
         values = {
           ...rest,
           platform: targeting.platform,
-          ad_format: targeting.format, // LLM sends "format", schema expects "ad_format"
+          ad_format: targeting.format,
           ad_unit_ids: targeting.ad_unit_ids,
         }
-        console.log("[ToolApprovalBlock] Flattened targeting:", values)
       }
 
       // Convert array fields to comma-separated strings if schema expects string
@@ -563,27 +539,13 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
           ...values,
           ad_unit_ids: (values.ad_unit_ids as string[]).join(", ")
         }
-        console.log("[ToolApprovalBlock] Converted ad_unit_ids array to string:", values.ad_unit_ids)
       }
 
-      console.log("[ToolApprovalBlock] FINAL initialValues:", values)
       return values
-    } catch (e) {
-      console.log("[ToolApprovalBlock] JSON parse FAILED:", e, "input was:", toolInput)
+    } catch {
       return {}
     }
   }, [toolInput])
-
-  // Extract affected entity from params (e.g., ad_units_id, network_code)
-  const _affectedEntity = React.useMemo(() => {
-    const keys = Object.keys(initialValues)
-    // Look for ID fields
-    const idKey = keys.find(k => k.endsWith("_id") || k === "network_code")
-    if (idKey && initialValues[idKey]) {
-      return `${idKey.replace(/_/g, " ")}: ${String(initialValues[idKey]).slice(0, 20)}${String(initialValues[idKey]).length > 20 ? "..." : ""}`
-    }
-    return null
-  }, [initialValues])
 
   // Track modified parameters and validation state
   const [currentValues, setCurrentValues] = React.useState<Record<string, unknown>>(initialValues)
@@ -604,130 +566,88 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
     }
   }
 
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className={cn(
-        "rounded-2xl overflow-hidden bg-white dark:bg-zinc-800/50 border",
-        metadata.riskLevel === "high" ? "border-red-500/30" : "border-zinc-200 dark:border-zinc-700/50"
-      )}>
-        <CollapsibleTrigger asChild>
-          <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")}>
-            <div className="flex items-center gap-2.5 min-w-0 h-full">
-              <IconBox color={metadata.riskLevel === "high" ? "red" : metadata.riskLevel === "medium" ? "amber" : "emerald"}>
-                <ToolIconComponent className={cn("h-3.5 w-3.5", metadata.riskLevel === "high" ? "text-red-600 dark:text-red-400" : metadata.riskLevel === "medium" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")} />
-              </IconBox>
-              <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">{metadata.displayName}</span>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {/* Status Badge */}
-              {isPending && (
-                <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-amber-500/30 text-amber-300">
-                  <Clock className="h-2.5 w-2.5" />
-                  Pending
-                </Badge>
-              )}
-              {isExecuting && (
-                <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-emerald-500/30 text-emerald-300">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  Executing
-                </Badge>
-              )}
-              {isDenied && (
-                <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-red-500/30 text-red-300">
-                  <X className="h-2.5 w-2.5" />
-                  Denied
-                </Badge>
-              )}
-              {/* Operation Type Badge */}
-              <Badge className={cn("h-5 text-[8px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none", opStyle.bg, opStyle.text)}>
-                {metadata.operationType}
-              </Badge>
-              <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 transition-transform duration-200", isOpen && "rotate-180")} />
-            </div>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-zinc-200 dark:border-zinc-700/50 mt-1">
+  // Determine state for Tool component
+  // Use input-streaming for executing (inherits "Processing" badge automatically)
+  const toolState = isPending ? "approval-pending" : isExecuting ? "input-streaming" : isDenied ? "output-error" : "output-available"
 
-            {/* Editable form when schema available, otherwise tree/json view */}
-            {parameterSchema && isPending ? (
+  // Approval buttons content (only shown when pending)
+  const approvalButtons = isPending && (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-[10px]">
+        {metadata.riskLevel === "high" ? (
+          <>
+            <AlertTriangle className="h-3 w-3 text-red-400" />
+            <span className="text-red-400 dark:text-red-300">This action may have significant impact</span>
+          </>
+        ) : (
+          <>
+            <Shield className="h-3 w-3 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              {hasErrors ? "Fill required fields" : hasChanges ? "Review changes" : "Approval required"}
+            </span>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-3 text-[11px] text-muted-foreground hover:text-destructive-foreground hover:bg-destructive/80"
+          onClick={(e) => { e.stopPropagation(); handleApproval(false) }}
+        >
+          <X className="h-3 w-3 mr-1" />
+          Deny
+        </Button>
+        <Button
+          size="sm"
+          disabled={hasErrors}
+          className={cn(
+            "h-7 px-3 text-[11px]",
+            hasErrors
+              ? "bg-muted cursor-not-allowed opacity-50"
+              : hasChanges
+                ? "bg-amber-600 hover:bg-amber-500 text-white"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white"
+          )}
+          onClick={(e) => { e.stopPropagation(); handleApproval(true) }}
+        >
+          <Check className="h-3 w-3 mr-1" />
+          {hasChanges ? "Allow with Changes" : "Allow"}
+        </Button>
+      </div>
+    </div>
+  )
+
+  // For pending state with schema, show editable form
+  // Otherwise just pass the input values
+  const toolInput2 = parameterSchema && isPending ? undefined : initialValues
+
+  return (
+    <Tool
+      toolPart={{
+        type: metadata.displayName,
+        state: toolState,
+        input: toolInput2,
+        errorText: isDenied ? "Execution denied" : undefined,
+      }}
+      defaultOpen={isPending || isExecuting}
+      approvalContent={
+        <>
+          {/* Editable form when schema available and pending */}
+          {parameterSchema && isPending && (
+            <div className="mb-4">
               <RJSFParameterForm
                 rjsfSchema={parameterSchema}
                 initialValues={initialValues}
                 onChange={handleParamChange}
                 disabled={!isPending}
               />
-            ) : (
-              <JsonDisplay title="Request" content={initialValues} maxHeight="140px" collapsed={1} />
-            )}
-
-            {/* Approval Actions */}
-            {isPending && (
-              <div className="flex items-center justify-between gap-3 pt-2 border-t border-zinc-700/30">
-                <div className="flex items-center gap-2 text-[10px]">
-                  {metadata.riskLevel === "high" ? (
-                    <>
-                      <AlertTriangle className="h-3 w-3 text-red-400" />
-                      <span className="text-red-300">This action may have significant impact</span>
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="h-3 w-3 text-zinc-500" />
-                      <span className="text-zinc-400">
-                        {hasErrors ? "Fill required fields" : hasChanges ? "Review changes" : "Approval required"}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-3 text-[11px] text-zinc-300 hover:text-white hover:bg-red-500/80"
-                    onClick={(e) => { e.stopPropagation(); handleApproval(false) }}
-                  >
-                    <X className="h-3 w-3 mr-1" />
-                    Deny
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={hasErrors}
-                    className={cn(
-                      "h-7 px-3 text-[11px] text-white",
-                      hasErrors
-                        ? "bg-zinc-600 cursor-not-allowed opacity-50"
-                        : hasChanges
-                          ? "bg-amber-600 hover:bg-amber-500"
-                          : "bg-emerald-600 hover:bg-emerald-500"
-                    )}
-                    onClick={(e) => { e.stopPropagation(); handleApproval(true) }}
-                  >
-                    <Check className="h-3 w-3 mr-1" />
-                    {hasChanges ? "Allow with Changes" : "Allow"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Executing State - after approval, waiting for result */}
-            {isExecuting && (
-              <div className="flex items-center justify-center gap-2 pt-2 border-t border-zinc-700/30">
-                <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
-                <span className="text-[11px] text-emerald-300">Executing...</span>
-              </div>
-            )}
-
-            {/* Denied State */}
-            {isDenied && (
-              <div className="flex items-center justify-center gap-2 pt-2 border-t border-zinc-700/30">
-                <X className="h-4 w-4 text-red-400" />
-                <span className="text-[11px] text-red-300">Execution denied</span>
-              </div>
-            )}
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
+            </div>
+          )}
+          {approvalButtons}
+        </>
+      }
+    />
   )
 }
 
@@ -959,6 +879,251 @@ function getEventsFromMessage(message: Message): StreamEventItem[] {
 
 export function AssistantMessage({ message, onToolApproval, pendingApprovals = new Map(), isStreaming = false }: AssistantMessageProps) {
   const events = getEventsFromMessage(message)
+  const { displayMode: _displayMode } = useChatSettings()
+
+  // =============================================================================
+  // Perplexity-style Event Processing
+  // =============================================================================
+
+  // Separate events into categories:
+  // 1. Timeline events (routing, thinking, tool, tool_result) → StepsTimeline
+  // 2. Pending approvals → ToolApprovalBlock (outside timeline)
+  // 3. Final answer (content) → FinalAnswerBlock
+
+  // Build map of tool results
+  const toolResultsByToolIndex = new Map<number, unknown>()
+  const approvalIndicesWithResults = new Set<number>()
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (event.type === "tool_result") {
+      for (let j = i - 1; j >= 0; j--) {
+        const prevEvent = events[j]
+        if (prevEvent.type === "tool" && prevEvent.name === event.name) {
+          if (!toolResultsByToolIndex.has(j)) {
+            toolResultsByToolIndex.set(j, event.result)
+            break
+          }
+        }
+      }
+      for (let j = i - 1; j >= 0; j--) {
+        const prevEvent = events[j]
+        if (prevEvent.type === "tool_approval_required" && prevEvent.tool_name === event.name) {
+          if (!approvalIndicesWithResults.has(j)) {
+            approvalIndicesWithResults.add(j)
+            break
+          }
+        }
+      }
+    }
+  }
+
+  // Extract pending tool approvals FIRST (need this for timeline filtering)
+  // Build a set of tool EVENT INDICES that are currently pending/executing approval
+  // We track indices (not names) because the same tool can be called multiple times
+  const pendingToolEventIndices = new Set<number>()
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (event.type === "tool_approval_required") {
+      const approvalState = pendingApprovals.get(event.approval_id)
+      // Find if there's a tool_result after this approval for this specific tool call
+      const hasToolResult = events.slice(i + 1).some(
+        e => e.type === "tool_result" && e.name === event.tool_name
+      )
+      const isPending = approvalState === undefined || approvalState === null
+      const isExecuting = approvalState === true && !hasToolResult
+
+      // If pending or executing, find the corresponding tool event that PRECEDES this approval
+      if (isPending || isExecuting) {
+        // Walk backwards to find the tool event for this specific approval
+        for (let j = i - 1; j >= 0; j--) {
+          const prevEvent = events[j]
+          if (prevEvent.type === "tool" && prevEvent.name === event.tool_name) {
+            // Only mark this tool if it's not already marked (first match going backwards)
+            if (!pendingToolEventIndices.has(j)) {
+              pendingToolEventIndices.add(j)
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Extract timeline events (for StepsTimeline)
+  // Timeline shows: routing decisions, thinking, intermediate content, tool calls, and tool results
+  // Content events show intermediate text before/between tool calls (chain of thought)
+  // EXCLUDE specific tool events that are currently pending approval (they show in approval card instead)
+  const timelineEvents: StreamEventItem[] = events.filter((e, eventIndex) => {
+    if (e.type === "routing" || e.type === "thinking" || e.type === "content") {
+      return true
+    }
+    if (e.type === "tool") {
+      // Exclude only if THIS specific tool event is pending approval
+      return !pendingToolEventIndices.has(eventIndex)
+    }
+    if (e.type === "tool_result") {
+      // Find the tool event this result corresponds to and check if it's pending
+      for (let j = eventIndex - 1; j >= 0; j--) {
+        const prevEvent = events[j]
+        if (prevEvent.type === "tool" && prevEvent.name === e.name) {
+          // If this tool is pending, exclude its result too
+          return !pendingToolEventIndices.has(j)
+        }
+      }
+      return true
+    }
+    return false
+  })
+
+  // Extract pending tool approvals
+  const pendingApprovalEvents: Array<{
+    event: Extract<StreamEventItem, { type: "tool_approval_required" }>
+    index: number
+    isPending: boolean
+    isExecuting: boolean
+    isDenied: boolean
+  }> = []
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (event.type === "tool_approval_required") {
+      const approvalState = pendingApprovals.get(event.approval_id)
+      const hasToolResult = approvalIndicesWithResults.has(i)
+      const hasDeniedEvent = events.some((e, idx) => idx > i && e.type === "tool_denied" && e.tool_name === event.tool_name)
+
+      const isPending = approvalState === undefined || approvalState === null
+      const isExecuting = approvalState === true && !hasToolResult
+      const isDenied = approvalState === false && !hasDeniedEvent
+
+      // Show approval card if still relevant
+      if (isPending || isExecuting || isDenied) {
+        pendingApprovalEvents.push({ event, index: i, isPending, isExecuting, isDenied })
+      }
+    }
+  }
+
+  // Check if any approval is pending (for paused indicator)
+  const hasPendingApproval = pendingApprovalEvents.some(a => a.isPending)
+
+  // Extract tool denied events
+  const deniedEvents = events.filter(e => e.type === "tool_denied") as Array<Extract<StreamEventItem, { type: "tool_denied" }>>
+
+  // Extract final content from "result" events (definitive final answer from backend)
+  // "content" events are intermediate (during tool execution), "result" is the final answer
+  let finalContent = ""
+
+  // First, check for explicit "result" events (the definitive final answer)
+  for (const event of events) {
+    if (event.type === "result") {
+      finalContent = event.content
+      break  // Take the first result event
+    }
+  }
+
+  // Check if this message had tool calls (indicating a multi-step flow)
+  // If there were tools, intermediate content was streamed BEFORE tools and should NOT appear in final answer
+  const hadToolCalls = events.some(e => e.type === "tool" || e.type === "tool_result")
+
+  // Fallback: use accumulated message.content when no result event exists
+  // BUT ONLY if there were NO tool calls - if there were tools, the accumulated content
+  // includes intermediate "I'll help you..." text that should NOT be the final answer
+  // Do NOT use fallback for aborted streams - that would show intermediate content as final answer
+  if (!finalContent && message.content && !isStreaming && !message.aborted && !hadToolCalls) {
+    finalContent = message.content
+  }
+
+  // =============================================================================
+  // Render with Perplexity-style layout
+  // =============================================================================
+
+  return (
+    <div className="flex gap-2.5 group" data-testid="assistant-message">
+      <div className="flex-1 min-w-0 space-y-2">
+        {/* === PERPLEXITY STYLE: Steps Timeline === */}
+        {timelineEvents.length > 0 && (
+          <StepsTimeline
+            events={timelineEvents}
+            isStreaming={isStreaming}
+            hasPendingApproval={hasPendingApproval}
+          />
+        )}
+
+        {/* === Paused Indicator (when approval pending) === */}
+        {hasPendingApproval && <TimelinePausedIndicator />}
+
+        {/* === Tool Approval Card (outside timeline) - Only show ONE at a time === */}
+        {pendingApprovalEvents.length > 0 && (() => {
+          // Show only the FIRST pending/executing/denied approval
+          // After it completes (has result), it moves to timeline and next one appears
+          const firstApproval = pendingApprovalEvents[0]
+          return (
+            <ToolApprovalBlock
+              key={`approval-${firstApproval.index}`}
+              approvalId={firstApproval.event.approval_id}
+              toolName={firstApproval.event.tool_name}
+              toolInput={firstApproval.event.tool_input}
+              parameterSchema={firstApproval.event.parameter_schema}
+              onApproval={(approved, modifiedParams) => onToolApproval?.(firstApproval.event.approval_id, approved, modifiedParams)}
+              isPending={firstApproval.isPending}
+              isExecuting={firstApproval.isExecuting}
+              isDenied={firstApproval.isDenied}
+            />
+          )
+        })()}
+
+        {/* === Tool Denied Events === */}
+        {deniedEvents.map((event, idx) => (
+          <ToolDeniedBlock
+            key={`denied-${idx}`}
+            toolName={event.tool_name}
+            reason={event.reason}
+          />
+        ))}
+
+        {/* === Live Streaming Content === */}
+        {/* During streaming, show accumulated content in FinalAnswerBlock ONLY if no tools involved */}
+        {/* If tools are being called, content appears in the timeline as "content" events instead */}
+        {isStreaming && message.content && !hadToolCalls && (
+          <FinalAnswerBlock
+            content={message.content}
+            isStreaming={true}
+            messageId={message.id}
+            className={timelineEvents.length > 0 ? "mt-8" : undefined}
+          />
+        )}
+
+        {/* === PERPLEXITY STYLE: Final Answer === */}
+        {/* Show final answer after streaming completes */}
+        {!isStreaming && finalContent && (
+          <FinalAnswerBlock
+            content={finalContent}
+            isStreaming={false}
+            messageId={message.id}
+            className={timelineEvents.length > 0 ? "mt-8" : undefined}
+          />
+        )}
+
+        {/* === Stopped Indicator (when streaming was aborted) === */}
+        {message.aborted && !finalContent && (
+          <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
+            <div className="w-2 h-2 rounded-full bg-zinc-400" />
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              Response stopped
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// Legacy Component (kept for backward compatibility if needed)
+// =============================================================================
+
+export function AssistantMessageLegacy({ message, onToolApproval, pendingApprovals = new Map(), isStreaming = false }: AssistantMessageProps) {
+  const events = getEventsFromMessage(message)
   const { displayMode } = useChatSettings()
 
   // Note: MCPToolBlock no longer handles approvals - ToolApprovalBlock does
@@ -1007,9 +1172,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
   > = []
 
   // Process events in the order they arrive from LangGraph (which is sequential)
-  // Debug: log event order to verify
-  console.log("[AssistantMessage] Processing events:", events.map(e => e.type))
-
   for (let i = 0; i < events.length; i++) {
     const event = events[i]
     if (event.type === "routing") {
@@ -1042,9 +1204,14 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
       // Hide only when: approved AND tool result has arrived (MCPToolBlock takes over)
       // OR when tool_denied event has been processed
       const hasDeniedEvent = events.some((e, idx) => idx > i && e.type === "tool_denied" && e.tool_name === event.tool_name)
-      if (approvalState === undefined || approvalState === null ||
-          (approvalState === true && !hasToolResult) ||
-          (approvalState === false && !hasDeniedEvent)) {
+      const isPending = approvalState === undefined || approvalState === null
+      const isExecuting = approvalState === true && !hasToolResult
+      const isDenied = approvalState === false && !hasDeniedEvent
+
+      // Only show ONE approval at a time - skip if we already have one showing
+      const alreadyHasApproval = processedEvents.some(e => e.type === "tool_approval_required")
+
+      if ((isPending || isExecuting || isDenied) && !alreadyHasApproval) {
         processedEvents.push({ ...event, key: `approval-${i}` })
       }
     } else if (event.type === "tool_denied") processedEvents.push({ ...event, key: `denied-${i}` })
@@ -1080,15 +1247,7 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
       {/* Agent Avatar hidden */}
 
       {/* Content - limited width for chat bubble feel */}
-      <div className="flex-1 min-w-0 max-w-[85%] space-y-2">
-        {/* Agent Name */}
-        {message.agentName && (
-          <Badge className="gap-1.5 bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-[10px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-500 dark:bg-violet-400 animate-pulse" />
-            {message.agentName}
-          </Badge>
-        )}
-
+      <div className="flex-1 min-w-0 space-y-2">
         {/* Events */}
         {displayMode === "compact" ? (
           <>

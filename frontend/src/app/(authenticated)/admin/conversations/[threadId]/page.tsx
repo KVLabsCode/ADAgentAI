@@ -19,21 +19,19 @@ import {
   Copy,
   Check,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/atoms/button"
+import { Badge } from "@/atoms/badge"
+import { ScrollArea } from "@/molecules/scroll-area"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import {
   PageContainer,
   StatCard,
-  SectionCard,
-  SectionCardHeader,
-  SectionCardContent,
+  SettingsSection,
   LoadingSpinner,
   ErrorCard,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 
 // Types
 interface Message {
@@ -387,21 +385,21 @@ export default function ConversationDetailPage() {
           {/* Main Messages Column */}
           <div className="lg:col-span-2 space-y-3">
             {/* Session Info */}
-            <SectionCard>
-              <SectionCardContent className="py-3">
-                <div className="flex flex-wrap gap-4 text-xs">
+            <SettingsSection title="Session Details">
+              <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                <div className="flex flex-wrap gap-4 text-[length:var(--text-small)]">
                   <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">User ID</p>
+                    <p className="text-[length:var(--text-small)] text-muted-foreground uppercase tracking-wider">User ID</p>
                     <p className="font-mono">{data.session.userId.slice(0, 12)}...</p>
                   </div>
                   {data.session.organizationId && (
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Org ID</p>
+                      <p className="text-[length:var(--text-small)] text-muted-foreground uppercase tracking-wider">Org ID</p>
                       <p className="font-mono">{data.session.organizationId.slice(0, 12)}...</p>
                     </div>
                   )}
                   <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Created</p>
+                    <p className="text-[length:var(--text-small)] text-muted-foreground uppercase tracking-wider">Created</p>
                     <p className="font-mono">
                       {new Date(data.session.createdAt).toLocaleDateString("en-US", {
                         month: "short",
@@ -412,25 +410,22 @@ export default function ConversationDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Messages</p>
+                    <p className="text-[length:var(--text-small)] text-muted-foreground uppercase tracking-wider">Messages</p>
                     <p className="font-mono">{data.messages.length}</p>
                   </div>
                   {data.session.isArchived && (
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px]">
+                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[length:var(--text-small)]">
                       Archived
                     </Badge>
                   )}
                 </div>
-              </SectionCardContent>
-            </SectionCard>
+              </div>
+            </SettingsSection>
 
             {/* Messages */}
-            <SectionCard>
-              <SectionCardHeader
-                title="Conversation Thread"
-                description={`${data.messages.length} messages`}
-              />
-              <SectionCardContent className="pt-0">
+            <SettingsSection title="Conversation Thread">
+              <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                <p className="text-[length:var(--text-description)] text-muted-foreground mb-4">{data.messages.length} messages</p>
                 <ScrollArea className="h-[500px] pr-4">
                   <div className="space-y-4 py-2">
                     {data.messages.map((message) => (
@@ -438,8 +433,8 @@ export default function ConversationDetailPage() {
                     ))}
                   </div>
                 </ScrollArea>
-              </SectionCardContent>
-            </SectionCard>
+              </div>
+            </SettingsSection>
           </div>
 
           {/* Sidebar - Runs & Stats */}
@@ -473,12 +468,9 @@ export default function ConversationDetailPage() {
             )}
 
             {/* Run History */}
-            <SectionCard>
-              <SectionCardHeader
-                title="Run History"
-                description={`${data.runs.length} runs`}
-              />
-              <SectionCardContent className="pt-0">
+            <SettingsSection title="Run History">
+              <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                <p className="text-[length:var(--text-description)] text-muted-foreground mb-4">{data.runs.length} runs</p>
                 {data.runs.length > 0 ? (
                   <ScrollArea className="h-[400px] pr-2">
                     <div className="space-y-3">
@@ -488,12 +480,12 @@ export default function ConversationDetailPage() {
                     </div>
                   </ScrollArea>
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center py-8">
+                  <p className="text-[length:var(--text-small)] text-muted-foreground text-center py-8">
                     No run data available
                   </p>
                 )}
-              </SectionCardContent>
-            </SectionCard>
+              </div>
+            </SettingsSection>
           </div>
         </div>
       )}

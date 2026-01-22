@@ -6,23 +6,24 @@ import {
   Router, Smartphone, LayoutGrid, HelpCircle, Database,
   ChevronDown, ChevronRight, Pencil, History
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/atoms/button"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/molecules/tooltip"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/molecules/collapsible"
 import {
   PageContainer,
   PageHeader,
+  SettingsSection,
   ErrorCard,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5001"
 
@@ -134,21 +135,23 @@ export default function PromptsPage() {
       )}
 
       {/* Prompts list */}
-      <div className="space-y-4">
-        {prompts.map((prompt) => (
-          <PromptCard
-            key={prompt.id}
-            prompt={prompt}
-            isExpanded={expandedPrompts.has(prompt.id)}
-            onToggle={() => togglePrompt(prompt.id)}
-            onCopy={() => copyToClipboard(prompt.content, prompt.id)}
-            isCopied={copiedId === prompt.id}
-          />
-        ))}
-      </div>
+      <SettingsSection title="System Prompts">
+        <div className="divide-y divide-[color:var(--item-divider)]">
+          {prompts.map((prompt) => (
+            <PromptCard
+              key={prompt.id}
+              prompt={prompt}
+              isExpanded={expandedPrompts.has(prompt.id)}
+              onToggle={() => togglePrompt(prompt.id)}
+              onCopy={() => copyToClipboard(prompt.content, prompt.id)}
+              isCopied={copiedId === prompt.id}
+            />
+          ))}
+        </div>
+      </SettingsSection>
 
       {/* Footer */}
-      <div className="text-center text-xs text-muted-foreground py-4">
+      <div className="text-center text-[length:var(--text-small)] text-muted-foreground py-4">
         <p>Prompts are loaded from the chat agent service. Changes require a backend deployment.</p>
       </div>
     </PageContainer>
@@ -172,128 +175,126 @@ function PromptCard({
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
-      <div className="rounded border border-border/30 overflow-hidden">
-        <CollapsibleTrigger asChild>
-          <button className="w-full px-4 py-3 flex items-center justify-between bg-card hover:bg-card/80 transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded border border-border/50 text-muted-foreground">
-                {icon}
-              </div>
-              <div className="text-left">
-                <h3 className="text-sm font-medium">{prompt.title}</h3>
-                <p className="text-xs text-muted-foreground">{prompt.description}</p>
-              </div>
+      <CollapsibleTrigger asChild>
+        <button className="w-full px-[var(--item-padding-x)] py-[var(--item-padding-y)] flex items-center justify-between hover:bg-muted/30 transition-colors">
+          <div className="flex items-center gap-[var(--item-gap)]">
+            <div className="p-2 rounded border border-[color:var(--card-border)] text-muted-foreground">
+              {icon}
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right text-[10px] text-muted-foreground">
-                <div>v{prompt.version}</div>
-                <div>{prompt.lastUpdated}</div>
-              </div>
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </button>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent>
-          <div className="border-t border-border/30">
-            {/* Actions bar - dark background */}
-            <div className="px-4 py-3 bg-background flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs gap-2"
-                        onClick={onCopy}
-                      >
-                        {isCopied ? (
-                          <>
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3.5 w-3.5" />
-                            Copy Prompt
-                          </>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Copy prompt content to clipboard</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs gap-2 opacity-50 cursor-not-allowed"
-                        disabled
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Coming soon</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs gap-2 opacity-50 cursor-not-allowed"
-                        disabled
-                      >
-                        <History className="h-3.5 w-3.5" />
-                        History
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Coming soon</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <span className="text-xs text-muted-foreground">
-                {prompt.content.length} characters
-              </span>
-            </div>
-
-            {/* Prompt content - dark background */}
-            <div className="p-4 bg-background">
-              <pre className="p-3 bg-muted/30 rounded border border-border/30 overflow-x-auto text-xs font-mono text-foreground whitespace-pre-wrap">
-                {prompt.content}
-              </pre>
-
-              {/* Metadata section if exists */}
-              {prompt.metadata && Object.keys(prompt.metadata).length > 0 && (
-                <div className="mt-3 p-3 bg-muted/20 rounded border border-border/30">
-                  <h4 className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">Metadata</h4>
-                  <pre className="text-[10px] font-mono text-muted-foreground overflow-x-auto">
-                    {JSON.stringify(prompt.metadata, null, 2)}
-                  </pre>
-                </div>
-              )}
+            <div className="text-left">
+              <h3 className="text-[length:var(--text-label)] font-medium">{prompt.title}</h3>
+              <p className="text-[length:var(--text-description)] text-muted-foreground">{prompt.description}</p>
             </div>
           </div>
-        </CollapsibleContent>
-      </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right text-[length:var(--text-small)] text-muted-foreground">
+              <div>v{prompt.version}</div>
+              <div>{prompt.lastUpdated}</div>
+            </div>
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        </button>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent>
+        <div className="border-t border-[color:var(--item-divider)]">
+          {/* Actions bar */}
+          <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)] bg-muted/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[length:var(--text-small)] gap-2"
+                      onClick={onCopy}
+                    >
+                      {isCopied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-success" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy Prompt
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Copy prompt content to clipboard</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[length:var(--text-small)] gap-2 opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Coming soon</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[length:var(--text-small)] gap-2 opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      History
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Coming soon</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
+            <span className="text-[length:var(--text-small)] text-muted-foreground">
+              {prompt.content.length} characters
+            </span>
+          </div>
+
+          {/* Prompt content */}
+          <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+            <pre className="p-3 bg-muted/30 rounded border border-[color:var(--card-border)] overflow-x-auto text-[length:var(--text-small)] font-mono text-foreground whitespace-pre-wrap">
+              {prompt.content}
+            </pre>
+
+            {/* Metadata section if exists */}
+            {prompt.metadata && Object.keys(prompt.metadata).length > 0 && (
+              <div className="mt-3 p-3 bg-muted/20 rounded border border-[color:var(--card-border)]">
+                <h4 className="text-[length:var(--text-small)] font-semibold text-muted-foreground uppercase mb-2">Metadata</h4>
+                <pre className="text-[length:var(--text-small)] font-mono text-muted-foreground overflow-x-auto">
+                  {JSON.stringify(prompt.metadata, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      </CollapsibleContent>
     </Collapsible>
   )
 }

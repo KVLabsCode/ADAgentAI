@@ -32,6 +32,7 @@ from .events import (
     DoneEvent,
     ToolApprovalRequiredEvent,
     ToolDeniedEvent,
+    ToolExecutingEvent,
 )
 from .state import (
     start_stream,
@@ -166,7 +167,9 @@ async def stream_chat_response(
 
     async def run_graph_and_emit():
         """Run LangGraph and emit SSE events to output queue."""
+        print(f"[run_graph_and_emit] Starting...", flush=True)
         try:
+            print(f"[run_graph_and_emit] Calling run_graph...", flush=True)
             async for event in run_graph(
                 user_query=user_query,
                 user_id=user_id,
@@ -192,6 +195,12 @@ async def stream_chat_response(
                             print(f"[processor] tool_name: {interrupt_value.get('tool_name')}")
                             print(f"[processor] tool_args: {tool_args}")
                             print(f"[processor] tool_input_str: {tool_input_str}")
+                            # Debug: Log the param_schema uiSchema structure
+                            param_schema_debug = interrupt_value.get("param_schema")
+                            if param_schema_debug and "uiSchema" in param_schema_debug:
+                                ui_schema_debug = param_schema_debug.get("uiSchema", {})
+                                if "mediation_group_lines" in ui_schema_debug:
+                                    print(f"[processor] mediation_group_lines uiSchema being sent: {json.dumps(ui_schema_debug.get('mediation_group_lines'), indent=2)}")
                             await output_queue.put(format_sse(ToolApprovalRequiredEvent(
                                 approval_id=interrupt_value.get("approval_id", ""),
                                 tool_name=interrupt_value.get("tool_name", ""),
@@ -378,34 +387,40 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
 
         # Check for partial response (text before tool calls)
         # Only emit as ContentEvent if NOT already streamed via content_queue
+        # (streaming chunks are sent separately for live display)
         partial_response = state_update.get("partial_response")
         content_streamed = state_update.get("content_streamed", False)
         if partial_response and not content_streamed:
-            # Emit as content event for inline rendering
             events.append(ContentEvent(content=partial_response).model_dump(mode='json'))
 
         # Check for tool calls
         tool_calls = state_update.get("tool_calls", [])
+        print(f"[_convert_state_to_sse] specialist node has {len(tool_calls)} tool_calls", flush=True)
         for tc in tool_calls:
+            tc_id = tc.get("id", "no-id")
+            tc_name = tc.get("name", "unknown")
+            tc_result = tc.get("result")
+            print(f"[_convert_state_to_sse] Tool call: id={tc_id}, name={tc_name}, has_result={tc_result is not None}", flush=True)
             if tc.get("result") is None:  # Pending tool call
-                # Format tool args as JSON string for frontend
                 tool_args = tc.get("args", {})
-                args_json = json.dumps(tool_args)
                 tool_name = tc.get("name", "unknown")
+                # Convert args to JSON string for frontend (expects input_preview/input_full)
+                args_json = json.dumps(tool_args) if tool_args else "{}"
+                print(f"[_convert_state_to_sse] EMITTING tool event: {tool_name} (id={tc_id})", flush=True)
                 events.append({
                     "type": "tool",
-                    "name": tool_name,  # Frontend uses 'name' for deduplication with pending approvals
-                    "tool": tool_name,  # Frontend also expects 'tool' field
-                    "input_preview": args_json[:200] if len(args_json) > 200 else args_json,
+                    "tool": tool_name,  # Frontend expects 'tool' not 'name'
+                    "input_preview": args_json,  # Frontend expects JSON string
                     "input_full": args_json,
-                    "is_dangerous": tc.get("is_dangerous", False),
                     "approved": tc.get("approval_status") == "approved",
                 })
 
-        # Check for final response
-        # Only emit if NOT already streamed via content_queue
+        # Check for final response - only emit when NO tool calls (this is the definitive final answer)
+        # If there are tool calls, this is an intermediate response, not the final answer
         response = state_update.get("response")
-        if response and not content_streamed:
+        print(f"[_convert_state_to_sse] response field = '{response[:50] if response else 'None'}...', tool_calls count = {len(tool_calls)}", flush=True)
+        if response and len(tool_calls) == 0:
+            print(f"[_convert_state_to_sse] EMITTING ResultEvent (no tool calls = final answer)", flush=True)
             events.append(ResultEvent(content=response).model_dump(mode='json'))
 
         # Check for error
@@ -426,8 +441,12 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
 
         # Check for tool results
         tool_calls = state_update.get("tool_calls", [])
+        print(f"[_convert_state_to_sse] tool_executor node has {len(tool_calls)} tool_calls", flush=True)
         for tc in tool_calls:
+            tc_id = tc.get("id", "no-id")
+            tc_name = tc.get("name", "unknown")
             result = tc.get("result")
+            print(f"[_convert_state_to_sse] Tool call: id={tc_id}, name={tc_name}, has_result={result is not None}", flush=True)
             if result is not None:
                 # Check if denied
                 if tc.get("approval_status") == "denied":
@@ -435,18 +454,8 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
                         tool_name=tc.get("name", "unknown"),
                     ).model_dump(mode='json'))
                 else:
-                    # Emit tool event first (so frontend can pair with tool_result)
-                    tool_args = tc.get("args", {})
-                    args_json = json.dumps(tool_args)
-                    events.append({
-                        "type": "tool",
-                        "name": tc.get("name", "unknown"),
-                        "tool": tc.get("name", "unknown"),  # Frontend expects 'tool' field too
-                        "input_preview": args_json[:200] if len(args_json) > 200 else args_json,
-                        "input_full": args_json,
-                        "is_dangerous": tc.get("is_dangerous", False),
-                        "approved": True,  # Already approved and executed
-                    })
+                    # NOTE: Don't emit tool event here - it was already emitted by specialist node
+                    # Just emit the tool_result to pair with the existing tool event
 
                     # Format result for frontend
                     result_str = result if isinstance(result, str) else json.dumps(result)
@@ -482,6 +491,7 @@ async def stream_resume_response(
     stream_id: str,
     approved: bool,
     modified_params: Optional[dict] = None,
+    tool_name: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Resume a paused graph after tool approval.
 
@@ -492,18 +502,24 @@ async def stream_resume_response(
         stream_id: The stream/thread ID to resume
         approved: Whether the user approved the tool execution
         modified_params: Optional modified parameters from user
+        tool_name: Name of the tool being approved (for progress events)
 
     Yields:
         SSE events from the resumed graph execution
     """
-    print(f"[resume_gen] Starting resume for stream_id={stream_id}, approved={approved}", flush=True)
     try:
+        # Emit tool_executing event immediately when approved
+        # This gives the frontend a signal to show progress UI
+        if approved and tool_name:
+            yield format_sse(ToolExecutingEvent(
+                tool_name=tool_name,
+                message="Executing...",
+            ).model_dump(mode='json'))
+
         approval_result = {
             "approved": approved,
             "modified_params": modified_params,
         }
-
-        print(f"[resume_gen] Calling resume_graph...", flush=True)
         async for event in resume_graph(
             thread_id=stream_id,
             approval_result=approval_result,

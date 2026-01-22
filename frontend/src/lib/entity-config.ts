@@ -61,6 +61,17 @@ export const ENTITY_RELATIONSHIPS = {
     displayField: "name",
     description: "Ad sources for mediation",
   },
+  // Filtered ad source variants for bidding vs waterfall
+  bidding_ad_sources: {
+    parent: "accounts",
+    displayField: "name",
+    description: "Bidding ad sources (real-time auction)",
+  },
+  waterfall_ad_sources: {
+    parent: "accounts",
+    displayField: "name",
+    description: "Waterfall ad sources (priority-based)",
+  },
   mediation_groups: {
     parent: "accounts",
     displayField: "displayName",
@@ -167,6 +178,25 @@ export const PARAM_DISPLAY_NAMES: Record<string, string> = {
   platform: "Platform",
   format: "Format",
   targeting: "Targeting",
+
+  // Mediation lines
+  pricing_mode: "Pricing",
+  cpm_floor: "CPM Floor",
+  cpm_micros: "CPM (micros)",
+  cpm_mode: "CPM Mode",
+  experiment_variant: "A/B Variant",
+  bidding_lines: "Bidding Lines",
+  waterfall_lines: "Waterfall Lines",
+  line_id: "Line ID",
+
+  // Region targeting
+  advanced_targeting: "Advanced Targeting",
+  targeted_region_codes: "Target Regions",
+  excluded_region_codes: "Exclude Regions",
+  idfa_targeting: "IDFA Targeting",
+
+  // Ad format
+  ad_format: "Ad Format",
 
   // Dates
   start_date: "Start Date",

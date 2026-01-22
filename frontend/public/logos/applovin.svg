@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <defs>
+    <linearGradient id="paint0_linear" x1="6.5" y1="2" x2="6.5" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00D4AA"/>
+      <stop offset="1" stop-color="#0099FF"/>
+    </linearGradient>
+    <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(33.5 20) scale(18 36)">
+      <stop stop-color="#00D4AA"/>
+      <stop offset="1" stop-color="#0099FF"/>
+    </radialGradient>
+    <radialGradient id="paint2_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(15.5 20) scale(9 36)">
+      <stop stop-color="#00D4AA"/>
+      <stop offset="1" stop-color="#0099FF"/>
+    </radialGradient>
+    <radialGradient id="paint3_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(24.5 20) scale(9 36)">
+      <stop stop-color="#00D4AA"/>
+      <stop offset="1" stop-color="#0099FF"/>
+    </radialGradient>
+  </defs>
+  <path d="M10.0271 2.558L2.51994 14.4428C2.18034 14.9804 2.00034 15.602 2.00034 16.2368V37.1576C2.00034 38 3.10074 38.318 3.55074 37.6064L10.0271 27.41C10.2539 27.0512 10.6247 26.8652 11.0003 26.852V2C10.6247 2.0132 10.2539 2.1992 10.0271 2.558Z" fill="url(#paint0_linear)"/>
+  <path d="M37.4804 14.4428L29.9732 2.558C29.7464 2.1992 29.3756 2.0132 29 2V26.852C29.3756 26.8652 29.7464 27.0512 29.9732 27.41L36.4496 37.6064C36.8996 38.318 38 38 38 37.1576V16.238C38 15.6032 37.82 14.9804 37.4804 14.444V14.4428Z" fill="url(#paint1_radial)"/>
+  <path d="M19.01 12.6981L12.0308 2.5209C11.7836 2.1597 11.3888 1.9881 11 2.0001V26.8521C11.3888 26.8389 11.7836 27.0105 12.0308 27.3717L19.01 37.4781C19.2488 37.8261 19.6244 37.9989 20 37.9989V13.2201C19.6244 13.2201 19.2488 13.0461 19.01 12.6993V12.6981Z" fill="url(#paint2_radial)"/>
+  <path d="M27.9692 2.52077L20.99 12.698C20.7512 13.046 20.3756 13.2188 20 13.2188V37.9988C20.3756 37.9988 20.7512 37.8248 20.99 37.478L27.9692 27.3716C28.2164 27.0104 28.6112 26.8388 29 26.852V1.99997C28.6112 1.98677 28.2164 2.15837 27.9692 2.51957V2.52077Z" fill="url(#paint3_radial)"/>
+</svg>

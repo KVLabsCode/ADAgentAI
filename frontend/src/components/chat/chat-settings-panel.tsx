@@ -7,8 +7,8 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet"
-import { Switch } from "@/components/ui/switch"
+} from "@/molecules/sheet"
+import { Switch } from "@/atoms/switch"
 import { cn } from "@/lib/utils"
 import type { Provider } from "@/lib/types"
 

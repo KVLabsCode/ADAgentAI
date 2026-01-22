@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { PageContainer, PageHeader } from "@/components/ui/theme"
+import { PageContainer, PageHeader, SettingsSection } from "@/organisms/theme"
 import { MyInvitationsSection } from "@/components/invitations"
 import {
   OrganizationSection,
@@ -27,11 +27,19 @@ export default function SettingsPage() {
           title="Settings"
           description="Manage your application preferences."
         />
-        <div className="space-y-6">
+        <div className="space-y-8">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded border border-border/30 p-4 animate-pulse">
-              <div className="h-4 w-32 bg-muted rounded mb-2" />
-              <div className="h-3 w-48 bg-muted/50 rounded" />
+            <div key={i}>
+              <div className="h-4 w-24 bg-muted/50 rounded mb-3" />
+              <div className="rounded-lg border border-border/40 p-4 space-y-4">
+                <div className="flex items-center justify-between py-2">
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-32 bg-muted rounded" />
+                    <div className="h-3 w-48 bg-muted/50 rounded" />
+                  </div>
+                  <div className="h-6 w-11 bg-muted rounded-full" />
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -46,26 +54,41 @@ export default function SettingsPage() {
         description="Manage your application preferences."
       />
 
-      {/* Invitations To You - Shows pending invitations user has received */}
-      <MyInvitationsSection />
+      {/* Sections container with 48px gap between sections (Linear ground truth) */}
+      <div className="flex flex-col gap-[var(--section-gap)]">
+        {/* Invitations To You - Shows pending invitations user has received */}
+        <MyInvitationsSection />
 
-      {/* Chat Display */}
-      <ChatSettingsSection />
+        {/* Chat Section */}
+        <SettingsSection title="Chat">
+          <ChatSettingsSection />
+        </SettingsSection>
 
-      {/* Organization */}
-      <OrganizationSection />
+        {/* Organization Section */}
+        <SettingsSection title="Organization">
+          <OrganizationSection />
+        </SettingsSection>
 
-      {/* Appearance */}
-      <AppearanceSection />
+        {/* Interface Section */}
+        <SettingsSection title="Interface">
+          <AppearanceSection />
+        </SettingsSection>
 
-      {/* Notifications */}
-      <NotificationsSection />
+        {/* Notifications Section */}
+        <SettingsSection title="Notifications">
+          <NotificationsSection />
+        </SettingsSection>
 
-      {/* Privacy */}
-      <PrivacySection />
+        {/* Privacy Section */}
+        <SettingsSection title="Privacy">
+          <PrivacySection />
+        </SettingsSection>
 
-      {/* Account */}
-      <AccountSection />
+        {/* Account Section */}
+        <SettingsSection title="Account">
+          <AccountSection />
+        </SettingsSection>
+      </div>
     </PageContainer>
   )
 }

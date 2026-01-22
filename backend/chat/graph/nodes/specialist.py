@@ -21,79 +21,11 @@ from ..state import GraphState
 from .entity_loader import build_entity_system_prompt
 from ...tools import get_tools_for_service
 from ...streaming.events import format_sse, ThinkingEvent
-
-
-# Service-specific instructions
-SERVICE_INSTRUCTIONS = {
-    "admob": """
-Instructions for AdMob:
-1. Use "list_accounts" to get available accounts first
-2. Use the account_id from step 1 for subsequent calls
-3. For apps: use "list_apps" with the account_id
-4. For ad units: use "list_ad_units" with the account_id
-5. For reports: use the appropriate report generation tool
-
-IMPORTANT: Always verify account IDs exist before using them.
-""",
-    "admanager": """
-Instructions for Ad Manager:
-1. Use "list_networks" to get network codes first
-2. Use the network_code from step 1 for subsequent calls
-3. For ad units: use "list_ad_units"
-4. For reports: use the report tools
-
-IMPORTANT: Always verify network codes exist before using them.
-""",
-    "general": """
-You are a helpful assistant for ad monetization platforms.
-Answer questions about AdMob and Google Ad Manager.
-If the user needs to perform operations, suggest they connect their accounts first.
-""",
-}
-
-# Agent role descriptions
-AGENT_ROLES = {
-    ("admob", "inventory"): {
-        "role": "AdMob Inventory Specialist",
-        "goal": "Help users manage their AdMob accounts, apps, and ad units",
-    },
-    ("admob", "reporting"): {
-        "role": "AdMob Reporting Specialist",
-        "goal": "Help users analyze revenue, eCPM, impressions, and performance metrics",
-    },
-    ("admob", "mediation"): {
-        "role": "AdMob Mediation Specialist",
-        "goal": "Help users optimize mediation groups, ad sources, and waterfalls",
-    },
-    ("admob", "experimentation"): {
-        "role": "AdMob Experimentation Specialist",
-        "goal": "Help users run and analyze A/B tests and experiments",
-    },
-    ("admanager", "inventory"): {
-        "role": "Ad Manager Inventory Specialist",
-        "goal": "Help users manage networks, ad units, placements, and sites",
-    },
-    ("admanager", "reporting"): {
-        "role": "Ad Manager Reporting Specialist",
-        "goal": "Help users generate and analyze performance reports",
-    },
-    ("admanager", "orders"): {
-        "role": "Ad Manager Orders Specialist",
-        "goal": "Help users manage orders, line items, campaigns, and creatives",
-    },
-    ("admanager", "deals"): {
-        "role": "Ad Manager Deals Specialist",
-        "goal": "Help users manage private auctions and programmatic deals",
-    },
-    ("admanager", "targeting"): {
-        "role": "Ad Manager Targeting Specialist",
-        "goal": "Help users configure custom targeting, audiences, and geo targeting",
-    },
-    ("general", "assistant"): {
-        "role": "Ad Platform Assistant",
-        "goal": "Help users with general questions about ad monetization",
-    },
-}
+from ...utils.prompts import (
+    get_system_prompt_template,
+    get_service_instructions,
+    get_agent_role,
+)
 
 
 def _build_system_prompt(
@@ -102,12 +34,15 @@ def _build_system_prompt(
     user_context: dict,
     conversation_history: list[dict] | None,
 ) -> str:
-    """Build the full system prompt for the specialist."""
-    # Get role info
-    role_info = AGENT_ROLES.get((service, capability), AGENT_ROLES[("general", "assistant")])
+    """Build the full system prompt for the specialist.
 
-    # Get service instructions
-    instructions = SERVICE_INSTRUCTIONS.get(service, SERVICE_INSTRUCTIONS["general"])
+    Pulls prompt template from LangSmith if available, falls back to defaults.
+    """
+    # Get role info (from LangSmith or defaults)
+    role_info = get_agent_role(service, capability)
+
+    # Get service instructions (from LangSmith or defaults)
+    instructions = get_service_instructions(service)
 
     # Get entity grounding section
     entity_section = build_entity_system_prompt(user_context)
@@ -116,21 +51,21 @@ def _build_system_prompt(
     now = datetime.now(timezone.utc)
     current_date = now.strftime("%Y-%m-%d")
     current_datetime = now.strftime("%Y-%m-%d %H:%M:%S UTC")
-    
+
     # Calculate example date ranges
     from datetime import timedelta
     seven_days_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
     thirty_days_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
     yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
     month_start = now.strftime("%Y-%m") + "-01"
-    
+
     # Build temporal context section
     temporal_section = f"""
 ## Current Date and Time
 Today's date: {current_date}
 Current time: {current_datetime}
 
-When the user asks about date ranges like "last 7 days", "this month", "yesterday", etc., 
+When the user asks about date ranges like "last 7 days", "this month", "yesterday", etc.,
 calculate the appropriate dates based on today's date ({current_date}).
 
 For example:
@@ -157,25 +92,18 @@ Use this context to understand follow-up questions and maintain continuity.
 Reference previous context when relevant (e.g., if user says "that app" or "the same account").
 """
 
-    return f"""You are {role_info['role']}.
+    # Get system prompt template (from LangSmith or default)
+    template = get_system_prompt_template()
 
-Goal: {role_info['goal']}
-
-{temporal_section}
-
-{entity_section}
-
-{context_section}
-
-{instructions}
-
-## Response Guidelines
-- Provide clear, actionable responses
-- If you encounter errors, explain them clearly
-- Always verify entity IDs before using them
-- For write operations, confirm the action before proceeding
-- Be concise but thorough
-"""
+    # Format the template with all variables
+    return template.format(
+        role=role_info['role'],
+        goal=role_info['goal'],
+        temporal_section=temporal_section,
+        entity_section=entity_section,
+        context_section=context_section,
+        instructions=instructions,
+    )
 
 
 def _get_model_from_selection(selected_model: str | None, enable_thinking: bool = True) -> BaseChatModel:
@@ -627,6 +555,7 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         if content_queue and final_content:
             result["content_streamed"] = True
 
+        print(f"[specialist] Returning FINAL result with keys: {list(result.keys())}, response length: {len(result.get('response', ''))}", flush=True)
         return result
 
     except Exception as e:

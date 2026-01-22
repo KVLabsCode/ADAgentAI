@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import JsonView from "@uiw/react-json-view"
+import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from "@/molecules/scroll-area"
 
 // Custom zinc dark theme to match the app's UI
 const zincDarkTheme = {
@@ -33,6 +34,37 @@ const zincDarkTheme = {
   "--w-rjv-type-url-color": "#22d3ee", // cyan-400
   "--w-rjv-type-null-color": "#ef4444", // red-400
   "--w-rjv-type-nan-color": "#ef4444", // red-400
+  "--w-rjv-type-undefined-color": "#71717a", // zinc-500
+} as React.CSSProperties
+
+// Light theme to match the app's light mode
+const zincLightTheme = {
+  "--w-rjv-font-family": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  "--w-rjv-color": "#3f3f46", // zinc-700
+  "--w-rjv-key-string": "#7c3aed", // violet-600
+  "--w-rjv-background-color": "transparent",
+  "--w-rjv-line-color": "#e4e4e7", // zinc-200
+  "--w-rjv-arrow-color": "#71717a", // zinc-500
+  "--w-rjv-edit-color": "#d97706", // amber-600
+  "--w-rjv-info-color": "#a1a1aa", // zinc-400
+  "--w-rjv-update-color": "#16a34a", // green-600
+  "--w-rjv-copied-color": "#16a34a", // green-600
+  "--w-rjv-copied-success-color": "#16a34a", // green-600
+  "--w-rjv-curlybraces-color": "transparent", // Hide curly braces
+  "--w-rjv-colon-color": "#a1a1aa", // zinc-400 (subtle)
+  "--w-rjv-brackets-color": "transparent", // Hide brackets
+  "--w-rjv-ellipsis-color": "#71717a", // zinc-500
+  "--w-rjv-quotes-color": "transparent", // Hide quotes
+  "--w-rjv-quotes-string-color": "transparent", // Hide string quotes
+  "--w-rjv-type-string-color": "#52525b", // zinc-600
+  "--w-rjv-type-int-color": "#2563eb", // blue-600
+  "--w-rjv-type-float-color": "#2563eb", // blue-600
+  "--w-rjv-type-bigint-color": "#2563eb", // blue-600
+  "--w-rjv-type-boolean-color": "#ea580c", // orange-600
+  "--w-rjv-type-date-color": "#db2777", // pink-600
+  "--w-rjv-type-url-color": "#0891b2", // cyan-600
+  "--w-rjv-type-null-color": "#dc2626", // red-600
+  "--w-rjv-type-nan-color": "#dc2626", // red-600
   "--w-rjv-type-undefined-color": "#71717a", // zinc-500
 } as React.CSSProperties
 
@@ -92,6 +124,16 @@ export function JsonTreeView({
   displayDataTypes = false,
   displayObjectSize = true,
 }: JsonTreeViewProps) {
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  // Avoid hydration mismatch
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const theme = mounted && resolvedTheme === "light" ? zincLightTheme : zincDarkTheme
+
   // Handle edit events
   const handleEdit = React.useCallback(
     (opts: Parameters<NonNullable<typeof onEdit>>[0]) => {
@@ -125,7 +167,8 @@ export function JsonTreeView({
   return (
     <div
       className={cn(
-        "rounded-xl overflow-hidden border border-zinc-700/50 bg-zinc-900/80",
+        "rounded-xl overflow-hidden border bg-card/50",
+        "border-zinc-200 dark:border-zinc-700/50",
         className
       )}
     >
@@ -133,7 +176,7 @@ export function JsonTreeView({
         <div className="p-3">
           <JsonView
             value={data as object}
-            style={zincDarkTheme}
+            style={theme}
             collapsed={collapsed}
             enableClipboard={enableClipboard}
             displayDataTypes={displayDataTypes}
@@ -152,5 +195,62 @@ export function JsonTreeView({
   )
 }
 
+/**
+ * Compact inline JSON tree view for use in tight spaces (e.g., step details).
+ * No border, smaller padding, and smaller max height.
+ */
+export function JsonTreeViewCompact({
+  data,
+  collapsed = 2,
+  className,
+  maxHeight = "180px",
+}: Pick<JsonTreeViewProps, "data" | "collapsed" | "className" | "maxHeight">) {
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const theme = mounted && resolvedTheme === "light" ? zincLightTheme : zincDarkTheme
+
+  // Handle primitive types (strings, numbers, booleans) - display as text, not JSON tree
+  if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
+    return (
+      <ScrollArea type="hover" className={cn("w-full", className)} style={{ maxHeight }}>
+        <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap py-1">
+          {String(data)}
+        </pre>
+      </ScrollArea>
+    )
+  }
+
+  // Handle null/undefined
+  if (data === null || data === undefined) {
+    return (
+      <ScrollArea type="hover" className={cn("w-full", className)} style={{ maxHeight }}>
+        <span className="font-mono text-xs text-muted-foreground py-1">
+          {data === null ? "null" : "undefined"}
+        </span>
+      </ScrollArea>
+    )
+  }
+
+  return (
+    <ScrollArea type="hover" className={cn("w-full", className)} style={{ maxHeight }}>
+      <div className="py-1">
+        <JsonView
+          value={data as object}
+          style={theme}
+          collapsed={collapsed}
+          enableClipboard={false}
+          displayDataTypes={false}
+          displayObjectSize={false}
+        />
+      </div>
+    </ScrollArea>
+  )
+}
+
 // Re-export for convenience
-export { zincDarkTheme }
+export { zincDarkTheme, zincLightTheme }

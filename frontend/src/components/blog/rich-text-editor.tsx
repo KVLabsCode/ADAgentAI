@@ -20,13 +20,13 @@ import {
   Undo,
   Redo,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/atoms/button"
+import { Separator } from "@/atoms/separator"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/molecules/tooltip"
 import { cn } from "@/lib/utils"
 
 interface RichTextEditorProps {

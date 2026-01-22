@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { Message } from "@/lib/types"
+import { storage } from "@/lib/storage"
 
 const CHAT_STORAGE_KEY = "adagent_active_chat"
 
@@ -12,40 +13,25 @@ export interface ChatState {
 
 // Load chat state from localStorage
 export function loadChatState(): ChatState | null {
-  if (typeof window === "undefined") return null
-  try {
-    const saved = localStorage.getItem(CHAT_STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      if (parsed && Array.isArray(parsed.messages)) {
-        return { messages: parsed.messages, sessionId: parsed.sessionId || null }
-      }
-    }
-  } catch (e) {
-    console.error("[ChatPersistence] Load error:", e)
+  const saved = storage.get<ChatState | null>(CHAT_STORAGE_KEY, null)
+  if (saved && Array.isArray(saved.messages)) {
+    return { messages: saved.messages, sessionId: saved.sessionId || null }
   }
   return null
 }
 
 // Save chat state to localStorage
 export function saveChatState(messages: Message[], sessionId: string | null) {
-  if (typeof window === "undefined") return
-  try {
-    if (messages.length > 0) {
-      const data = JSON.stringify({ messages, sessionId })
-      localStorage.setItem(CHAT_STORAGE_KEY, data)
-    } else {
-      localStorage.removeItem(CHAT_STORAGE_KEY)
-    }
-  } catch (e) {
-    console.error("[ChatPersistence] Save error:", e)
+  if (messages.length > 0) {
+    storage.set(CHAT_STORAGE_KEY, { messages, sessionId })
+  } else {
+    storage.remove(CHAT_STORAGE_KEY)
   }
 }
 
 // Clear chat state from localStorage
 export function clearChatState() {
-  if (typeof window === "undefined") return
-  localStorage.removeItem(CHAT_STORAGE_KEY)
+  storage.remove(CHAT_STORAGE_KEY)
 }
 
 interface UseChatPersistenceOptions {

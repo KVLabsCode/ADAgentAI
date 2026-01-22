@@ -40,6 +40,7 @@ AI-powered assistant for managing AdMob and Google Ad Manager accounts. Ask ques
 | Layer | Technology |
 |-------|------------|
 | **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui |
+| **Design Tokens** | W3C DTCG format, Style Dictionary, Tokens Studio |
 | **API Server** | Hono, Bun, Drizzle ORM |
 | **Database** | Neon PostgreSQL |
 | **Auth** | Better Auth + Google OAuth |
@@ -84,6 +85,29 @@ AI-powered assistant for managing AdMob and Google Ad Manager accounts. Ask ques
 ├── studio-sanity/           # Sanity CMS studio (blog)
 └── .github/workflows/       # CI pipeline
 ```
+
+## Design System
+
+The project has a comprehensive design system with:
+
+- **W3C DTCG Tokens** - Industry-standard design tokens format
+- **Atomic Design** - Components organized as atoms/molecules/organisms
+- **Linear-Inspired UI** - Clean, professional aesthetic
+- **Bidirectional Sync** - Edit in Figma or code, changes flow both ways
+
+```bash
+# Build CSS from tokens
+cd frontend && bun run tokens:build
+```
+
+### Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Design System](docs/design-system.md) | Full design system overview |
+| [Figma Integration](docs/figma-integration.md) | Complete Figma setup with Tokens Studio |
+| [Linear Theme Migration](docs/linear-theme-migration.md) | Using extracted Linear theme tokens |
+| [Design Tokens](frontend/docs/design-tokens.md) | W3C DTCG token system guide |
 
 ## Getting Started
 

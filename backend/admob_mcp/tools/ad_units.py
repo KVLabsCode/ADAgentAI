@@ -85,6 +85,13 @@ def register_ad_unit_tools(mcp: FastMCP) -> None:
             if params.ad_types:
                 ad_unit_data["adTypes"] = params.ad_types
 
+            # Add reward settings for REWARDED and REWARDED_INTERSTITIAL ad formats
+            if params.reward_settings:
+                ad_unit_data["rewardSettings"] = {
+                    "unitAmount": params.reward_settings.unit_amount,
+                    "unitType": params.reward_settings.unit_type,
+                }
+
             response = await client.create_ad_unit(params.account_id, ad_unit_data)
 
             if params.response_format == ResponseFormat.MARKDOWN:
@@ -151,6 +158,7 @@ def register_ad_unit_tools(mcp: FastMCP) -> None:
             mapping_data = {
                 "adSourceId": params.ad_source_id,
                 "displayName": params.display_name,
+                "state": params.state.value,
             }
 
             if params.ad_unit_configurations:
@@ -200,6 +208,7 @@ def register_ad_unit_tools(mcp: FastMCP) -> None:
                     "adUnitMapping": {
                         "adSourceId": mapping.ad_source_id,
                         "displayName": mapping.display_name,
+                        "state": mapping.state.value,
                     }
                 }
                 if mapping.ad_unit_configurations:

@@ -1,15 +1,16 @@
 "use client"
 
-import { Loader2, FileText, Shield, Mail } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { FileText, Shield, Mail } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
+import { Checkbox } from "@/atoms/checkbox"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/molecules/dialog"
 import { useUser } from "@/hooks/use-user"
 import { useTosAcceptance } from "@/hooks/useTosAcceptance"
 import { cn } from "@/lib/utils"
@@ -162,7 +163,7 @@ export function TosModal({ open }: TosModalProps) {
           >
             {isAccepting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Accepting...
               </>
             ) : (

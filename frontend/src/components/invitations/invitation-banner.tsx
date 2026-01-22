@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Mail, X, ChevronRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/atoms/button"
 import { ReceivedInvitation } from "@/lib/types"
 import { InvitationCard } from "./invitation-card"
 

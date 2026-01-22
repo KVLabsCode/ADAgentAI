@@ -62,3 +62,7 @@ nul
 
 # Project docs (not for repo)
 SPEC.md
+
+# Linear reverse engineering (local research)
+linear_copy/
+linear_reverse/

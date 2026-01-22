@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { Building2, Loader2, Check, X, Clock } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Building2, Check, X, Clock } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
 import { ReceivedInvitation } from "@/lib/types"
 
 interface InvitationCardProps {
@@ -100,7 +101,7 @@ export function InvitationCard({
             className="h-7 px-2 text-xs"
           >
             {isAccepting ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Spinner size="xs" />
             ) : (
               <>
                 <Check className="h-3 w-3 mr-1" />
@@ -116,7 +117,7 @@ export function InvitationCard({
             className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
           >
             {isRejecting ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Spinner size="xs" />
             ) : (
               <X className="h-3 w-3" />
             )}
@@ -160,7 +161,7 @@ export function InvitationCard({
           className="h-8"
         >
           {isAccepting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <>
               <Check className="h-4 w-4 mr-1" />
@@ -176,7 +177,7 @@ export function InvitationCard({
           className="h-8 text-muted-foreground hover:text-destructive hover:border-destructive"
         >
           {isRejecting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <>
               <X className="h-4 w-4 mr-1" />

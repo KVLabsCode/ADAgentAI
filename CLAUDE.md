@@ -148,29 +148,91 @@ Lightweight LLM call classifies user queries to route to appropriate specialists
 - `NEXT_PUBLIC_CHAT_URL` - Chat agent URL (default: http://localhost:5000)
 - `NEXT_PUBLIC_SANITY_*` - Sanity CMS for blog
 
-### API (`backend/api/.env`)
+### Backend (`backend/.env`) - Shared by API and Agent
 - `DATABASE_URL` - Neon PostgreSQL connection
 - `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` - Auth config
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - OAuth
 - `POLAR_ACCESS_TOKEN` - Billing integration
-
-### Agent (`backend/.env`)
 - `ANTHROPIC_API_KEY` - LLM provider
-- `API_URL`, `INTERNAL_API_KEY` - API communication
+- `API_URL` - API server URL (default: http://localhost:3001)
+- `INTERNAL_API_KEY` - Shared key for agent → API communication
+
+## Design System
+
+### Overview
+
+The project uses a comprehensive design system with:
+- **W3C DTCG tokens** - Industry-standard design tokens format
+- **Atomic Design** - Components organized as atoms/molecules/organisms
+- **Linear-inspired UI** - Clean, professional aesthetic inspired by Linear's design
+- **Bidirectional Figma sync** - Edit tokens in code or Figma
+
+### Quick Commands
+```bash
+cd frontend
+bun run tokens:build    # Generate CSS from tokens
+bun run tokens:watch    # Watch mode (auto-rebuild)
+```
+
+### Token Architecture (Three-Tier)
+```
+Primitives (raw values) → Semantic (theme-aware) → Components (UI-specific)
+```
+
+**Token files:**
+```
+frontend/tokens/
+├── primitives/    # colors, spacing, typography, radius, shadow, motion
+├── semantic/      # dark.tokens.json, light.tokens.json
+└── style-dictionary.config.mjs
+```
+
+**Generated output:**
+- `src/styles/tokens.css` - CSS custom properties
+- `src/styles/tokens-dark.css` - Dark theme overrides
+- `src/styles/tokens-light.css` - Light theme overrides
+- `src/styles/tokens.json` - JSON for JavaScript
+
+### Component Organization (Atomic Design)
+```
+frontend/src/components/
+├── atoms/        # Button, Input, Badge, Label, Checkbox, Switch
+├── molecules/    # Card, Dialog, Select, Tabs, Accordion, Dropdown
+├── organisms/    # Sidebar, DataTable, Tool, ChainOfThought
+└── features/     # chat/, billing/, settings/, admin/
+```
+
+**Import pattern:**
+```tsx
+import { Button } from "@/atoms/button"
+import { Card } from "@/molecules/card"
+import { Sidebar } from "@/organisms/sidebar"
+```
+
+### Design Documentation
+- `docs/design-system.md` - Full design system guide
+- `docs/figma-integration.md` - Figma setup with Tokens Studio
+- `docs/linear-theme-migration.md` - Using Linear theme tokens
+- `docs/theme.md` - Semantic color tokens and usage
+- `frontend/docs/design-tokens.md` - W3C DTCG token system guide
 
 ## Code Style
 
 See documentation for detailed guidelines:
 - `docs/separation-of-concerns.md` - Component/hook patterns
-- `docs/theme.md` - Design tokens and colors
+- `docs/theme.md` - Semantic color tokens and usage
+- `docs/design-system.md` - Full design system guide
+- `docs/component-patterns.md` - Compound components, CVA variants
 
 ### Quick Reference
 
 **Separation of Concerns**: Components render UI, hooks handle logic. Extract when 3+ state variables.
 
-**Design Tokens**: Use `text-success`, `text-destructive`, `text-warning` instead of hardcoded colors.
+**Design Tokens**: Use semantic tokens like `--tokenAccentDefault`, `--tokenSuccessDefault`. Never hardcode colors.
 
 **File Size**: Pages < 200 lines, Components < 300 lines, Hooks < 150 lines.
+
+**Accessibility**: All icon buttons need `sr-only` labels. Use `transition-colors` instead of `transition-all`.
 
 **Organization Context**: Pass `selectedOrganizationId` to API calls:
 ```tsx

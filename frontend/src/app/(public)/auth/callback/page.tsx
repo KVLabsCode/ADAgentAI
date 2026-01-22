@@ -3,8 +3,9 @@
 import * as React from "react"
 import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
 import { useUser } from "@/hooks/use-user"
+import { storage } from "@/lib/storage"
 
 function CallbackContent() {
   const router = useRouter()
@@ -32,9 +33,9 @@ function CallbackContent() {
       setStatus("success")
       setMessage("Sign in successful! Redirecting...")
 
-      // Get redirect destination from localStorage or use default
-      const redirectTo = localStorage.getItem("auth_redirect") || "/dashboard"
-      localStorage.removeItem("auth_redirect")
+      // Get redirect destination from storage or use default
+      const redirectTo = storage.get<string>("auth_redirect", "/dashboard")
+      storage.remove("auth_redirect")
 
       setTimeout(() => {
         router.push(redirectTo)
@@ -53,7 +54,7 @@ function CallbackContent() {
     <>
       {status === "loading" && (
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Spinner size="md" className="text-muted-foreground" />
           <p className="text-sm text-muted-foreground">{message}</p>
         </div>
       )}
@@ -86,7 +87,7 @@ function CallbackContent() {
 function CallbackSkeleton() {
   return (
     <div className="flex flex-col items-center gap-3">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <Spinner size="md" className="text-muted-foreground" />
       <p className="text-sm text-muted-foreground">Loading...</p>
     </div>
   )

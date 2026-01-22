@@ -54,6 +54,32 @@ export function GoogleAdManagerLogo({ className, size = "md" }: LogoProps) {
   )
 }
 
+interface AppLovinLogoProps extends LogoProps {
+  disabled?: boolean
+}
+
+/**
+ * AppLovin MAX Logo
+ */
+export function AppLovinLogo({ className, size = "md", disabled = false }: AppLovinLogoProps) {
+  return (
+    <div className={cn(
+      SIZE_CLASSES[size],
+      "relative flex-shrink-0",
+      disabled && "grayscale brightness-75 opacity-70",
+      className
+    )}>
+      <Image
+        src="/logos/applovin.svg"
+        alt="AppLovin MAX"
+        width={SIZE_PX[size]}
+        height={SIZE_PX[size]}
+        className="object-contain"
+      />
+    </div>
+  )
+}
+
 /**
  * Combined logo badge component for consistent display
  * Handles both connected (active) and coming soon (disabled) states

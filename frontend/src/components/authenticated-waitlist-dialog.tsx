@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { Check, Loader2, Copy, CheckCheck, Briefcase, MessageSquareText } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
+import { Check, Copy, CheckCheck, Briefcase, MessageSquareText } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
+import { Textarea } from "@/atoms/textarea"
+import { Label } from "@/atoms/label"
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/molecules/dialog"
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 import {
   Select,
@@ -20,7 +21,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/molecules/select"
 import { cn } from "@/lib/utils"
 import { useAuthenticatedWaitlistForm } from "@/hooks/useAuthenticatedWaitlistForm"
 
@@ -221,7 +222,7 @@ export function AuthenticatedWaitlistDialog({
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Spinner size="sm" className="mr-2" />
                       Joining...
                     </>
                   ) : (

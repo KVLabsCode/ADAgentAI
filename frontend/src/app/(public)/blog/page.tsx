@@ -1,12 +1,30 @@
+import { Suspense } from "react"
 import { getAllPosts } from "@/lib/blog"
 import { BlogList } from "./blog-list"
+import { Skeleton } from "@/atoms/skeleton"
 
-export const dynamic = "force-dynamic"
-export const revalidate = 60 // Revalidate every 60 seconds
-
-export default async function BlogPage() {
+// Async component for data fetching
+async function BlogPosts() {
   const posts = await getAllPosts()
+  return <BlogList posts={posts} />
+}
 
+// Loading skeleton for blog posts
+function BlogPostsSkeleton() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-64 w-full rounded-lg" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-48 rounded-lg" />
+          <Skeleton className="h-48 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function BlogPage() {
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -23,7 +41,9 @@ export default async function BlogPage() {
         </div>
       </section>
 
-      <BlogList posts={posts} />
+      <Suspense fallback={<BlogPostsSkeleton />}>
+        <BlogPosts />
+      </Suspense>
 
       {/* Newsletter CTA */}
       <section className="py-12 border-t border-border/40 bg-muted/30">
@@ -36,6 +56,8 @@ export default async function BlogPage() {
             <div className="flex gap-2 max-w-sm mx-auto">
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 placeholder="Enter your email"
                 className="flex-1 h-8 px-3 text-xs rounded-md border border-border/50 bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               />

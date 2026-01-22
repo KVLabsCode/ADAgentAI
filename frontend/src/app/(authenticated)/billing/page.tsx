@@ -2,56 +2,51 @@
 
 import * as React from "react"
 import { Suspense } from "react"
-import { AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { AlertCircle, ArrowRight } from "lucide-react"
+import { Button } from "@/atoms/button"
+import { Skeleton } from "@/atoms/skeleton"
 import {
   PageContainer,
-  PageHeader,
-  SectionCard,
-  EmptyState,
   StatusMessage,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 import { useBilling } from "@/hooks/useBilling"
-import {
-  CurrentPlanCard,
-  PlanSelector,
-  InvoiceList,
-  PaymentMethodsCard,
-} from "@/components/billing"
+import { PlanCards, RecentInvoicesCard } from "@/components/billing"
 
 function BillingContent() {
   const {
-    subscription,
-    usage,
     invoices,
     isPro,
-    usagePercent,
     isLoading,
     loadError,
     isUpgrading,
-    isOpeningPortal,
     statusMessage,
     handleUpgrade,
-    handleManageSubscription,
     retry,
   } = useBilling()
 
   if (isLoading) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Billing"
-          description="Manage your subscription and payment methods."
-        />
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <SectionCard key={i}>
-              <div className="p-4 animate-pulse">
-                <div className="h-4 w-32 bg-muted rounded mb-2" />
-                <div className="h-3 w-48 bg-muted rounded" />
-              </div>
-            </SectionCard>
-          ))}
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <Skeleton className="h-7 w-20" />
+            <Skeleton className="h-4 w-56" />
+          </div>
+          <Skeleton className="h-4 w-20" />
+        </div>
+
+        {/* Plan cards skeleton */}
+        <div className="grid gap-4 sm:grid-cols-2 mt-8">
+          <Skeleton className="h-48 w-full rounded-[var(--card-radius)]" />
+          <Skeleton className="h-48 w-full rounded-[var(--card-radius)]" />
+        </div>
+
+        {/* Invoices skeleton */}
+        <div className="mt-8">
+          <Skeleton className="h-4 w-28 mb-3" />
+          <Skeleton className="h-16 w-full rounded-[var(--card-radius)]" />
         </div>
       </PageContainer>
     )
@@ -60,27 +55,36 @@ function BillingContent() {
   if (loadError) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Billing"
-          description="Manage your subscription and payment methods."
-        />
-        <SectionCard>
-          <EmptyState
-            icon={AlertCircle}
-            title="Unable to load billing"
-            description={loadError}
-            className="py-12"
-          >
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs"
-              onClick={retry}
-            >
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-[length:var(--text-title)] font-[var(--font-weight-semibold)] leading-[var(--line-height-title)]">
+              Billing
+            </h1>
+            <p className="text-[length:var(--text-description)] leading-[var(--line-height-description)] text-[color:var(--text-color-description)]">
+              For questions about billing,{" "}
+              <Link href="/support" className="text-foreground hover:underline underline-offset-2">
+                contact us
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Error card */}
+        <div className="mt-8 rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)] px-[var(--item-padding-x)] py-8">
+          <div className="flex flex-col items-center text-center">
+            <AlertCircle className="h-8 w-8 text-muted-foreground mb-3" />
+            <p className="text-[length:var(--text-label)] font-[var(--font-weight-medium)] mb-1">
+              Unable to load billing
+            </p>
+            <p className="text-[length:var(--text-description)] text-muted-foreground mb-4">
+              {loadError}
+            </p>
+            <Button size="sm" variant="outline" onClick={retry}>
               Try again
             </Button>
-          </EmptyState>
-        </SectionCard>
+          </div>
+        </div>
       </PageContainer>
     )
   }
@@ -91,45 +95,43 @@ function BillingContent() {
         <StatusMessage type={statusMessage.type} message={statusMessage.text} />
       )}
 
-      <PageHeader
-        title="Billing"
-        description="Manage your subscription and payment methods."
-      />
-
-      <CurrentPlanCard
-        subscription={subscription}
-        usage={usage}
-        isPro={isPro}
-        usagePercent={usagePercent}
-        isOpeningPortal={isOpeningPortal}
-        onManage={handleManageSubscription}
-      />
-
-      <PlanSelector
-        isPro={isPro}
-        isUpgrading={isUpgrading}
-        onUpgrade={handleUpgrade}
-      />
-
-      {isPro && (
-        <PaymentMethodsCard
-          isOpeningPortal={isOpeningPortal}
-          onManage={handleManageSubscription}
-        />
-      )}
-
-      <InvoiceList invoices={invoices} />
-
-      <div className="flex items-start gap-2 px-4 py-3 rounded border border-border/30 bg-muted/20">
-        <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+      {/* Header - Linear style */}
+      <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs text-muted-foreground">
-            Need help with billing? Contact{" "}
-            <a href="mailto:support@kovio.dev" className="text-foreground hover:underline underline-offset-2">
-              support@kovio.dev
-            </a>
+          <h1 className="text-[length:var(--text-title)] font-[var(--font-weight-semibold)] leading-[var(--line-height-title)]">
+            Billing
+          </h1>
+          <p className="text-[length:var(--text-description)] leading-[var(--line-height-description)] text-[color:var(--text-color-description)]">
+            For questions about billing,{" "}
+            <Link href="/support" className="text-foreground hover:underline underline-offset-2">
+              contact us
+            </Link>
           </p>
         </div>
+        <Link
+          href="/pricing"
+          className="flex items-center gap-1 text-[length:var(--text-description)] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          All plans
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      {/* Plan cards - two column grid */}
+      <div className="mt-8">
+        <PlanCards
+          isPro={isPro}
+          isUpgrading={isUpgrading}
+          onUpgrade={handleUpgrade}
+        />
+      </div>
+
+      {/* Recent invoices */}
+      <div className="mt-8">
+        <h2 className="text-[length:var(--text-label)] font-[var(--font-weight-medium)] mb-3">
+          Recent invoices
+        </h2>
+        <RecentInvoicesCard invoices={invoices} />
       </div>
     </PageContainer>
   )
@@ -138,19 +140,20 @@ function BillingContent() {
 function BillingLoadingSkeleton() {
   return (
     <PageContainer>
-      <div className="space-y-1">
-        <div className="h-4 w-20 bg-muted rounded animate-pulse" />
-        <div className="h-3 w-56 bg-muted rounded animate-pulse" />
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <Skeleton className="h-7 w-20" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-4 w-20" />
       </div>
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <SectionCard key={i}>
-            <div className="p-4 animate-pulse">
-              <div className="h-4 w-32 bg-muted rounded mb-2" />
-              <div className="h-3 w-48 bg-muted rounded" />
-            </div>
-          </SectionCard>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-2 mt-8">
+        <Skeleton className="h-48 w-full rounded-[var(--card-radius)]" />
+        <Skeleton className="h-48 w-full rounded-[var(--card-radius)]" />
+      </div>
+      <div className="mt-8">
+        <Skeleton className="h-4 w-28 mb-3" />
+        <Skeleton className="h-16 w-full rounded-[var(--card-radius)]" />
       </div>
     </PageContainer>
   )

@@ -5,7 +5,6 @@ import {
   Plug,
   ChevronRight,
   Settings2,
-  Loader2,
   Search,
   Layers,
   X,
@@ -18,22 +17,23 @@ import {
   Minus,
   ShieldCheck,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
+import { Switch } from "@/atoms/switch"
+import { Label } from "@/atoms/label"
+import { Input } from "@/atoms/input"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/molecules/dialog"
 import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from "@/molecules/scroll-area"
 import { AdMobLogo, GoogleAdManagerLogo } from "@/components/icons/provider-logos"
 import { useChatSettings } from "@/lib/chat-settings"
-import { useSidebar } from "@/components/ui/sidebar"
+import { useSidebar } from "@/organisms/sidebar"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import type { Provider, ProviderApp } from "@/lib/types"
@@ -314,7 +314,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
               )}
             >
               {isLoading ? (
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                <Spinner size="xs" className="text-muted-foreground" />
               ) : (
                 <ChevronRight
                   className={cn(
@@ -391,7 +391,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
           >
             {isLoading ? (
               <div className="flex items-center gap-2 py-2 pl-3 text-[10px] text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Spinner size="xs" />
                 <span>Loading apps...</span>
               </div>
             ) : filteredAppsList.length === 0 ? (

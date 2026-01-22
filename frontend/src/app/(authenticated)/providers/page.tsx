@@ -6,15 +6,15 @@ import { Plug } from "lucide-react"
 import {
   PageContainer,
   PageHeader,
-  SectionCard,
-  SectionCardContent,
+  SettingsSection,
+  ConfigFieldGroup,
   EmptyState,
   StatusMessage,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 import {
   ConnectProviderDropdown,
   ProviderListItem,
-  SupportedPlatformsCard,
+  SupportedPlatformsContent,
   AccountSelectionModal,
 } from "@/components/providers"
 import { useProviderManagement } from "@/hooks/useProviderManagement"
@@ -56,10 +56,10 @@ function ProvidersContent() {
       </PageHeader>
 
       {isLoading ? (
-        <SectionCard>
-          <div className="p-4 space-y-3">
+        <SettingsSection title="Connected Accounts">
+          <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)] space-y-3">
             {[1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse">
+              <div key={i} className="flex items-center gap-[var(--item-gap)] animate-pulse">
                 <div className="h-8 w-8 rounded bg-muted" />
                 <div className="space-y-1.5">
                   <div className="h-3.5 w-32 bg-muted rounded" />
@@ -68,16 +68,16 @@ function ProvidersContent() {
               </div>
             ))}
           </div>
-        </SectionCard>
+        </SettingsSection>
       ) : providers.length === 0 ? (
-        <SectionCard>
+        <SettingsSection title="Connected Accounts">
           <EmptyState
             icon={Plug}
             title="No providers connected"
             description={canManage === false
-              ? "No ad platforms have been connected yet. Contact your organization admin to connect providers."
-              : "Connect your AdMob or Google Ad Manager account to start."}
-            className="py-12"
+              ? "Contact your admin to connect providers."
+              : "Connect your AdMob account to start."}
+            className="py-8"
           >
             {canManage && (
               <ConnectProviderDropdown
@@ -87,27 +87,27 @@ function ProvidersContent() {
               />
             )}
           </EmptyState>
-        </SectionCard>
+        </SettingsSection>
       ) : (
-        <SectionCard>
-          <SectionCardContent padded={false}>
-            <div className="divide-y divide-border/30">
-              {providers.map((provider) => (
-                <ProviderListItem
-                  key={provider.id}
-                  provider={provider}
-                  canManage={canManage ?? false}
-                  togglingProvider={togglingProvider}
-                  onToggleEnabled={handleToggleEnabled}
-                  onDisconnect={handleDisconnect}
-                />
-              ))}
-            </div>
-          </SectionCardContent>
-        </SectionCard>
+        <SettingsSection title="Connected Accounts">
+          <ConfigFieldGroup>
+            {providers.map((provider) => (
+              <ProviderListItem
+                key={provider.id}
+                provider={provider}
+                canManage={canManage ?? false}
+                togglingProvider={togglingProvider}
+                onToggleEnabled={handleToggleEnabled}
+                onDisconnect={handleDisconnect}
+              />
+            ))}
+          </ConfigFieldGroup>
+        </SettingsSection>
       )}
 
-      <SupportedPlatformsCard />
+      <SettingsSection title="Supported Platforms" bare>
+        <SupportedPlatformsContent />
+      </SettingsSection>
 
       <AccountSelectionModal
         open={accountSelectionOpen}
@@ -126,15 +126,15 @@ function ProvidersLoadingSkeleton() {
     <PageContainer>
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <div className="h-4 w-40 bg-muted rounded animate-pulse" />
-          <div className="h-3 w-56 bg-muted rounded animate-pulse" />
+          <div className="h-7 w-40 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-56 bg-muted rounded animate-pulse" />
         </div>
         <div className="h-8 w-20 bg-muted rounded animate-pulse" />
       </div>
-      <SectionCard>
-        <div className="p-4 space-y-3">
+      <SettingsSection title="Connected Accounts">
+        <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)] space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3 animate-pulse">
+            <div key={i} className="flex items-center gap-[var(--item-gap)] animate-pulse">
               <div className="h-8 w-8 rounded bg-muted" />
               <div className="space-y-1.5">
                 <div className="h-3.5 w-32 bg-muted rounded" />
@@ -143,7 +143,7 @@ function ProvidersLoadingSkeleton() {
             </div>
           ))}
         </div>
-      </SectionCard>
+      </SettingsSection>
     </PageContainer>
   )
 }

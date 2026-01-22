@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2 } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
 import { ChatContainer } from "@/components/chat/chat-container"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
@@ -60,7 +60,7 @@ export default function ChatPage() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <Spinner size="md" className="text-muted-foreground" />
       </div>
     )
   }

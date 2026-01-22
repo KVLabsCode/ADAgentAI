@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: admob-mcp-server
+    runtime: python
+    buildCommand: pip install -e .
+    startCommand: python -m admob_mcp.server
+    envVars:
+      - key: TRANSPORT
+        value: http
+      - key: PORT
+        value: 10000
+      - key: ADMOB_ACCESS_TOKEN
+        sync: false  # Set manually in Render dashboard
+    healthCheckPath: /mcp

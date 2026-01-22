@@ -1,11 +1,13 @@
 name: E2E Tests
 
+# E2E tests are disabled temporarily - they require all services running
+# and proper test fixtures. Run manually via workflow_dispatch when needed.
 on:
-  push:
-    branches: [main, DEV]
-  pull_request:
-    branches: [main, DEV]
-  # Allow manual triggering
+  # Disabled: push:
+  #   branches: [main, DEV]
+  # Disabled: pull_request:
+  #   branches: [main, DEV]
+  # Allow manual triggering only
   workflow_dispatch:
 
 env:

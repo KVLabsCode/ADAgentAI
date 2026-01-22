@@ -2,16 +2,13 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Calendar, Clock, Twitter, Linkedin } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/atoms/button"
+import { Badge } from "@/atoms/badge"
 import { getPostBySlug, getRelatedPosts, getAllSlugs } from "@/lib/blog"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { PortableTextRenderer } from "@/components/blog/portable-text-renderer"
 import type { PortableTextBlock } from "@/lib/sanity"
-
-export const dynamic = "force-dynamic"
-export const revalidate = 60
 
 interface Props {
   params: Promise<{ slug: string }>

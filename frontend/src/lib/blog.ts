@@ -101,8 +101,7 @@ export async function getAllPosts(): Promise<BlogPostMeta[]> {
       blogQueries.allPublishedPosts
     )
     const posts = sanityPosts.map(transformPost).map(toMeta)
-    posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    return posts
+    return posts.toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   } catch (err) {
     console.error("Failed to fetch blog posts:", err)
     return []

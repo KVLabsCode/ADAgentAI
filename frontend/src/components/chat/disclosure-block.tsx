@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { ChevronRight, ChevronDown } from "lucide-react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/molecules/collapsible"
 import { cn } from "@/lib/utils"
 
 interface DisclosureBlockProps {
@@ -23,15 +23,15 @@ export function DisclosureBlock({
   const [isOpen, setIsOpen] = React.useState(defaultOpen)
 
   const variantStyles = {
-    thinking: "border-amber-500/15 bg-amber-500/[0.03]",
-    tool: "border-blue-500/15 bg-blue-500/[0.03]",
-    result: "border-green-500/15 bg-green-500/[0.03]",
+    thinking: "border-border/40 bg-muted/30",
+    tool: "border-border/40 bg-muted/30",
+    result: "border-border/40 bg-muted/30",
   }
 
   const iconStyles = {
-    thinking: "text-amber-600/70 dark:text-amber-400/70",
-    tool: "text-blue-600/70 dark:text-blue-400/70",
-    result: "text-green-600/70 dark:text-green-400/70",
+    thinking: "text-muted-foreground",
+    tool: "text-muted-foreground",
+    result: "text-muted-foreground",
   }
 
   return (

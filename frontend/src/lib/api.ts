@@ -76,6 +76,7 @@ export interface ChatStreamCallbacks {
   onAgent?: (agent: string, task: string) => void;
   onThinking?: (content: string) => void;
   onToolCall?: (tool: string, inputPreview: string, inputFull?: string, approved?: boolean) => void;
+  onToolExecuting?: (toolName: string, message: string) => void;  // Tool started executing (progress UI)
   onToolResult?: (preview: string, full?: string, dataType?: string) => void;
   onToolApprovalRequired?: (approvalId: string, toolName: string, toolInput: string, parameterSchema?: Record<string, unknown>) => void;
   onToolDenied?: (toolName: string, reason: string) => void;
@@ -238,14 +239,10 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
     case "tool_result":
       callbacks.onToolResult?.(event.preview || "", event.full, event.data_type);
       break;
+    case "tool_executing":
+      callbacks.onToolExecuting?.(event.tool_name || "", event.message || "Executing...");
+      break;
     case "tool_approval_required":
-      console.log("[api.ts] tool_approval_required event:", {
-        tool_name: event.tool_name,
-        tool_input: event.tool_input,
-        tool_input_type: typeof event.tool_input,
-        parameter_schema: event.parameter_schema ? "YES" : "NO",
-        full_event: event
-      });
       callbacks.onToolApprovalRequired?.(
         event.approval_id || "",
         event.tool_name || "",
@@ -272,6 +269,13 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
 export interface FieldOption {
   value: string;
   label: string;
+  // Optional metadata for filtering/validation
+  adFormat?: string;
+  appId?: string;
+  platform?: string;
+  // UI state
+  disabled?: boolean;
+  comingSoon?: boolean;
 }
 
 export interface FieldOptionsResponse {
@@ -280,17 +284,28 @@ export interface FieldOptionsResponse {
 }
 
 /**
+ * Filter parameters for cascading field dependencies
+ */
+export interface FieldFilterParams {
+  platform?: string;    // IOS, ANDROID
+  adFormat?: string;    // BANNER, INTERSTITIAL, REWARDED, etc.
+  appId?: string;       // Filter by specific app
+}
+
+/**
  * Fetch dynamic field options for parameter forms
  * @param fieldType - Type of field (accounts, apps, ad_units, etc.)
- * @param accountId - Optional account ID for dependent fields
  * @param accessToken - User's access token
+ * @param accountId - Optional account ID for dependent fields
  * @param organizationId - Optional organization context
+ * @param filters - Optional filter params for cascading dependencies
  */
 export async function fetchFieldOptions(
   fieldType: string,
   accessToken: string | null,
   accountId?: string,
-  organizationId?: string | null
+  organizationId?: string | null,
+  filters?: FieldFilterParams
 ): Promise<FieldOptionsResponse> {
   try {
     const headers: Record<string, string> = {
@@ -309,6 +324,10 @@ export async function fetchFieldOptions(
       body: JSON.stringify({
         field_type: fieldType,
         account_id: accountId,
+        // Include filter params if provided
+        platform: filters?.platform,
+        ad_format: filters?.adFormat,
+        app_id: filters?.appId,
       }),
     });
 
@@ -316,7 +335,8 @@ export async function fetchFieldOptions(
       return { options: [], manual_input: true };
     }
 
-    return await response.json();
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error("[fetchFieldOptions] Error:", error);
     return { options: [], manual_input: true };
@@ -364,7 +384,6 @@ export async function approveTool(
     }
 
     const result = await response.json();
-    console.log(`[approveTool] Response:`, result);
     return { success: result.success === true };
   } catch (error) {
     console.error("[approveTool] Error:", error);
@@ -440,7 +459,8 @@ export async function resumeStream(
   callbacks: ChatStreamCallbacks,
   accessToken?: string | null,
   modifiedParams?: Record<string, unknown>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  toolName?: string
 ): Promise<void> {
   const url = `${AGENT_URL}/chat/resume`;
   let doneHandled = false;
@@ -462,6 +482,7 @@ export async function resumeStream(
         stream_id: streamId,
         approved,
         modified_params: modifiedParams,
+        tool_name: toolName,
       }),
       signal,
     });

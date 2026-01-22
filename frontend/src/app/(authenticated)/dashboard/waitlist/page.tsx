@@ -4,9 +4,6 @@ import * as React from "react"
 import { useState, useEffect, useCallback } from "react"
 import {
   Users,
-  Mail,
-  Clock,
-  CheckCircle2,
   Send,
   RefreshCw,
   Search,
@@ -16,33 +13,17 @@ import {
   MoreHorizontal,
   XCircle,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-  DataTableContainer,
-  DataTableHeaderRow,
-  DataTableHead,
-  DataTableRow,
-  DataTableCell,
-  Table,
-  TableBody,
-  TableHeader,
-} from "@/components/ui/data-table"
-import {
-  PageContainer,
-  PageHeader,
-  StatCard,
-  FilterBar,
-  EmptyState,
-} from "@/components/ui/theme"
+import { Button } from "@/atoms/button"
+import { Input } from "@/atoms/input"
+import { Badge } from "@/atoms/badge"
+import { PageContainer } from "@/organisms/theme"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/molecules/select"
 import {
   Dialog,
   DialogContent,
@@ -50,14 +31,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/molecules/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/molecules/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,13 +48,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/molecules/alert-dialog"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/molecules/tooltip"
+import { Skeleton } from "@/atoms/skeleton"
 import { cn } from "@/lib/utils"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -91,70 +72,50 @@ interface WaitlistEntry {
   invitedAt: string | null
 }
 
-interface WaitlistStats {
-  total: number
-  pending: number
-  invited: number
-  joined: number
-  rejected: number
-}
-
 function StatusBadge({ status }: { status: string }) {
   const getStatusInfo = () => {
     switch (status) {
       case "pending":
         return {
-          label: "Awaiting Invite",
-          description: "User signed up, waiting for you to send invite",
-          className: "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/20",
-          icon: Clock,
+          label: "Pending",
+          description: "Waiting for invite",
+          // Linear uses purple/violet for badges
+          className: "bg-[lch(48_59.31_288.43/0.2)] text-foreground",
         }
       case "invited":
         return {
-          label: "Invite Sent",
-          description: "Invitation email sent, waiting for user to sign up",
-          className: "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-blue-500/20",
-          icon: Mail,
+          label: "Invited",
+          description: "Invite sent",
+          className: "bg-[lch(48_59.31_288.43/0.2)] text-foreground",
         }
       case "joined":
         return {
           label: "Joined",
-          description: "User has created an account",
-          className: "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20",
-          icon: CheckCircle2,
+          description: "Account created",
+          className: "bg-emerald-500/20 text-emerald-400",
         }
       case "rejected":
         return {
           label: "Rejected",
-          description: "User was rejected from the waitlist",
-          className: "bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-500/20",
-          icon: XCircle,
+          description: "Rejected from waitlist",
+          className: "bg-red-500/20 text-red-400",
         }
       default:
-        return {
-          label: status,
-          description: "",
-          className: "",
-          icon: Clock,
-        }
+        return { label: status, description: "", className: "" }
     }
   }
 
   const info = getStatusInfo()
-  const Icon = info.icon
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge
-          variant="secondary"
-          className={cn("text-[10px] h-5 px-1.5 cursor-help", info.className)}
-        >
-          <Icon className="h-2.5 w-2.5 mr-1" />
+        {/* Linear badge: padding 2px 6px, border-radius 3px, font-size ~12px */}
+        <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-xs font-normal cursor-help", info.className)}>
           {info.label}
-        </Badge>
+        </span>
       </TooltipTrigger>
-      <TooltipContent side="top" className="text-xs max-w-[200px]">
+      <TooltipContent side="top" className="text-xs">
         {info.description}
       </TooltipContent>
     </Tooltip>
@@ -165,13 +126,18 @@ function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
   })
+}
+
+function getInitials(name: string | null, email: string) {
+  if (name) {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
+  return email[0].toUpperCase()
 }
 
 export default function WaitlistAdminPage() {
   const [entries, setEntries] = useState<WaitlistEntry[]>([])
-  const [stats, setStats] = useState<WaitlistStats>({ total: 0, pending: 0, invited: 0, joined: 0, rejected: 0 })
   const [loading, setLoading] = useState(true)
   const [inviting, setInviting] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<string | null>(null)
@@ -201,40 +167,9 @@ export default function WaitlistAdminPage() {
     }
   }, [statusFilter, page])
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const [allRes, pendingRes, invitedRes, joinedRes, rejectedRes] = await Promise.all([
-        fetch(`${API_URL}/api/waitlist/admin/list?limit=1`),
-        fetch(`${API_URL}/api/waitlist/admin/list?limit=1&status=pending`),
-        fetch(`${API_URL}/api/waitlist/admin/list?limit=1&status=invited`),
-        fetch(`${API_URL}/api/waitlist/admin/list?limit=1&status=joined`),
-        fetch(`${API_URL}/api/waitlist/admin/list?limit=1&status=rejected`),
-      ])
-
-      const [all, pending, invited, joined, rejected] = await Promise.all([
-        allRes.json(),
-        pendingRes.json(),
-        invitedRes.json(),
-        joinedRes.json(),
-        rejectedRes.json(),
-      ])
-
-      setStats({
-        total: all.total || 0,
-        pending: pending.total || 0,
-        invited: invited.total || 0,
-        joined: joined.total || 0,
-        rejected: rejected.total || 0,
-      })
-    } catch (error) {
-      console.error("Failed to fetch stats:", error)
-    }
-  }, [])
-
   useEffect(() => {
     fetchEntries()
-    fetchStats()
-  }, [fetchEntries, fetchStats])
+  }, [fetchEntries])
 
   const handleInvite = async (email: string) => {
     setInviting(email)
@@ -247,7 +182,6 @@ export default function WaitlistAdminPage() {
       const data = await res.json()
       if (data.success) {
         fetchEntries()
-        fetchStats()
       } else {
         alert(data.error || "Failed to invite user")
       }
@@ -276,7 +210,6 @@ export default function WaitlistAdminPage() {
       const data = await res.json()
       if (data.success) {
         fetchEntries()
-        fetchStats()
       } else {
         alert(data.error || "Failed to reject user")
       }
@@ -296,253 +229,253 @@ export default function WaitlistAdminPage() {
     entry.role?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Group entries by status
+  const groupedEntries = filteredEntries.reduce((acc, entry) => {
+    const group = entry.status === "joined" ? "joined" : entry.status === "rejected" ? "rejected" : "pending"
+    if (!acc[group]) acc[group] = []
+    acc[group].push(entry)
+    return acc
+  }, {} as Record<string, WaitlistEntry[]>)
+
   const totalPages = Math.ceil(total / limit)
 
   return (
-    <PageContainer>
-      {/* Header */}
-      <PageHeader
-        title="Waitlist"
-        description="Manage waitlist entries and send invites"
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs"
-          onClick={() => { fetchEntries(); fetchStats() }}
-        >
-          <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", loading && "animate-spin")} />
-          Refresh
-        </Button>
-      </PageHeader>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-5 gap-3">
-        <StatCard title="Total" value={stats.total} icon={Users} />
-        <StatCard title="Awaiting" value={stats.pending} icon={Clock} valueColor="warning" />
-        <StatCard title="Invited" value={stats.invited} icon={Mail} />
-        <StatCard title="Joined" value={stats.joined} icon={CheckCircle2} valueColor="success" />
-        <StatCard title="Rejected" value={stats.rejected} icon={XCircle} valueColor="error" />
+    <PageContainer size="full">
+      {/* Header - Linear style: title on first row, controls below */}
+      <div className="flex flex-col gap-3 -mx-[var(--page-padding)] px-[var(--page-padding)]">
+        <h1 className="text-[length:var(--text-page-title)] leading-[var(--line-height-title)] font-[var(--font-weight-medium)] pl-[var(--item-padding-x)]">
+          Waitlist
+        </h1>
+        <div className="flex items-center gap-5 pl-[var(--item-padding-x)] pr-[var(--item-padding-x)] pb-2">
+          {/* Search - Linear style: 300px, dark bg */}
+          <div className="relative w-[300px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or email"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 !bg-[lch(4.8_0.7_272)] border-[0.8px] border-[lch(19_3.54_272)] rounded-[5px] text-[13px] focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </div>
+          {/* Filter */}
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0) }}>
+            <SelectTrigger size="sm" className="w-24 text-[13px]">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="invited">Invited</SelectItem>
+              <SelectItem value="joined">Joined</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* Refresh - pushed right */}
+          <Button variant="outline" size="sm" className="h-8 ml-auto" onClick={fetchEntries}>
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <FilterBar>
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search by email, name, or role..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-8 text-xs"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0) }}>
-          <SelectTrigger className="w-36 h-8 text-xs">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="text-xs">All Status</SelectItem>
-            <SelectItem value="pending" className="text-xs">Awaiting Invite</SelectItem>
-            <SelectItem value="invited" className="text-xs">Invite Sent</SelectItem>
-            <SelectItem value="joined" className="text-xs">Joined</SelectItem>
-            <SelectItem value="rejected" className="text-xs">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-      </FilterBar>
+      {/* Table - Linear style full width */}
+      <div className="mt-4 overflow-visible">
+        {loading ? (
+          <div className="space-y-1">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-[50px] w-full" />
+            ))}
+          </div>
+        ) : filteredEntries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Users className="h-8 w-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-normal mb-1">No entries found</p>
+            <p className="text-xs text-muted-foreground">
+              {searchQuery ? "Try adjusting your search." : "The waitlist is empty."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Column headers - Linear style aligned with row data, 32px height */}
+            <div className="flex items-center h-8 text-xs font-medium text-muted-foreground -mx-[var(--page-padding)] px-[var(--page-padding)]">
+              <div className="w-[40%] min-w-0 pl-[var(--item-padding-x)]">Name</div>
+              <div className="w-[25%] min-w-0">Email</div>
+              <div className="w-[15%] min-w-0">Status</div>
+              <div className="w-[12%] min-w-0">Joined</div>
+              <div className="w-[8%] min-w-0 pr-[var(--item-padding-x)]"></div>
+            </div>
 
-      {/* Table */}
-      {loading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : filteredEntries.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="No entries found"
-          description={searchQuery ? "Try adjusting your search." : "The waitlist is empty."}
-        />
-      ) : (
-        <>
-          <DataTableContainer>
-            <Table>
-              <TableHeader>
-                <DataTableHeaderRow>
-                  <DataTableHead>Email</DataTableHead>
-                  <DataTableHead>Role</DataTableHead>
-                  <DataTableHead>Status</DataTableHead>
-                  <DataTableHead>Date</DataTableHead>
-                  <DataTableHead className="text-right">Actions</DataTableHead>
-                </DataTableHeaderRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEntries.map((entry) => (
-                  <DataTableRow key={entry.id}>
-                    <DataTableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium text-xs">{entry.email}</span>
-                        {entry.name && (
-                          <span className="text-[10px] text-muted-foreground">{entry.name}</span>
+            {/* Grouped sections */}
+            {Object.entries(groupedEntries).map(([group, groupEntries], groupIdx) => (
+              <div key={group}>
+                {/* Section header - full width with negative margins */}
+                <div className="flex items-center gap-2 h-8 bg-[lch(10.633_3.033_272)] -mx-[var(--page-padding)] px-[var(--page-padding)]">
+                  <span className="text-xs font-medium text-foreground capitalize pl-[var(--item-padding-x)]">
+                    {group === "pending" ? "Awaiting" : group}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {groupEntries.length}
+                  </span>
+                </div>
+
+                {/* Rows - full width with border separator */}
+                {groupEntries.map((entry, idx) => (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "group flex items-center h-[50px] hover:bg-muted/30 has-[[data-state=open]]:bg-muted/30 transition-colors -mx-[var(--page-padding)] px-[var(--page-padding)]",
+                      idx < groupEntries.length - 1 && "border-b border-[color:var(--item-divider)]"
+                    )}
+                  >
+                    {/* Name + Avatar - 40% width to match header */}
+                    <div className="w-[40%] min-w-0 flex items-center gap-3 pl-[var(--item-padding-x)]">
+                      <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-medium shrink-0">
+                        {getInitials(entry.name, entry.email)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[length:var(--text-label)] font-normal truncate">
+                          {entry.name || entry.email.split('@')[0]}
+                        </div>
+                        {entry.role && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {entry.role}
+                          </div>
                         )}
                       </div>
-                    </DataTableCell>
-                    <DataTableCell>
-                      {entry.role ? (
-                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-border/50 capitalize">
-                          {entry.role}
-                        </Badge>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">—</span>
-                      )}
-                    </DataTableCell>
-                    <DataTableCell>
+                    </div>
+
+                    {/* Email - 25% width */}
+                    <div className="w-[25%] min-w-0 text-xs text-muted-foreground truncate">
+                      {entry.email}
+                    </div>
+
+                    {/* Status - 15% width */}
+                    <div className="w-[15%] min-w-0">
                       <StatusBadge status={entry.status} />
-                    </DataTableCell>
-                    <DataTableCell>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(entry.createdAt)}
-                      </span>
-                    </DataTableCell>
-                    <DataTableCell className="text-right">
+                    </div>
+
+                    {/* Date - 12% width */}
+                    <div className="w-[12%] min-w-0 text-xs text-muted-foreground">
+                      {formatDate(entry.createdAt)}
+                    </div>
+
+                    {/* Actions - 8% width, only visible on hover */}
+                    <div className="w-[8%] min-w-0 flex justify-end pr-[var(--item-padding-x)]">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-7 w-7 p-0">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-muted hover:bg-muted transition-all">
                             <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-3.5 w-3.5" />
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuContent align="end" className="w-40">
                           {entry.useCase && (
-                            <DropdownMenuItem
-                              className="text-xs cursor-pointer"
-                              onClick={() => setSelectedEntry(entry)}
-                            >
+                            <DropdownMenuItem onClick={() => setSelectedEntry(entry)}>
                               <FileText className="mr-2 h-3.5 w-3.5" />
-                              View Use Case
+                              View details
                             </DropdownMenuItem>
                           )}
                           {entry.status === "pending" && (
                             <DropdownMenuItem
-                              className="text-xs cursor-pointer"
                               onClick={() => handleInvite(entry.email)}
                               disabled={inviting === entry.email}
                             >
                               {inviting === entry.email ? (
-                                <>
-                                  <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                  Sending...
-                                </>
+                                <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
                               ) : (
-                                <>
-                                  <Send className="mr-2 h-3.5 w-3.5" />
-                                  Send Invite
-                                </>
+                                <Send className="mr-2 h-3.5 w-3.5" />
                               )}
+                              Send invite
                             </DropdownMenuItem>
                           )}
                           {entry.status !== "rejected" && entry.status !== "joined" && (
                             <>
-                              {(entry.useCase || entry.status === "pending") && (
-                                <DropdownMenuSeparator />
-                              )}
+                              {(entry.useCase || entry.status === "pending") && <DropdownMenuSeparator />}
                               <DropdownMenuItem
-                                className="text-xs cursor-pointer text-destructive focus:text-destructive"
+                                className="text-destructive focus:text-destructive"
                                 onClick={() => handleRejectClick(entry)}
                                 disabled={rejecting === entry.email}
                               >
-                                {rejecting === entry.email ? (
-                                  <>
-                                    <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                    Rejecting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <XCircle className="mr-2 h-3.5 w-3.5" />
-                                    Reject
-                                  </>
-                                )}
+                                <XCircle className="mr-2 h-3.5 w-3.5" />
+                                Reject
                               </DropdownMenuItem>
                             </>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </DataTableCell>
-                  </DataTableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          </DataTableContainer>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {page * limit + 1}-{Math.min((page + 1) * limit, total)} of {total}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                >
-                  Next
-                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            ))}
+
+            {/* Pagination - Linear style */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-[color:var(--item-divider)]">
+                <p className="text-xs text-muted-foreground">
+                  {page * limit + 1}-{Math.min((page + 1) * limit, total)} of {total}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Use Case Dialog */}
       <Dialog open={!!selectedEntry} onOpenChange={() => setSelectedEntry(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base">Use Case</DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogTitle className="text-base font-normal">Details</DialogTitle>
+            <DialogDescription className="text-sm">
               {selectedEntry?.email}
-              {selectedEntry?.role && (
-                <span className="ml-1.5 capitalize">• {selectedEntry.role}</span>
-              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {selectedEntry?.name && (
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Name</p>
+                <p className="text-xs text-muted-foreground mb-1">Name</p>
                 <p className="text-sm">{selectedEntry.name}</p>
               </div>
             )}
+            {selectedEntry?.role && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Role</p>
+                <p className="text-sm capitalize">{selectedEntry.role}</p>
+              </div>
+            )}
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Use Case</p>
+              <p className="text-xs text-muted-foreground mb-1">Use Case</p>
               <p className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/30 rounded-md p-3">
                 {selectedEntry?.useCase || "No use case provided"}
               </p>
             </div>
-            <div className="pt-2 border-t border-border/50">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Status</p>
-              {selectedEntry && <StatusBadge status={selectedEntry.status} />}
-            </div>
           </div>
-          <DialogFooter className="gap-3">
+          <DialogFooter className="gap-2">
             {selectedEntry?.status !== "rejected" && selectedEntry?.status !== "joined" && (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 text-xs text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive"
                 onClick={() => {
                   if (selectedEntry) {
                     setSelectedEntry(null)
@@ -550,14 +483,13 @@ export default function WaitlistAdminPage() {
                   }
                 }}
               >
-                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                <XCircle className="h-3.5 w-3.5" />
                 Reject
               </Button>
             )}
             {selectedEntry?.status === "pending" && (
               <Button
                 size="sm"
-                className="h-8 text-xs"
                 onClick={() => {
                   if (selectedEntry) {
                     handleInvite(selectedEntry.email)
@@ -570,8 +502,8 @@ export default function WaitlistAdminPage() {
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <>
-                    <Send className="h-3.5 w-3.5 mr-1.5" />
-                    Send Invite
+                    <Send className="h-3.5 w-3.5" />
+                    Send invite
                   </>
                 )}
               </Button>
@@ -584,16 +516,16 @@ export default function WaitlistAdminPage() {
       <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">Reject from waitlist?</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">
-              This will mark <span className="font-medium text-foreground">{entryToReject?.email}</span> as rejected. The entry will remain in the waitlist for record keeping.
+            <AlertDialogTitle>Reject from waitlist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark <span className="font-medium text-foreground">{entryToReject?.email}</span> as rejected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-8 text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRejectConfirm}
-              className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Reject
             </AlertDialogAction>

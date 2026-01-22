@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
 import { authClient } from "@/lib/neon-auth/client"
 
 export default function LoginPage() {
@@ -28,7 +28,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-4">
+    <div className="fixed inset-0 flex items-center justify-center p-4 bg-[#08090a]">
       <div className="w-full max-w-sm space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -53,7 +53,7 @@ export default function LoginPage() {
           className="w-full h-11 gap-3"
         >
           {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path

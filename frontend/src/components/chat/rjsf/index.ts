@@ -3,4 +3,4 @@
  */
 
 export { RJSFParameterForm } from "./rjsf-parameter-form"
-export { customWidgets, AsyncSelectWidget } from "./widgets"
+export { customWidgets } from "./widgets"

@@ -44,8 +44,10 @@ export interface RJSFSchema {
 export type StreamEventItem =
   | { type: "routing"; service: string; capability: string; thinking?: string }
   | { type: "thinking"; content: string }
-  | { type: "content"; content: string }
+  | { type: "content"; content: string }  // Intermediate content (before/between tools)
+  | { type: "result"; content: string }    // Final answer (after all tools complete)
   | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean }
+  | { type: "tool_executing"; tool_name: string; message: string }  // Tool execution started (progress UI)
   | { type: "tool_result"; name: string; result: unknown }
   | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: RJSFSchema }
   | { type: "tool_denied"; tool_name: string; reason: string }
@@ -58,6 +60,8 @@ export interface Message {
   createdAt: string
   // Sequential events for display
   events?: StreamEventItem[]
+  // Streaming state
+  aborted?: boolean  // True if streaming was stopped by user
   // Legacy fields for backward compatibility with saved messages
   hasThinking?: boolean
   thinking?: string

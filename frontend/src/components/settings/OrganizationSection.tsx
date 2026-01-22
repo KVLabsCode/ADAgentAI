@@ -4,14 +4,14 @@ import * as React from "react"
 import Image from "next/image"
 import {
   Building2, UserPlus, Trash2, Crown, ShieldCheck, Users,
-  Loader2, Send, Mail, X, Clock, Pencil, AlertTriangle,
+  Send, Mail, X, Clock, Pencil, AlertTriangle,
   Link2, Copy, Check, RefreshCw, Shield, User
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { GmailEmailInput, getFullEmail } from "@/components/ui/gmail-email-input"
-import { SectionCard, SectionCardHeader, SectionCardContent } from "@/components/ui/theme"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
+import { Input } from "@/atoms/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/molecules/select"
+import { GmailEmailInput, getFullEmail } from "@/organisms/gmail-email-input"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/molecules/alert-dialog"
 import {
   useMemberManagement,
   useInvitationManagement,
@@ -74,18 +74,12 @@ export function OrganizationSection() {
 
   return (
     <>
-      <SectionCard>
-        <SectionCardHeader
-          icon={Building2}
-          title="Organization"
-          description={selectedOrganization ? `Manage ${selectedOrganization.name}` : "Select an organization to manage"}
-        />
-        <SectionCardContent className="space-y-4">
-          {!selectedOrganization ? (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              Switch to an organization using the sidebar to manage members.
-            </p>
-          ) : (
+      <div className="px-4 py-4 space-y-4">
+        {!selectedOrganization ? (
+          <p className="text-[13px] text-muted-foreground text-center py-4">
+            Switch to an organization using the sidebar to manage members.
+          </p>
+        ) : (
             <>
               {/* Share Member Link */}
               {members.canManageMembers && (
@@ -93,7 +87,7 @@ export function OrganizationSection() {
                   <div className="flex items-center gap-2">
                     <Link2 className="h-3.5 w-3.5 text-muted-foreground/70" />
                     <p className="text-xs font-medium">Share Member Link</p>
-                    {inviteLink.isLoadingInviteLink && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                    {inviteLink.isLoadingInviteLink && <Spinner size="xs" className="text-muted-foreground" />}
                   </div>
 
                   {inviteLink.inviteLink ? (
@@ -130,7 +124,7 @@ export function OrganizationSection() {
                             className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
                           >
                             {inviteLink.isRegeneratingLink ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <Spinner size="xs" />
                             ) : (
                               <>
                                 <RefreshCw className="h-3 w-3 mr-1" />
@@ -154,7 +148,7 @@ export function OrganizationSection() {
                         className="h-8 text-xs"
                       >
                         {inviteLink.isRegeneratingLink ? (
-                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          <Spinner size="xs" className="mr-1" />
                         ) : (
                           <Link2 className="h-3 w-3 mr-1" />
                         )}
@@ -217,7 +211,7 @@ export function OrganizationSection() {
                       disabled={invitations.isInviting || !invitations.inviteUsername}
                       className="h-9 w-9 p-0 shrink-0"
                     >
-                      {invitations.isInviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      {invitations.isInviting ? <Spinner size="sm" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
@@ -240,7 +234,7 @@ export function OrganizationSection() {
                       <Mail className="h-3.5 w-3.5 text-muted-foreground/70" />
                       <p className="text-xs font-medium">Pending Invitations</p>
                     </div>
-                    {invitations.isLoadingInvites && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                    {invitations.isLoadingInvites && <Spinner size="xs" className="text-muted-foreground" />}
                   </div>
                   <div className="space-y-1">
                     {invitations.pendingInvites.map((invite) => (
@@ -266,7 +260,7 @@ export function OrganizationSection() {
                             className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
                           >
                             {invitations.resendingInviteId === invite.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <Spinner size="xs" />
                             ) : (
                               <>
                                 <Clock className="h-3 w-3 mr-1" />
@@ -282,7 +276,7 @@ export function OrganizationSection() {
                             className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             {invitations.cancellingInviteId === invite.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <Spinner size="xs" />
                             ) : (
                               <X className="h-3 w-3" />
                             )}
@@ -298,7 +292,7 @@ export function OrganizationSection() {
               <div className="border-t border-border/20 pt-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium">Members</p>
-                  {members.isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  {members.isLoading && <Spinner size="xs" className="text-muted-foreground" />}
                 </div>
                 <div className="space-y-1.5">
                   {members.members.length === 0 && !members.isLoading ? (
@@ -372,7 +366,7 @@ export function OrganizationSection() {
                                   className="h-7 px-2 text-xs"
                                 >
                                   {members.changingRoleMemberId === member.id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <Spinner size="xs" />
                                   ) : (
                                     "Save"
                                   )}
@@ -437,6 +431,8 @@ export function OrganizationSection() {
                         <div className="flex items-center gap-2 mt-1.5">
                           <Input
                             type="text"
+                            name="organization"
+                            autoComplete="organization"
                             value={org.newOrgName}
                             onChange={(e) => org.setNewOrgName(e.target.value)}
                             className="h-7 text-xs flex-1"
@@ -448,7 +444,7 @@ export function OrganizationSection() {
                             disabled={org.isUpdatingOrg || !org.newOrgName.trim()}
                             className="h-7 text-xs px-2"
                           >
-                            {org.isUpdatingOrg ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                            {org.isUpdatingOrg ? <Spinner size="xs" /> : "Save"}
                           </Button>
                           <Button
                             size="sm"
@@ -488,8 +484,8 @@ export function OrganizationSection() {
                     </div>
                     <AlertDialog onOpenChange={(open) => !open && org.resetDeleteConfirm()}>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="h-7 text-xs">
-                          <Trash2 className="h-3 w-3 mr-1" />
+                        <Button variant="destructive" size="sm">
+                          <Trash2 className="h-3.5 w-3.5" />
                           Delete
                         </Button>
                       </AlertDialogTrigger>
@@ -529,7 +525,7 @@ export function OrganizationSection() {
                           >
                             {org.isDeletingOrg ? (
                               <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Spinner size="sm" className="mr-2" />
                                 Deleting...
                               </>
                             ) : (
@@ -546,10 +542,9 @@ export function OrganizationSection() {
                   )}
                 </div>
               )}
-            </>
-          )}
-        </SectionCardContent>
-      </SectionCard>
+          </>
+        )}
+      </div>
 
       {/* Copy Invite Message Modal */}
       <AlertDialog open={invitations.showInviteMessageModal} onOpenChange={(open) => {

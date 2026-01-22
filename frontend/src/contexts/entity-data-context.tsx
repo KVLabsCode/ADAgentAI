@@ -2,17 +2,59 @@
 
 import * as React from "react"
 import { createContext, useContext, useCallback, useState, useMemo } from "react"
-import { fetchFieldOptions, FieldOption } from "@/lib/api"
+import { fetchFieldOptions, FieldOption, FieldFilterParams } from "@/lib/api"
 import { useUser } from "./user-context"
 import { ENTITY_RELATIONSHIPS, EntityType } from "@/lib/entity-config"
+import { sessionStore } from "@/lib/storage"
 
-/** Cache TTL in milliseconds (5 minutes) */
-const CACHE_TTL = 5 * 60 * 1000
+/** Cache TTL in milliseconds (10 minutes - entity data changes infrequently) */
+const CACHE_TTL = 10 * 60 * 1000
+
+/** Session storage key for persistent cache */
+const STORAGE_KEY = 'entity_cache_data'
+
+/** Get cached data from sessionStorage */
+function getStoredCache(): EntityCache {
+  const stored = sessionStore.get<Record<string, Record<string, CacheEntry>> | null>(STORAGE_KEY, null)
+  if (!stored) return new Map()
+
+  // Reconstruct Map structure from serialized data
+  const cache: EntityCache = new Map()
+  for (const [type, entries] of Object.entries(stored)) {
+    const typeMap = new Map<string | null, CacheEntry>()
+    for (const [key, entry] of Object.entries(entries)) {
+      // Convert "null" string back to null
+      const mapKey = key === '__null__' ? null : key
+      typeMap.set(mapKey, entry)
+    }
+    cache.set(type, typeMap)
+  }
+  return cache
+}
+
+/** Save cache to sessionStorage */
+function saveStoredCache(cache: EntityCache): void {
+  // Convert Map structure to serializable object
+  const serializable: Record<string, Record<string, CacheEntry>> = {}
+  for (const [type, entries] of cache.entries()) {
+    serializable[type] = {}
+    for (const [key, entry] of entries.entries()) {
+      // Convert null key to special string
+      const mapKey = key === null ? '__null__' : key
+      serializable[type][mapKey] = entry
+    }
+  }
+  sessionStore.set(STORAGE_KEY, serializable)
+}
 
 export interface EntityItem {
   id: string
   name: string
   metadata?: Record<string, unknown>
+  /** If true, item is disabled and cannot be selected */
+  disabled?: boolean
+  /** If true, show "Coming Soon" badge (implies disabled) */
+  comingSoon?: boolean
 }
 
 interface CacheEntry {
@@ -25,20 +67,21 @@ type EntityCache = Map<string, Map<string | null, CacheEntry>>
 
 interface EntityDataContextValue {
   /** Get cached entities (returns empty array if not cached) */
-  getCachedEntities: (fetchType: string, parentId?: string | null) => EntityItem[]
+  getCachedEntities: (fetchType: string, parentId?: string | null, filters?: FieldFilterParams) => EntityItem[]
 
   /** Fetch entities (uses cache if fresh, fetches if stale/missing) */
   fetchEntities: (
     fetchType: string,
     parentId?: string | null,
-    force?: boolean
+    force?: boolean,
+    filters?: FieldFilterParams
   ) => Promise<EntityItem[]>
 
   /** Check if currently loading a specific fetch */
-  isLoading: (fetchType: string, parentId?: string | null) => boolean
+  isLoading: (fetchType: string, parentId?: string | null, filters?: FieldFilterParams) => boolean
 
   /** Get any error for a specific fetch */
-  getError: (fetchType: string, parentId?: string | null) => string | null
+  getError: (fetchType: string, parentId?: string | null, filters?: FieldFilterParams) => string | null
 
   /** Get display name for an entity ID */
   getDisplayName: (fetchType: string, id: string, parentId?: string | null) => string
@@ -58,8 +101,8 @@ const EntityDataContext = createContext<EntityDataContextValue | null>(null)
 export function EntityDataProvider({ children }: { children: React.ReactNode }) {
   const { getAccessToken, selectedOrganizationId } = useUser()
 
-  // Main cache
-  const [cache, setCache] = useState<EntityCache>(new Map())
+  // Main cache - initialize from sessionStorage
+  const [cache, setCache] = useState<EntityCache>(() => getStoredCache())
 
   // Loading states: "fetchType:parentId" -> boolean
   const [loadingStates, setLoadingStates] = useState<Map<string, boolean>>(new Map())
@@ -67,9 +110,12 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
   // Error states: "fetchType:parentId" -> string
   const [errorStates, setErrorStates] = useState<Map<string, string | null>>(new Map())
 
-  // Generate cache key for loading/error states
-  const getCacheKey = useCallback((fetchType: string, parentId?: string | null) => {
-    return `${fetchType}:${parentId ?? "null"}`
+  // Generate cache key for loading/error states (includes filter params for uniqueness)
+  const getCacheKey = useCallback((fetchType: string, parentId?: string | null, filters?: FieldFilterParams) => {
+    const filterKey = filters
+      ? `:${filters.platform || ""}:${filters.adFormat || ""}:${filters.appId || ""}`
+      : ""
+    return `${fetchType}:${parentId ?? "null"}${filterKey}`
   }, [])
 
   // Check if cache entry is fresh
@@ -80,13 +126,17 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
 
   // Get cached entities
   const getCachedEntities = useCallback(
-    (fetchType: string, parentId?: string | null): EntityItem[] => {
+    (fetchType: string, parentId?: string | null, filters?: FieldFilterParams): EntityItem[] => {
+      const key = getCacheKey(fetchType, parentId, filters)
       const typeCache = cache.get(fetchType)
       if (!typeCache) return []
-      const entry = typeCache.get(parentId ?? null)
+      // For filtered queries, use the full key; for unfiltered, use parentId only
+      const entry = filters
+        ? typeCache.get(key)
+        : typeCache.get(parentId ?? null)
       return entry?.items ?? []
     },
-    [cache]
+    [cache, getCacheKey]
   )
 
   // Convert FieldOption to EntityItem
@@ -94,6 +144,8 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
     return options.map((opt) => ({
       id: opt.value,
       name: opt.label,
+      disabled: opt.disabled,
+      comingSoon: opt.comingSoon,
     }))
   }, [])
 
@@ -102,21 +154,26 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
     async (
       fetchType: string,
       parentId?: string | null,
-      force: boolean = false
+      force: boolean = false,
+      filters?: FieldFilterParams
     ): Promise<EntityItem[]> => {
-      const key = getCacheKey(fetchType, parentId)
+      const key = getCacheKey(fetchType, parentId, filters)
 
       // Check cache first (unless force refresh)
-      if (!force) {
-        const typeCache = cache.get(fetchType)
-        const entry = typeCache?.get(parentId ?? null)
-        if (isCacheFresh(entry)) {
-          return entry!.items
-        }
+      const typeCache = cache.get(fetchType)
+      const cacheKey = filters ? key : (parentId ?? null)
+      const entry = typeCache?.get(cacheKey)
+
+      if (!force && isCacheFresh(entry)) {
+        // Cache is fresh - return immediately without loading state
+        return entry!.items
       }
 
-      // Set loading state
-      setLoadingStates((prev) => new Map(prev).set(key, true))
+      // Only show loading if we don't have ANY cached data to display
+      const hasStaleData = entry && entry.items.length > 0
+      if (!hasStaleData) {
+        setLoadingStates((prev) => new Map(prev).set(key, true))
+      }
       setErrorStates((prev) => new Map(prev).set(key, null))
 
       try {
@@ -132,26 +189,31 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
           fetchType,
           accessToken,
           accountId,
-          selectedOrganizationId
+          selectedOrganizationId,
+          filters // Pass filter params to API
         )
 
         const items = toEntityItems(response.options)
 
-        // Update cache
+        // Update cache (use full key for filtered queries)
         setCache((prev) => {
           const newCache = new Map(prev)
           if (!newCache.has(fetchType)) {
             newCache.set(fetchType, new Map())
           }
-          newCache.get(fetchType)!.set(parentId ?? null, {
+          const cacheKey = filters ? key : (parentId ?? null)
+          newCache.get(fetchType)!.set(cacheKey, {
             items,
             timestamp: Date.now(),
           })
+          // Persist to sessionStorage
+          saveStoredCache(newCache)
           return newCache
         })
 
         return items
       } catch (error) {
+        console.error(`[entity-data-context] fetchEntities error for ${fetchType}:`, error)
         const errorMessage = error instanceof Error ? error.message : "Failed to fetch"
         setErrorStates((prev) => new Map(prev).set(key, errorMessage))
         return []
@@ -164,8 +226,8 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
 
   // Check loading state
   const isLoading = useCallback(
-    (fetchType: string, parentId?: string | null): boolean => {
-      const key = getCacheKey(fetchType, parentId)
+    (fetchType: string, parentId?: string | null, filters?: FieldFilterParams): boolean => {
+      const key = getCacheKey(fetchType, parentId, filters)
       return loadingStates.get(key) ?? false
     },
     [getCacheKey, loadingStates]
@@ -173,8 +235,8 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
 
   // Get error state
   const getError = useCallback(
-    (fetchType: string, parentId?: string | null): string | null => {
-      const key = getCacheKey(fetchType, parentId)
+    (fetchType: string, parentId?: string | null, filters?: FieldFilterParams): string | null => {
+      const key = getCacheKey(fetchType, parentId, filters)
       return errorStates.get(key) ?? null
     },
     [getCacheKey, errorStates]
@@ -205,6 +267,8 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
     setCache(new Map())
     setLoadingStates(new Map())
     setErrorStates(new Map())
+    // Also clear sessionStorage
+    sessionStore.remove(STORAGE_KEY)
   }, [])
 
   // Clear cache for specific entity type
@@ -212,6 +276,8 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
     setCache((prev) => {
       const newCache = new Map(prev)
       newCache.delete(fetchType)
+      // Persist to sessionStorage
+      saveStoredCache(newCache)
       return newCache
     })
   }, [])

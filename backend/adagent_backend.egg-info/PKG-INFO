@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: adagent-backend
+Version: 0.1.0
+Summary: AD Agent AI Backend
+Requires-Python: >=3.11
+Requires-Dist: langgraph>=1.0.0
+Requires-Dist: langgraph-checkpoint-postgres>=3.0.0
+Requires-Dist: langchain-anthropic>=1.0.0
+Requires-Dist: langchain-openai>=1.0.0
+Requires-Dist: langsmith>=0.1.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: psycopg[binary]>=3.0.0
+Requires-Dist: fastapi>=0.128.0
+Requires-Dist: uvicorn>=0.40.0
+Requires-Dist: sse-starlette>=2.1.3
+Requires-Dist: langchain-mcp-adapters>=0.2.1
+Provides-Extra: studio
+Requires-Dist: langgraph-cli[inmem]>=0.4.0; extra == "studio"

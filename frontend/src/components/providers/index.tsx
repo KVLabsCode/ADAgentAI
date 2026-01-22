@@ -1,12 +1,13 @@
 "use client"
 
 import * as React from "react"
+import { useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { NeonAuthUIProvider } from "@neondatabase/auth/react"
 import { authClient } from "@/lib/neon-auth/client"
 import { ThemeProvider } from "./theme-provider"
-import { QueryProvider } from "./query-provider"
+import { QueryProvider, getQueryClient } from "./query-provider"
 import { PostHogProvider } from "./posthog-provider"
 import { UserProvider } from "@/contexts/user-context"
 import { EntityDataProvider } from "@/contexts/entity-data-context"
@@ -14,11 +15,21 @@ import { EntityDataProvider } from "@/contexts/entity-data-context"
 // Re-export provider management components
 export { ConnectProviderDropdown } from "./ConnectProviderDropdown"
 export { ProviderListItem } from "./ProviderListItem"
-export { SupportedPlatformsCard } from "./SupportedPlatformsCard"
+export { SupportedPlatformsContent } from "./SupportedPlatformsCard"
 export { AccountSelectionModal } from "./account-selection-modal"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+
+  // Use targeted cache invalidation instead of router.refresh()
+  // This prevents the "numbers zeroing" issue caused by full cache invalidation
+  const handleSessionChange = useCallback(() => {
+    const queryClient = getQueryClient()
+    // Invalidate auth-related queries to refetch user data
+    queryClient.invalidateQueries({ queryKey: ['user'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    queryClient.invalidateQueries({ queryKey: ['providers'] })
+  }, [])
 
   return (
     <PostHogProvider>
@@ -27,7 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           authClient={authClient}
           navigate={router.push}
           replace={router.replace}
-          onSessionChange={() => router.refresh()}
+          onSessionChange={handleSessionChange}
           social={{ providers: ["google"] }}
           redirectTo="/dashboard"
           Link={Link}

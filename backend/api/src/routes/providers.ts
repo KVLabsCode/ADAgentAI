@@ -818,6 +818,14 @@ providers.get("/internal/apps", async (c) => {
  * GET /providers/internal/ad-units - Internal endpoint for fetching ad units for a provider
  * Protected by internal API key.
  * SECURITY: Validates provider belongs to userId/org if provided
+ *
+ * Query params:
+ *   - providerId (required): Provider UUID
+ *   - userId (optional): For ownership validation
+ *   - organizationId (optional): For org context validation
+ *   - platform (optional): Filter by platform (IOS, ANDROID)
+ *   - adFormat (optional): Filter by ad format (BANNER, INTERSTITIAL, REWARDED, etc.)
+ *   - appId (optional): Filter by app ID
  */
 providers.get("/internal/ad-units", async (c) => {
   // Verify internal API key
@@ -831,6 +839,10 @@ providers.get("/internal/ad-units", async (c) => {
   const providerId = c.req.query("providerId");
   const userId = c.req.query("userId");
   const organizationId = c.req.query("organizationId");
+  // Filter parameters for cascading dependencies
+  const platformFilter = c.req.query("platform"); // IOS, ANDROID
+  const adFormatFilter = c.req.query("adFormat"); // BANNER, INTERSTITIAL, REWARDED, etc.
+  const appIdFilter = c.req.query("appId"); // Filter by specific app
 
   if (!providerId) {
     return c.json({ error: "providerId is required" }, 400);
@@ -883,6 +895,7 @@ providers.get("/internal/ad-units", async (c) => {
         adUnitId?: string;
         displayName?: string;
         adFormat?: string;
+        appId?: string;
       }>;
     };
 
@@ -894,6 +907,26 @@ providers.get("/internal/ad-units", async (c) => {
         const id = unit.adUnitId || "";
         if (!id || seen.has(id)) return false;
         seen.add(id);
+
+        // Apply platform filter if specified
+        // Ad units don't directly have platform, but we can filter via appId lookup
+        // For now, skip platform filtering at ad unit level (done via app selection)
+
+        // Apply adFormat filter if specified
+        if (adFormatFilter && unit.adFormat) {
+          // Normalize comparison (AdMob returns formats like BANNER, INTERSTITIAL, etc.)
+          if (unit.adFormat.toUpperCase() !== adFormatFilter.toUpperCase()) {
+            return false;
+          }
+        }
+
+        // Apply appId filter if specified
+        if (appIdFilter && unit.appId) {
+          if (unit.appId !== appIdFilter) {
+            return false;
+          }
+        }
+
         return true;
       })
       .map((unit) => {
@@ -903,10 +936,13 @@ providers.get("/internal/ad-units", async (c) => {
         return {
           value: fullId,
           label: `${unit.displayName || "Unnamed"} (${unit.adFormat || "Unknown"}) #${shortId}`,
+          // Include metadata for frontend validation
+          adFormat: unit.adFormat,
+          appId: unit.appId,
         };
       });
 
-    console.log(`[ad-units] Returning ${adUnits.length} unique ad units:`, adUnits.map(u => u.value));
+    console.log(`[ad-units] Returning ${adUnits.length} ad units (filters: platform=${platformFilter}, adFormat=${adFormatFilter}, appId=${appIdFilter})`);
     return c.json({ adUnits });
   } catch (error) {
     console.error("Error fetching ad units:", error);
@@ -1004,6 +1040,111 @@ providers.get("/internal/mediation-groups", async (c) => {
   } catch (error) {
     console.error("Error fetching mediation groups:", error);
     return c.json({ mediationGroups: [], error: "Failed to fetch mediation groups" });
+  }
+});
+
+/**
+ * GET /providers/internal/ad-sources - Internal endpoint for fetching ad sources (ad networks)
+ * Protected by internal API key.
+ * SECURITY: Validates provider belongs to userId/org if provided
+ */
+providers.get("/internal/ad-sources", async (c) => {
+  console.log("[ad-sources] Request received");
+
+  // Verify internal API key
+  const apiKey = c.req.header("x-internal-api-key");
+  const expectedKey = Bun.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    console.log("[ad-sources] Unauthorized - API key mismatch");
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const providerId = c.req.query("providerId");
+  const userId = c.req.query("userId");
+  const organizationId = c.req.query("organizationId");
+  console.log(`[ad-sources] providerId=${providerId}, userId=${userId}, orgId=${organizationId}`);
+
+  if (!providerId) {
+    console.log("[ad-sources] Missing providerId");
+    return c.json({ error: "providerId is required" }, 400);
+  }
+
+  // Find the provider connection
+  const provider = await db.query.connectedProviders.findFirst({
+    where: eq(connectedProviders.id, providerId),
+  });
+  console.log(`[ad-sources] Found provider:`, provider ? { id: provider.id, type: provider.provider, publisherId: provider.publisherId } : null);
+
+  if (!provider || provider.provider !== "admob") {
+    console.log("[ad-sources] Provider not found or not admob");
+    return c.json({ adSources: [] });
+  }
+
+  // SECURITY: Validate provider ownership if userId provided
+  if (userId) {
+    if (provider.userId !== userId) {
+      return c.json({ adSources: [], error: "Provider not owned by user" });
+    }
+    // Validate org context matches
+    const requestedOrg = organizationId || null;
+    if (provider.organizationId !== requestedOrg) {
+      return c.json({ adSources: [], error: "Provider not in current org context" });
+    }
+  }
+
+  // Get valid access token (with refresh if needed)
+  const accessToken = await getValidAccessToken(provider);
+  if (!accessToken) {
+    return c.json({ adSources: [], error: "Token unavailable" });
+  }
+
+  try {
+    const accountId = provider.publisherId?.startsWith("pub-")
+      ? provider.publisherId
+      : `pub-${provider.publisherId}`;
+
+    console.log(`[ad-sources] Fetching from AdMob API for account: ${accountId}`);
+    const response = await fetch(
+      `https://admob.googleapis.com/v1beta/accounts/${accountId}/adSources?pageSize=100`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    console.log(`[ad-sources] AdMob API response status: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[ad-sources] AdMob API error: ${errorText}`);
+      return c.json({ adSources: [], error: "Failed to fetch ad sources" });
+    }
+
+    const data = (await response.json()) as {
+      adSources?: Array<{
+        name?: string;
+        adSourceId?: string;
+        title?: string;
+      }>;
+    };
+    console.log(`[ad-sources] Raw API response:`, JSON.stringify(data, null, 2));
+
+    // Deduplicate by adSourceId to avoid duplicates in dropdown
+    const seen = new Set<string>();
+    const adSources = (data.adSources || [])
+      .filter((source) => {
+        const id = source.adSourceId || source.name?.split("/").pop() || "";
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((source) => ({
+        value: source.adSourceId || source.name?.split("/").pop() || "",
+        label: source.title || "Unknown Network",
+      }));
+
+    console.log(`[ad-sources] Returning ${adSources.length} ad sources`);
+    return c.json({ adSources });
+  } catch (error) {
+    console.error("Error fetching ad sources:", error);
+    return c.json({ adSources: [], error: "Failed to fetch ad sources" });
   }
 });
 

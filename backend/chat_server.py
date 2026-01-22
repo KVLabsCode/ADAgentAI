@@ -143,6 +143,10 @@ class DynamicFieldRequest(BaseModel):
     """Request body for fetching dynamic field options."""
     field_type: str  # accounts, apps, ad_units, ad_sources, mediation_groups
     account_id: Optional[str] = None  # Required for dependent fields
+    # Filter parameters for cascading dependencies
+    platform: Optional[str] = None  # IOS, ANDROID
+    ad_format: Optional[str] = None  # BANNER, INTERSTITIAL, REWARDED, etc.
+    app_id: Optional[str] = None  # Filter ad units by specific app
 
 
 class ResumeRequest(BaseModel):
@@ -150,6 +154,7 @@ class ResumeRequest(BaseModel):
     stream_id: str
     approved: bool
     modified_params: Optional[dict] = None
+    tool_name: Optional[str] = None  # For progress streaming UI
 
 
 # =============================================================================
@@ -242,6 +247,7 @@ async def resume_stream(request: Request, body: ResumeRequest):
             stream_id=body.stream_id,
             approved=body.approved,
             modified_params=body.modified_params,
+            tool_name=body.tool_name,
         ),
         media_type="text/event-stream",
         headers={
@@ -286,8 +292,21 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
         }
 
     # For dependent fields, call internal API endpoints
-    if body.field_type in ("apps", "ad_units", "mediation_groups"):
+    # Support bidding_ad_sources and waterfall_ad_sources as filtered variants of ad_sources
+    field_type = body.field_type
+    ad_source_filter = None
+
+    if field_type == "bidding_ad_sources":
+        field_type = "ad_sources"
+        ad_source_filter = "bidding"
+    elif field_type == "waterfall_ad_sources":
+        field_type = "ad_sources"
+        ad_source_filter = "waterfall"
+
+    if field_type in ("apps", "ad_units", "mediation_groups", "ad_sources"):
+        print(f"[field-options] Processing {body.field_type} request, account_id={body.account_id}, filter={ad_source_filter}")
         if not body.account_id:
+            print(f"[field-options] No account_id provided for {body.field_type}")
             return {"options": [], "manual_input": True}
 
         # First, find the provider ID for this account
@@ -296,7 +315,9 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
             (p for p in providers if p.get("identifier") == body.account_id),
             None
         )
+        print(f"[field-options] Found provider for {body.account_id}: {provider.get('id') if provider else None}")
         if not provider or not provider.get("id"):
+            print(f"[field-options] Provider not found for {body.account_id}")
             return {"options": [], "manual_input": True}
 
         provider_id = provider["id"]
@@ -306,25 +327,112 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
             "apps": "/api/providers/internal/apps",
             "ad_units": "/api/providers/internal/ad-units",
             "mediation_groups": "/api/providers/internal/mediation-groups",
+            "ad_sources": "/api/providers/internal/ad-sources",
         }
-        endpoint = endpoint_map.get(body.field_type)
+        endpoint = endpoint_map.get(field_type)
 
         if not endpoint or not INTERNAL_API_KEY:
+            print(f"[field-options] Missing endpoint or API key")
             return {"options": [], "manual_input": True}
 
         try:
+            # Build query params with filters
+            params = {"providerId": provider_id}
+            if body.platform:
+                params["platform"] = body.platform
+            if body.ad_format:
+                params["adFormat"] = body.ad_format
+            if body.app_id:
+                params["appId"] = body.app_id
+
+            print(f"[field-options] Calling {API_URL}{endpoint} with params={params}")
             async with httpx.AsyncClient(timeout=15) as client:
                 response = await client.get(
                     f"{API_URL}{endpoint}",
-                    params={"providerId": provider_id},
+                    params=params,
                     headers={"x-internal-api-key": INTERNAL_API_KEY},
                 )
+                print(f"[field-options] Response status: {response.status_code}")
                 if response.status_code == 200:
                     data = response.json()
-                    # Response keys: apps, adUnits, or mediationGroups
-                    key = body.field_type.replace("_", "") if body.field_type != "ad_units" else "adUnits"
+                    print(f"[field-options] Response data keys: {data.keys()}")
+                    # Map field_type to response keys
+                    response_key_map = {
+                        "apps": "apps",
+                        "ad_units": "adUnits",
+                        "mediation_groups": "mediationGroups",
+                        "ad_sources": "adSources",
+                    }
+                    key = response_key_map.get(field_type, field_type)
                     items = data.get(key, [])
+
+                    # Filter ad sources by type if requested
+                    # AdMob API ad sources follow a naming convention:
+                    # - "(bidding)" suffix = bidding-only variant (e.g., "Meta Audience Network (bidding)")
+                    # - No suffix = waterfall variant (e.g., "Meta Audience Network")
+                    # - Special: "AdMob Network" is bidding (no suffix), "AdMob Network Waterfall" is waterfall
+                    #
+                    # Source: https://developers.google.com/admob/api/v1/ad-sources-reference
+                    #
+                    # Networks marked as "coming soon" (disabled in UI, not yet integrated):
+                    # - Bidding: AppLovin, Unity Ads, Meta Audience Network, DT Exchange, ironSource Ads
+                    # - Waterfall: AppLovin, DT Exchange
+                    COMING_SOON_BIDDING = {
+                        "applovin", "unity ads", "meta audience network", "dt exchange", "ironsource ads",
+                        "liftoff monetize"  # Also known as Vungle
+                    }
+                    COMING_SOON_WATERFALL = {
+                        "applovin", "dt exchange"
+                    }
+
+                    if ad_source_filter and key == "adSources":
+                        print(f"[field-options] Filtering ad sources: filter={ad_source_filter}, total={len(items)}")
+                        before_count = len(items)
+                        filtered_items = []
+
+                        if ad_source_filter == "bidding":
+                            for item in items:
+                                # API returns "title", not "label"
+                                title = item.get("title", item.get("label", "")).lower()
+                                # Include if has "(bidding)" OR is exactly "AdMob Network" (special case)
+                                is_admob_bidding = title == "admob network"
+                                has_bidding_suffix = "(bidding)" in title
+
+                                if is_admob_bidding or has_bidding_suffix:
+                                    # Check if coming soon
+                                    base_name = title.replace("(bidding)", "").strip()
+                                    if any(coming in base_name for coming in COMING_SOON_BIDDING):
+                                        print(f"[field-options] Marking as coming soon: {base_name}")
+                                        item = {**item, "disabled": True, "comingSoon": True}
+                                    filtered_items.append(item)
+                            items = filtered_items
+                            # Count disabled items
+                            disabled_count = sum(1 for i in items if i.get("disabled"))
+                            print(f"[field-options] Bidding filter: {before_count} -> {len(items)} items ({disabled_count} disabled)")
+
+                        elif ad_source_filter == "waterfall":
+                            for item in items:
+                                # API returns "title", not "label"
+                                title = item.get("title", item.get("label", "")).lower()
+                                # Exclude bidding variants (has "(bidding)") but NOT "AdMob Network" (that's bidding-only)
+                                is_admob_bidding = title == "admob network"
+                                has_bidding_suffix = "(bidding)" in title
+
+                                if not has_bidding_suffix and not is_admob_bidding:
+                                    # Check if coming soon
+                                    if any(coming in title for coming in COMING_SOON_WATERFALL):
+                                        print(f"[field-options] Marking as coming soon: {title}")
+                                        item = {**item, "disabled": True, "comingSoon": True}
+                                    filtered_items.append(item)
+                            items = filtered_items
+                            # Count disabled items
+                            disabled_count = sum(1 for i in items if i.get("disabled"))
+                            print(f"[field-options] Waterfall filter: {before_count} -> {len(items)} items ({disabled_count} disabled)")
+
+                    print(f"[field-options] Returning {len(items)} items for {body.field_type}")
                     return {"options": items}
+                else:
+                    print(f"[field-options] Non-200 response: {response.text}")
         except Exception as e:
             print(f"[field-options] Error fetching {body.field_type}: {e}")
 

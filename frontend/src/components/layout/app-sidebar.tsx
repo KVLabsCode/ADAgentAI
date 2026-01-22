@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { PanelLeftClose, Shield } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
+import { storage } from "@/lib/storage"
 
 import {
   Sidebar,
@@ -18,13 +19,13 @@ import {
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
+} from "@/organisms/sidebar"
+import { Button } from "@/atoms/button"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/molecules/tooltip"
 import { Logo } from "@/components/brand/logo"
 import { OrganizationSwitcher } from "./OrganizationSwitcher"
 import { UserMenu } from "./UserMenu"
@@ -44,7 +45,7 @@ export function AppSidebar() {
   // Handle New Chat click - forces fresh navigation even when already on /chat or /chat/[id]
   const handleNewChat = (e: React.MouseEvent) => {
     e.preventDefault()
-    localStorage.removeItem('adagent_active_chat')
+    storage.remove('adagent_active_chat')
     if (pathname === '/chat' || pathname.startsWith('/chat/')) {
       router.push('/chat?new=' + Date.now())
     } else {

@@ -9,34 +9,30 @@ import {
   DollarSign,
   Download,
   RefreshCw,
-  Users,
-  Clock,
   Cpu,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/atoms/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/molecules/select"
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
+} from "@/organisms/chart"
 import {
   PageContainer,
   PageHeader,
   StatCard,
-  SectionCard,
-  SectionCardHeader,
-  SectionCardContent,
+  SettingsSection,
   LoadingSpinner,
   ErrorCard,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -320,8 +316,8 @@ export default function UsagePage() {
               value={formatNumber(data.week.totalTokens)}
               subValue={formatCurrency(data.week.cost)}
               icon={TrendingUp}
-              trend={weekTrend as "up" | "down" | "neutral"}
-              trendValue={`${((data.week.totalTokens / 7) / Math.max(data.today.totalTokens, 1) * 100 - 100).toFixed(0)}% vs last period`}
+              change={`${((data.week.totalTokens / 7) / Math.max(data.today.totalTokens, 1) * 100 - 100).toFixed(0)}% vs avg`}
+              changeType={weekTrend === "up" ? "positive" : weekTrend === "down" ? "negative" : "neutral"}
             />
             <StatCard
               title="Month Total"
@@ -334,23 +330,22 @@ export default function UsagePage() {
           {/* Charts Row */}
           <div className="grid gap-3 lg:grid-cols-3">
             {/* Timeline Chart - Takes 2 columns */}
-            <SectionCard className="lg:col-span-2">
-              <SectionCardHeader
-                title="Token Usage Over Time"
-                description="Input vs Output token distribution"
-              >
-                <div className="flex items-center gap-4 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(190, 95%, 55%)" }} />
-                    <span className="text-muted-foreground">Input</span>
+            <div className="lg:col-span-2">
+              <SettingsSection title="Token Usage Over Time">
+                <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[length:var(--text-description)] text-muted-foreground">Input vs Output token distribution</p>
+                    <div className="flex items-center gap-4 text-[length:var(--text-small)]">
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(190, 95%, 55%)" }} />
+                        <span className="text-muted-foreground">Input</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(45, 95%, 55%)" }} />
+                        <span className="text-muted-foreground">Output</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(45, 95%, 55%)" }} />
-                    <span className="text-muted-foreground">Output</span>
-                  </div>
-                </div>
-              </SectionCardHeader>
-              <SectionCardContent>
                 {data.timeline.length > 0 ? (
                   <ChartContainer config={timelineChartConfig} className="h-[280px] w-full">
                     <AreaChart
@@ -424,20 +419,18 @@ export default function UsagePage() {
                   <div className="flex h-[280px] items-center justify-center text-muted-foreground">
                     <div className="text-center">
                       <Activity className="mx-auto h-8 w-8 opacity-50" />
-                      <p className="mt-2 text-xs">No timeline data available</p>
+                      <p className="mt-2 text-[length:var(--text-small)]">No timeline data available</p>
                     </div>
                   </div>
                 )}
-              </SectionCardContent>
-            </SectionCard>
+                </div>
+              </SettingsSection>
+            </div>
 
             {/* Model Breakdown */}
-            <SectionCard>
-              <SectionCardHeader
-                title="By Model"
-                description="Token usage per LLM"
-              />
-              <SectionCardContent>
+            <SettingsSection title="By Model">
+              <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                <p className="text-[length:var(--text-description)] text-muted-foreground mb-4">Token usage per LLM</p>
                 {data.byModel.length > 0 ? (
                   <ChartContainer config={modelChartConfig} className="h-[280px] w-full">
                     <BarChart
@@ -486,24 +479,20 @@ export default function UsagePage() {
                   <div className="flex h-[280px] items-center justify-center text-muted-foreground">
                     <div className="text-center">
                       <Cpu className="mx-auto h-8 w-8 opacity-50" />
-                      <p className="mt-2 text-xs">No model data available</p>
+                      <p className="mt-2 text-[length:var(--text-small)]">No model data available</p>
                     </div>
                   </div>
                 )}
-              </SectionCardContent>
-            </SectionCard>
+              </div>
+            </SettingsSection>
           </div>
 
           {/* Bottom Row - Tables */}
           <div className="grid gap-3 lg:grid-cols-2">
             {/* Top Users */}
-            <SectionCard>
-              <SectionCardHeader
-                icon={Users}
-                title="Top Users"
-                description="Highest token consumers this period"
-              />
-              <SectionCardContent>
+            <SettingsSection title="Top Users">
+              <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                <p className="text-[length:var(--text-description)] text-muted-foreground mb-4">Highest token consumers this period</p>
                 {data.topUsers.length > 0 ? (
                   <div className="space-y-2">
                     {data.topUsers.slice(0, 5).map((user, idx) => (
@@ -537,20 +526,16 @@ export default function UsagePage() {
                   </div>
                 ) : (
                   <div className="flex h-32 items-center justify-center text-muted-foreground">
-                    <p className="text-xs">No user data available</p>
+                    <p className="text-[length:var(--text-small)]">No user data available</p>
                   </div>
                 )}
-              </SectionCardContent>
-            </SectionCard>
+              </div>
+            </SettingsSection>
 
             {/* Service Breakdown */}
-            <SectionCard>
-              <SectionCardHeader
-                icon={Clock}
-                title="By Service"
-                description="Token usage by service and capability"
-              />
-              <SectionCardContent>
+            <SettingsSection title="By Service">
+              <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
+                <p className="text-[length:var(--text-description)] text-muted-foreground mb-4">Token usage by service and capability</p>
                 {data.byService.length > 0 ? (
                   <div className="space-y-2">
                     {data.byService.slice(0, 5).map((service, idx) => {
@@ -562,7 +547,7 @@ export default function UsagePage() {
                           key={`${service.service}-${service.capability}-${idx}`}
                           className="space-y-1.5"
                         >
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center justify-between text-[length:var(--text-label)]">
                             <span className="capitalize">
                               {service.service || "general"} / {service.capability || "general"}
                             </span>
@@ -582,11 +567,11 @@ export default function UsagePage() {
                   </div>
                 ) : (
                   <div className="flex h-32 items-center justify-center text-muted-foreground">
-                    <p className="text-xs">No service data available</p>
+                    <p className="text-[length:var(--text-small)]">No service data available</p>
                   </div>
                 )}
-              </SectionCardContent>
-            </SectionCard>
+              </div>
+            </SettingsSection>
           </div>
         </>
       ) : null}

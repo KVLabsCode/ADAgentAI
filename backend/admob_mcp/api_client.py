@@ -140,9 +140,9 @@ class AdMobClient:
         api_message = error_info.get("message", "Unknown error")
 
         if status_code == 401:
-            return f"Authentication failed: {api_message}. Check your access token or service account."
+            return f"Authentication failed: {api_message}. Check your access token or service account. DO NOT RETRY - user needs to reconnect their account."
         elif status_code == 403:
-            return f"Permission denied: {api_message}. This endpoint may require special access from your Google account manager."
+            return f"Permission denied: {api_message}. DO NOT RETRY - this endpoint requires special beta access from a Google account manager. Inform the user they need to contact Google to enable this API feature for their account."
         elif status_code == 404:
             return f"Resource not found: {api_message}. Verify the ID exists."
         elif status_code == 429:

@@ -1,0 +1,50 @@
+name: Design Tokens
+
+on:
+  push:
+    paths:
+      - "frontend/tokens/**"
+      - "frontend/src/app/globals.css"
+  pull_request:
+    paths:
+      - "frontend/tokens/**"
+      - "frontend/src/app/globals.css"
+
+jobs:
+  build-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd frontend && bun install
+
+      - name: Build tokens
+        run: cd frontend && bun run tokens:build
+
+      - name: Validate contrast ratios
+        run: cd frontend && bun run validate:contrast
+
+      - name: Check for uncommitted token changes
+        run: |
+          if [[ -n $(git status --porcelain frontend/src/styles/tokens*.css 2>/dev/null) ]]; then
+            echo "❌ Token CSS files are out of sync."
+            echo "Run 'bun run tokens:build' locally and commit the changes."
+            git diff frontend/src/styles/
+            exit 1
+          fi
+          echo "✅ Token CSS files are in sync"
+
+      - name: Upload token artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: design-tokens
+          path: |
+            frontend/tokens/
+            frontend/src/styles/tokens*.css
+          retention-days: 7

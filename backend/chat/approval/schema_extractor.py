@@ -192,7 +192,7 @@ def _pydantic_to_rjsf(model: Type[BaseModel]) -> RJSFSchema:
         # Add async select for network_code field
         if "network_code" in schema["properties"]:
             ui_schema["network_code"] = {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "networks"}
             }
 
@@ -245,9 +245,10 @@ def get_tool_schema_by_mcp_name(mcp_tool_name: str) -> Optional[RJSFSchema]:
 # =============================================================================
 # Proper RJSF format with separate schema and uiSchema.
 # uiSchema uses standard RJSF conventions:
-#   - "ui:widget": "AsyncSelectWidget" for dynamic dropdowns
+#   - "ui:widget": "EntitySelectWidget" for dynamic dropdowns
 #   - "ui:options": { "fetchType": "accounts|apps|ad_units|..." }
-#   - "ui:options": { "dependsOn": "field_name" } for cascading fields
+#   - "ui:options": { "dependsOn": "field_name" } for structural cascading (clears child on change)
+#   - "ui:options": { "filterBy": ["field1", "field2"] } for filter cascading (keeps valid selections)
 
 ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
     "admob_create_app": {
@@ -258,6 +259,11 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                     "type": "string",
                     "description": "Publisher account ID"
                 },
+                "platform": {
+                    "type": "string",
+                    "enum": ["IOS", "ANDROID"],
+                    "description": "Platform: IOS or ANDROID"
+                },
                 "app_store_id": {
                     "type": "string",
                     "description": "App store ID (e.g., 'com.example.app' for Android, '123456789' for iOS)"
@@ -265,13 +271,18 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 "display_name": {
                     "type": "string",
                     "description": "Optional display name for the app"
+                },
+                "android_app_stores": {
+                    "type": "string",
+                    "description": "Comma-separated Android app stores (only for ANDROID): GOOGLE_PLAY, AMAZON_APPSTORE, OPPO, SAMSUNG, VIVO, XIAOMI"
                 }
             },
-            "required": ["account_id", "app_store_id"]
+            "required": ["account_id", "platform", "app_store_id"]
         },
         "uiSchema": {
+            "ui:order": ["account_id", "platform", "app_store_id", "display_name", "android_app_stores"],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             }
         }
@@ -302,18 +313,38 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 "ad_types": {
                     "type": "string",
                     "description": "Comma-separated ad types (RICH_MEDIA, VIDEO)"
+                },
+                "reward_settings": {
+                    "type": "object",
+                    "description": "Reward configuration for REWARDED and REWARDED_INTERSTITIAL ad formats",
+                    "properties": {
+                        "unit_amount": {
+                            "type": "integer",
+                            "description": "Reward amount (e.g., 100)",
+                            "minimum": 1
+                        },
+                        "unit_type": {
+                            "type": "string",
+                            "description": "Reward type label (e.g., 'coins', 'gems')"
+                        }
+                    },
+                    "required": ["unit_amount", "unit_type"]
                 }
             },
             "required": ["account_id", "app_id", "display_name", "ad_format"]
         },
         "uiSchema": {
+            "ui:order": ["account_id", "app_id", "display_name", "ad_format", "ad_types", "reward_settings"],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "app_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "apps", "dependsOn": "account_id"}
+            },
+            "reward_settings": {
+                "ui:order": ["unit_amount", "unit_type"]
             }
         }
     },
@@ -337,21 +368,28 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 "display_name": {
                     "type": "string",
                     "description": "Display name for the mapping"
+                },
+                "state": {
+                    "type": "string",
+                    "enum": ["ENABLED", "DISABLED"],
+                    "default": "ENABLED",
+                    "description": "Mapping state: ENABLED or DISABLED"
                 }
             },
             "required": ["account_id", "ad_unit_id", "ad_source_id", "display_name"]
         },
         "uiSchema": {
+            "ui:order": ["account_id", "ad_unit_id", "ad_source_id", "display_name", "state"],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "ad_unit_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id"}
             },
             "ad_source_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "AdSourceSelectWidget",
                 "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
             }
         }
@@ -373,8 +411,9 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
             "required": ["account_id", "mappings_json"]
         },
         "uiSchema": {
+            "ui:order": ["account_id", "mappings_json"],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "mappings_json": {
@@ -410,23 +449,193 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                     "type": "string",
                     "description": "Comma-separated list of ad unit IDs"
                 },
+                "advanced_targeting": {
+                    "type": "object",
+                    "title": "Advanced Targeting",
+                    "description": "Optional geographic and IDFA targeting settings",
+                    "properties": {
+                        "targeted_region_codes": {
+                            "type": "string",
+                            "title": "Target Regions",
+                            "description": "ISO 3166-1 alpha-2 country codes to target (e.g., 'US,CA,GB')"
+                        },
+                        "excluded_region_codes": {
+                            "type": "string",
+                            "title": "Exclude Regions",
+                            "description": "ISO 3166-1 alpha-2 country codes to exclude (e.g., 'CN,RU')"
+                        },
+                        "idfa_targeting": {
+                            "type": "string",
+                            "title": "IDFA Targeting",
+                            "enum": ["ALL", "OPTED_IN_USERS", "NOT_OPTED_IN_USERS"],
+                            "default": "ALL",
+                            "description": "iOS IDFA targeting"
+                        }
+                    }
+                },
                 "state": {
                     "type": "string",
                     "enum": ["ENABLED", "DISABLED"],
                     "default": "ENABLED",
                     "description": "Mediation group state"
+                },
+                "bidding_lines": {
+                    "type": "array",
+                    "description": "Bidding networks (real-time auction). These compete via live bidding.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "display_name": {
+                                "type": "string",
+                                "description": "Network label (e.g., 'AdMob Bidding')"
+                            },
+                            "ad_source_id": {
+                                "type": "string",
+                                "description": "Bidding ad network source ID"
+                            },
+                            "state": {
+                                "type": "string",
+                                "enum": ["ENABLED", "DISABLED"],
+                                "default": "ENABLED",
+                                "description": "Enable or disable this bidder"
+                            },
+                            "experiment_variant": {
+                                "type": "string",
+                                "enum": ["ORIGINAL", "VARIANT_A", "VARIANT_B"],
+                                "description": "A/B test variant assignment (optional)"
+                            }
+                        },
+                        "required": ["display_name", "ad_source_id"]
+                    }
+                },
+                "waterfall_lines": {
+                    "type": "array",
+                    "description": "Waterfall networks (priority-based). These are called in order by CPM.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "display_name": {
+                                "type": "string",
+                                "description": "Network label (e.g., 'Meta Waterfall')"
+                            },
+                            "ad_source_id": {
+                                "type": "string",
+                                "description": "Waterfall ad network source ID"
+                            },
+                            "pricing_mode": {
+                                "type": "string",
+                                "enum": ["FIXED", "NETWORK_OPTIMIZED"],
+                                "default": "FIXED",
+                                "description": "FIXED = set your own CPM, NETWORK_OPTIMIZED = network sets CPM"
+                            },
+                            "cpm_floor": {
+                                "type": "number",
+                                "description": "CPM floor in dollars (e.g., 1.50). Required for FIXED pricing."
+                            },
+                            "state": {
+                                "type": "string",
+                                "enum": ["ENABLED", "DISABLED"],
+                                "default": "ENABLED",
+                                "description": "Enable or disable this network"
+                            },
+                            "experiment_variant": {
+                                "type": "string",
+                                "enum": ["ORIGINAL", "VARIANT_A", "VARIANT_B"],
+                                "description": "A/B test variant assignment (optional)"
+                            }
+                        },
+                        "required": ["display_name", "ad_source_id"]
+                    }
                 }
             },
             "required": ["account_id", "display_name", "platform", "ad_format", "ad_unit_ids"]
         },
         "uiSchema": {
+            "ui:order": [
+                "account_id", "display_name", "state", "platform", "ad_format",
+                "ad_unit_ids", "advanced_targeting",
+                "bidding_lines", "waterfall_lines"
+            ],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "ad_unit_ids": {
-                "ui:widget": "AsyncSelectWidget",
-                "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id", "multiSelect": True}
+                "ui:widget": "MultiSelectWidget",
+                "ui:options": {
+                    "fetchType": "ad_units",
+                    "dependsOn": "account_id",
+                    "filterBy": ["ad_format"]
+                }
+            },
+            "state": {
+                "ui:widget": "ToggleWidget"
+            },
+            "platform": {
+                "ui:widget": "PlatformWidget"
+            },
+            "advanced_targeting": {
+                "ui:order": ["targeted_region_codes", "excluded_region_codes", "idfa_targeting"],
+                "ui:options": {"collapsible": True, "defaultCollapsed": True},
+                "targeted_region_codes": {
+                    "ui:widget": "RegionCodesWidget",
+                    "ui:placeholder": "Select target regions..."
+                },
+                "excluded_region_codes": {
+                    "ui:widget": "RegionCodesWidget",
+                    "ui:placeholder": "Select regions to exclude..."
+                },
+                "idfa_targeting": {
+                    "ui:widget": "SelectWidget"
+                }
+            },
+            "bidding_lines": {
+                "ui:title": "Bidding (Real-time auction)",
+                "ui:options": {
+                    "orderable": True,
+                    "addable": True,
+                    "removable": True
+                },
+                "items": {
+                    "ui:order": ["ad_source_id", "display_name", "state", "experiment_variant"],
+                    "display_name": {"ui:placeholder": "e.g., AdMob Bidding"},
+                    "ad_source_id": {
+                        "ui:widget": "AdSourceSelectWidget",
+                        "ui:options": {
+                            "fetchType": "bidding_ad_sources",
+                            "dependsOn": "account_id"
+                        }
+                    },
+                    "state": {"ui:widget": "hidden"},
+                    "experiment_variant": {"ui:widget": "hidden"}
+                }
+            },
+            "waterfall_lines": {
+                "ui:title": "Waterfall (Priority-based)",
+                "ui:options": {
+                    "orderable": True,
+                    "addable": True,
+                    "removable": True
+                },
+                "items": {
+                    "ui:order": ["ad_source_id", "display_name", "pricing_mode", "cpm_floor", "state", "experiment_variant"],
+                    "display_name": {"ui:placeholder": "e.g., Meta Waterfall"},
+                    "ad_source_id": {
+                        "ui:widget": "AdSourceSelectWidget",
+                        "ui:options": {
+                            "fetchType": "waterfall_ad_sources",
+                            "dependsOn": "account_id"
+                        }
+                    },
+                    "pricing_mode": {"ui:widget": "RadioWidget"},
+                    "cpm_floor": {
+                        "ui:widget": "CurrencyWidget",
+                        "ui:placeholder": "e.g., 1.50",
+                        "ui:options": {"showWhen": {"pricing_mode": "FIXED"}}
+                    },
+                    "state": {"ui:widget": "hidden"},
+                    "experiment_variant": {"ui:widget": "hidden"}
+                }
             }
         }
     },
@@ -455,22 +664,196 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 "ad_unit_ids": {
                     "type": "string",
                     "description": "Comma-separated list of updated ad unit IDs"
+                },
+                "advanced_targeting": {
+                    "type": "object",
+                    "title": "Advanced Targeting",
+                    "description": "Optional geographic and IDFA targeting settings",
+                    "properties": {
+                        "targeted_region_codes": {
+                            "type": "string",
+                            "title": "Target Regions",
+                            "description": "ISO 3166-1 alpha-2 country codes to target"
+                        },
+                        "excluded_region_codes": {
+                            "type": "string",
+                            "title": "Exclude Regions",
+                            "description": "ISO 3166-1 alpha-2 country codes to exclude"
+                        },
+                        "idfa_targeting": {
+                            "type": "string",
+                            "title": "IDFA Targeting",
+                            "enum": ["ALL", "OPTED_IN_USERS", "NOT_OPTED_IN_USERS"],
+                            "default": "ALL",
+                            "description": "iOS IDFA targeting"
+                        }
+                    }
+                },
+                "bidding_lines": {
+                    "type": "array",
+                    "description": "Bidding networks to add or update. Use line_id to update existing lines.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line_id": {
+                                "type": "string",
+                                "description": "Existing line ID to update (leave empty to add new)"
+                            },
+                            "display_name": {
+                                "type": "string",
+                                "description": "Network label"
+                            },
+                            "ad_source_id": {
+                                "type": "string",
+                                "description": "Bidding ad network source ID"
+                            },
+                            "state": {
+                                "type": "string",
+                                "enum": ["ENABLED", "DISABLED", "REMOVED"],
+                                "default": "ENABLED",
+                                "description": "Line state (use REMOVED to delete)"
+                            },
+                            "experiment_variant": {
+                                "type": "string",
+                                "enum": ["ORIGINAL", "VARIANT_A", "VARIANT_B"],
+                                "description": "A/B test variant assignment (optional)"
+                            }
+                        },
+                        "required": ["display_name", "ad_source_id"]
+                    }
+                },
+                "waterfall_lines": {
+                    "type": "array",
+                    "description": "Waterfall networks to add or update. Use line_id to update existing lines.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line_id": {
+                                "type": "string",
+                                "description": "Existing line ID to update (leave empty to add new)"
+                            },
+                            "display_name": {
+                                "type": "string",
+                                "description": "Network label"
+                            },
+                            "ad_source_id": {
+                                "type": "string",
+                                "description": "Waterfall ad network source ID"
+                            },
+                            "pricing_mode": {
+                                "type": "string",
+                                "enum": ["FIXED", "NETWORK_OPTIMIZED"],
+                                "default": "FIXED",
+                                "description": "FIXED = set CPM, NETWORK_OPTIMIZED = network sets CPM"
+                            },
+                            "cpm_floor": {
+                                "type": "number",
+                                "description": "CPM floor in dollars. Required for FIXED pricing."
+                            },
+                            "state": {
+                                "type": "string",
+                                "enum": ["ENABLED", "DISABLED", "REMOVED"],
+                                "default": "ENABLED",
+                                "description": "Line state (use REMOVED to delete)"
+                            },
+                            "experiment_variant": {
+                                "type": "string",
+                                "enum": ["ORIGINAL", "VARIANT_A", "VARIANT_B"],
+                                "description": "A/B test variant assignment (optional)"
+                            }
+                        },
+                        "required": ["display_name", "ad_source_id"]
+                    }
                 }
             },
             "required": ["account_id", "mediation_group_id"]
         },
         "uiSchema": {
+            "ui:order": [
+                "account_id", "mediation_group_id", "display_name", "state",
+                "ad_unit_ids", "advanced_targeting",
+                "bidding_lines", "waterfall_lines"
+            ],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
             },
             "ad_unit_ids": {
-                "ui:widget": "AsyncSelectWidget",
-                "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id", "multiSelect": True}
+                "ui:widget": "MultiSelectWidget",
+                "ui:options": {
+                    "fetchType": "ad_units",
+                    "dependsOn": "account_id",
+                    "filterBy": ["ad_format"]
+                }
+            },
+            "advanced_targeting": {
+                "ui:order": ["targeted_region_codes", "excluded_region_codes", "idfa_targeting"],
+                "ui:options": {"collapsible": True, "defaultCollapsed": True},
+                "targeted_region_codes": {
+                    "ui:widget": "RegionCodesWidget",
+                    "ui:placeholder": "Select target regions..."
+                },
+                "excluded_region_codes": {
+                    "ui:widget": "RegionCodesWidget",
+                    "ui:placeholder": "Select regions to exclude..."
+                },
+                "idfa_targeting": {
+                    "ui:widget": "SelectWidget"
+                }
+            },
+            "bidding_lines": {
+                "ui:title": "Bidding (Real-time auction)",
+                "ui:options": {
+                    "orderable": True,
+                    "addable": True,
+                    "removable": True
+                },
+                "items": {
+                    "ui:order": ["line_id", "ad_source_id", "display_name", "state", "experiment_variant"],
+                    "line_id": {"ui:placeholder": "Leave empty for new lines"},
+                    "display_name": {"ui:placeholder": "e.g., AdMob Bidding"},
+                    "ad_source_id": {
+                        "ui:widget": "AdSourceSelectWidget",
+                        "ui:options": {
+                            "fetchType": "bidding_ad_sources",
+                            "dependsOn": "account_id"
+                        }
+                    },
+                    "state": {"ui:widget": "hidden"},
+                    "experiment_variant": {"ui:widget": "hidden"}
+                }
+            },
+            "waterfall_lines": {
+                "ui:title": "Waterfall (Priority-based)",
+                "ui:options": {
+                    "orderable": True,
+                    "addable": True,
+                    "removable": True
+                },
+                "items": {
+                    "ui:order": ["line_id", "ad_source_id", "display_name", "pricing_mode", "cpm_floor", "state", "experiment_variant"],
+                    "line_id": {"ui:placeholder": "Leave empty for new lines"},
+                    "display_name": {"ui:placeholder": "e.g., Meta Waterfall"},
+                    "ad_source_id": {
+                        "ui:widget": "AdSourceSelectWidget",
+                        "ui:options": {
+                            "fetchType": "waterfall_ad_sources",
+                            "dependsOn": "account_id"
+                        }
+                    },
+                    "pricing_mode": {"ui:widget": "RadioWidget"},
+                    "cpm_floor": {
+                        "ui:widget": "CurrencyWidget",
+                        "ui:placeholder": "e.g., 1.50",
+                        "ui:options": {"showWhen": {"pricing_mode": "FIXED"}}
+                    },
+                    "state": {"ui:widget": "hidden"},
+                    "experiment_variant": {"ui:widget": "hidden"}
+                }
             }
         }
     },
@@ -497,18 +880,76 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                     "maximum": 99,
                     "default": 50,
                     "description": "Traffic percentage for experiment variant (1-99)"
+                },
+                "treatment_mediation_lines": {
+                    "type": "array",
+                    "description": "Mediation lines for the experiment variant (optional - defaults to copy of control)",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line_id": {
+                                "type": "string",
+                                "description": "Line identifier"
+                            },
+                            "display_name": {
+                                "type": "string",
+                                "description": "Display name for this line"
+                            },
+                            "ad_source_id": {
+                                "type": "string",
+                                "description": "Ad network source ID",
+                                "ui:widget": "EntitySelectWidget",
+                                "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
+                            },
+                            "cpm_mode": {
+                                "type": "string",
+                                "enum": ["LIVE", "MANUAL", "ANO"],
+                                "default": "LIVE",
+                                "description": "LIVE = bidding, MANUAL = fixed CPM, ANO = network-optimized"
+                            },
+                            "cpm_micros": {
+                                "type": "integer",
+                                "description": "CPM in micros for MANUAL mode"
+                            },
+                            "state": {
+                                "type": "string",
+                                "enum": ["ENABLED", "DISABLED"],
+                                "default": "ENABLED",
+                                "description": "Enable or disable this line"
+                            }
+                        },
+                        "required": ["display_name", "ad_source_id"]
+                    }
                 }
             },
             "required": ["account_id", "mediation_group_id", "display_name"]
         },
         "uiSchema": {
+            "ui:order": ["account_id", "mediation_group_id", "display_name", "traffic_percentage", "treatment_mediation_lines"],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
+            },
+            "treatment_mediation_lines": {
+                "ui:options": {
+                    "orderable": True,
+                    "addable": True,
+                    "removable": True
+                },
+                "items": {
+                    "ui:order": ["line_id", "ad_source_id", "display_name", "cpm_mode", "cpm_micros", "state"],
+                    "line_id": {"ui:placeholder": "Auto-generated"},
+                    "display_name": {"ui:placeholder": "e.g., AdMob Bidding"},
+                    "ad_source_id": {
+                        "ui:widget": "AdSourceSelectWidget",
+                        "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
+                    },
+                    "cpm_micros": {"ui:placeholder": "e.g., 1500000 = $1.50"}
+                }
             }
         }
     },
@@ -534,12 +975,13 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
             "required": ["account_id", "mediation_group_id", "variant_choice"]
         },
         "uiSchema": {
+            "ui:order": ["account_id", "mediation_group_id", "variant_choice"],
             "account_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
-                "ui:widget": "AsyncSelectWidget",
+                "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
             }
         }

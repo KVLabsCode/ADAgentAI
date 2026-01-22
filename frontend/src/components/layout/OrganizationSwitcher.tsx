@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
+} from "@/molecules/dropdown-menu"
 import { useUser } from "@/hooks/use-user"
 
 export function OrganizationSwitcher() {

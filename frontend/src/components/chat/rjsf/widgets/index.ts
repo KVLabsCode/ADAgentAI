@@ -9,26 +9,43 @@
  */
 
 import { RegistryWidgetsType } from "@rjsf/utils"
-import { AsyncSelectWidget } from "./async-select-widget"
+import { AdSourceSelectWidget } from "./ad-source-widget"
+import { CurrencyWidget } from "./currency-widget"
 import { EntitySelectWidget } from "./entity-select-widget"
 import { MultiSelectWidget } from "./multi-select-widget"
+import { PlatformWidget } from "./platform-widget"
+import { RadioWidget } from "./radio-widget"
+import { RegionCodesWidget } from "./region-codes-widget"
 import { SelectWidget } from "./select-widget"
+import { ToggleWidget } from "./toggle-widget"
 
 // Widget registry for RJSF
 export const customWidgets: RegistryWidgetsType = {
   // Override default select widget with dark-themed version
   SelectWidget,
 
-  // Legacy widget (still works, but prefer EntitySelectWidget for new usage)
-  AsyncSelectWidget,
-
-  // Enhanced widgets with caching and auto-dependencies
+  // Entity widgets with caching and auto-dependencies
   EntitySelectWidget,
   MultiSelectWidget,
+  AdSourceSelectWidget,
+
+  // State and option widgets
+  ToggleWidget,
+  PlatformWidget,
+  RadioWidget,
+
+  // Specialized input widgets
+  CurrencyWidget,
+  RegionCodesWidget,
 }
 
 // Named exports for direct imports
-export { AsyncSelectWidget } from "./async-select-widget"
+export { AdSourceSelectWidget } from "./ad-source-widget"
+export { CurrencyWidget } from "./currency-widget"
 export { EntitySelectWidget } from "./entity-select-widget"
 export { MultiSelectWidget } from "./multi-select-widget"
+export { PlatformWidget } from "./platform-widget"
+export { RadioWidget } from "./radio-widget"
+export { RegionCodesWidget } from "./region-codes-widget"
 export { SelectWidget } from "./select-widget"
+export { ToggleWidget } from "./toggle-widget"

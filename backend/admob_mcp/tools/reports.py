@@ -59,6 +59,42 @@ def register_report_tools(mcp: FastMCP) -> None:
                 "maxReportRows": params.max_report_rows
             }
 
+            # Add optional dimension filters
+            if params.dimension_filters:
+                report_spec["dimensionFilters"] = [
+                    {
+                        "dimension": f.dimension,
+                        "matchesAny": {"values": f.values}
+                    }
+                    for f in params.dimension_filters
+                ]
+
+            # Add optional sort conditions
+            if params.sort_conditions:
+                sort_conditions = []
+                for s in params.sort_conditions:
+                    condition = {"order": s.order.value}
+                    if s.dimension:
+                        condition["dimension"] = s.dimension
+                    if s.metric:
+                        condition["metric"] = s.metric
+                    sort_conditions.append(condition)
+                report_spec["sortConditions"] = sort_conditions
+
+            # Add optional localization settings
+            if params.localization_settings:
+                localization = {}
+                if params.localization_settings.currency_code:
+                    localization["currencyCode"] = params.localization_settings.currency_code
+                if params.localization_settings.language_code:
+                    localization["languageCode"] = params.localization_settings.language_code
+                if localization:
+                    report_spec["localizationSettings"] = localization
+
+            # Add optional timezone
+            if params.time_zone:
+                report_spec["timeZone"] = params.time_zone
+
             response = await client.generate_mediation_report(params.account_id, report_spec)
 
             if params.response_format == ResponseFormat.MARKDOWN:
@@ -106,6 +142,42 @@ def register_report_tools(mcp: FastMCP) -> None:
                 "maxReportRows": params.max_report_rows
             }
 
+            # Add optional dimension filters
+            if params.dimension_filters:
+                report_spec["dimensionFilters"] = [
+                    {
+                        "dimension": f.dimension,
+                        "matchesAny": {"values": f.values}
+                    }
+                    for f in params.dimension_filters
+                ]
+
+            # Add optional sort conditions
+            if params.sort_conditions:
+                sort_conditions = []
+                for s in params.sort_conditions:
+                    condition = {"order": s.order.value}
+                    if s.dimension:
+                        condition["dimension"] = s.dimension
+                    if s.metric:
+                        condition["metric"] = s.metric
+                    sort_conditions.append(condition)
+                report_spec["sortConditions"] = sort_conditions
+
+            # Add optional localization settings
+            if params.localization_settings:
+                localization = {}
+                if params.localization_settings.currency_code:
+                    localization["currencyCode"] = params.localization_settings.currency_code
+                if params.localization_settings.language_code:
+                    localization["languageCode"] = params.localization_settings.language_code
+                if localization:
+                    report_spec["localizationSettings"] = localization
+
+            # Add optional timezone
+            if params.time_zone:
+                report_spec["timeZone"] = params.time_zone
+
             response = await client.generate_network_report(params.account_id, report_spec)
 
             if params.response_format == ResponseFormat.MARKDOWN:
@@ -152,6 +224,42 @@ def register_report_tools(mcp: FastMCP) -> None:
                 "metrics": params.metrics,
                 "languageCode": params.language_code
             }
+
+            # Add optional dimension filters
+            if params.dimension_filters:
+                report_spec["dimensionFilters"] = [
+                    {
+                        "dimension": f.dimension,
+                        "matchesAny": {"values": f.values}
+                    }
+                    for f in params.dimension_filters
+                ]
+
+            # Add optional sort conditions
+            if params.sort_conditions:
+                sort_conditions = []
+                for s in params.sort_conditions:
+                    condition = {"order": s.order.value}
+                    if s.dimension:
+                        condition["dimension"] = s.dimension
+                    if s.metric:
+                        condition["metric"] = s.metric
+                    sort_conditions.append(condition)
+                report_spec["sortConditions"] = sort_conditions
+
+            # Add optional localization settings
+            if params.localization_settings:
+                localization = {}
+                if params.localization_settings.currency_code:
+                    localization["currencyCode"] = params.localization_settings.currency_code
+                if params.localization_settings.language_code:
+                    localization["languageCode"] = params.localization_settings.language_code
+                if localization:
+                    report_spec["localizationSettings"] = localization
+
+            # Add optional timezone
+            if params.time_zone:
+                report_spec["timeZone"] = params.time_zone
 
             response = await client.generate_campaign_report(params.account_id, report_spec)
 

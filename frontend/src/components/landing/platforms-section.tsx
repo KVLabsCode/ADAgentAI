@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Plug, Trash2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/atoms/badge"
+import { Switch } from "@/atoms/switch"
 import { AdMobLogo, ProviderLogoBadge } from "@/components/icons/provider-logos"
 
 export function PlatformsSection() {

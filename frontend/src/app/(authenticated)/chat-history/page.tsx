@@ -2,10 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Search, Download, Trash2, MessageSquare, MoreHorizontal, Loader2, X, CheckSquare } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Download, Trash2, MessageSquare, MoreHorizontal, X, CheckSquare } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
+import { Button } from "@/atoms/button"
+import { SearchInput } from "@/molecules"
+import { Checkbox } from "@/atoms/checkbox"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
@@ -13,7 +14,7 @@ import {
   PageContainer,
   PageHeader,
   EmptyState,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,14 +24,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/molecules/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/molecules/dropdown-menu"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
@@ -232,46 +233,44 @@ export default function ChatHistoryPage() {
 
   if (isLoading) {
     return (
-      <PageContainer size="sm">
+      <PageContainer>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Spinner size="md" className="text-muted-foreground" />
         </div>
       </PageContainer>
     )
   }
 
   return (
-    <PageContainer size="sm">
+    <PageContainer>
       {/* Header */}
       <PageHeader
         title="Chat History"
         description="Browse and manage your conversations."
       />
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
+      {/* Search & Select All */}
+      <div className="flex items-center gap-3">
+        <SearchInput
           placeholder="Search conversations..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-8 h-8 text-sm"
+          width="100%"
+          className="flex-1 h-8"
         />
+        {filteredChats.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={isAllSelected}
+              onCheckedChange={handleSelectAll}
+              className="h-3.5 w-3.5"
+            />
+            <span className="text-[length:var(--text-small)] text-muted-foreground whitespace-nowrap">
+              {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+            </span>
+          </div>
+        )}
       </div>
-
-      {/* Select All Row - only show when there are chats */}
-      {filteredChats.length > 0 && (
-        <div className="flex items-center gap-2 -mt-2">
-          <Checkbox
-            checked={isAllSelected}
-            onCheckedChange={handleSelectAll}
-            className="h-3.5 w-3.5"
-          />
-          <span className="text-[11px] text-muted-foreground">
-            {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
-          </span>
-        </div>
-      )}
 
       {/* Chat List */}
       {filteredChats.length === 0 ? (
@@ -289,7 +288,7 @@ export default function ChatHistoryPage() {
           )}
         </EmptyState>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-px">
           {filteredChats.map((chat) => {
             const isSelected = selectedIds.has(chat.id)
 
@@ -330,14 +329,14 @@ export default function ChatHistoryPage() {
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-medium truncate group-hover:text-foreground transition-colors">
+                    <h3 className="text-[length:var(--text-label)] font-medium truncate group-hover:text-foreground transition-colors">
                       {chat.title}
                     </h3>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
+                    <span className="text-[length:var(--text-small)] text-muted-foreground shrink-0">
                       {formatRelativeDate(chat.date)}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                  <p className="text-[length:var(--text-description)] text-muted-foreground mt-0.5 line-clamp-1">
                     {stripMarkdown(chat.preview)}
                   </p>
                 </Link>
@@ -351,21 +350,22 @@ export default function ChatHistoryPage() {
                       className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
+                      <span className="sr-only">Chat options</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-xs">
+                    <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-[length:var(--text-small)]">
                       <Download className="h-3 w-3 mr-2" />
                       Export as MD
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport(chat.id, "json")} className="text-xs">
+                    <DropdownMenuItem onClick={() => handleExport(chat.id, "json")} className="text-[length:var(--text-small)]">
                       <Download className="h-3 w-3 mr-2" />
                       Export as JSON
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => handleDelete(chat.id)}
-                      className="text-xs text-destructive focus:text-destructive"
+                      className="text-[length:var(--text-small)] text-destructive focus:text-destructive"
                     >
                       <Trash2 className="h-3 w-3 mr-2" />
                       Delete
@@ -381,20 +381,20 @@ export default function ChatHistoryPage() {
       {/* Floating action bar when items selected */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-background border border-border rounded-full shadow-xl">
-            <div className="flex items-center gap-2 text-sm text-foreground">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-background border border-[color:var(--card-border)] rounded-full shadow-xl">
+            <div className="flex items-center gap-2 text-[length:var(--text-label)] text-foreground">
               <CheckSquare className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">{selectedIds.size}</span>
               <span className="text-muted-foreground">selected</span>
             </div>
 
-            <div className="w-px h-4 bg-border mx-1" />
+            <div className="w-px h-4 bg-[color:var(--item-divider)] mx-1" />
 
             <Button
               variant="ghost"
               size="sm"
               onClick={clearSelection}
-              className="h-7 px-2 text-xs"
+              className="h-7 px-2 text-[length:var(--text-small)]"
             >
               <X className="h-3 w-3 mr-1" />
               Clear
@@ -404,7 +404,7 @@ export default function ChatHistoryPage() {
               variant="destructive"
               size="sm"
               onClick={() => setShowBulkDeleteDialog(true)}
-              className="h-7 px-3 text-xs"
+              className="h-7 px-3 text-[length:var(--text-small)]"
             >
               <Trash2 className="h-3 w-3 mr-1" />
               Delete
@@ -420,22 +420,22 @@ export default function ChatHistoryPage() {
             <AlertDialogTitle className="text-base">
               Delete {selectedIds.size} conversation{selectedIds.size > 1 ? 's' : ''}?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
+            <AlertDialogDescription className="text-[length:var(--text-description)]">
               This action cannot be undone. All selected conversations will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-8 text-xs" disabled={isDeleting}>
+            <AlertDialogCancel className="h-8 text-[length:var(--text-small)]" disabled={isDeleting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBulkDelete}
               disabled={isDeleting}
-              className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="h-8 text-[length:var(--text-small)] bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  <Spinner size="xs" className="mr-1" />
                   Deleting...
                 </>
               ) : (

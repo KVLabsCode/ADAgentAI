@@ -9,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Badge } from "@/components/ui/badge"
+} from "@/molecules/dialog"
+import { Button } from "@/atoms/button"
+import { RadioGroup, RadioGroupItem } from "@/molecules/radio-group"
+import { Badge } from "@/atoms/badge"
 import { cn } from "@/lib/utils"
 import type { OAuthAccount } from "@/lib/types"
 

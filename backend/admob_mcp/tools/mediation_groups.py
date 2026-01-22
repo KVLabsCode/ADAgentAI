@@ -101,6 +101,33 @@ def register_mediation_group_tools(mcp: FastMCP) -> None:
             if params.targeting.targeted_region_codes:
                 mediation_group_data["targeting"]["targetedRegionCodes"] = params.targeting.targeted_region_codes
 
+            if params.targeting.excluded_region_codes:
+                mediation_group_data["targeting"]["excludedRegionCodes"] = params.targeting.excluded_region_codes
+
+            if params.targeting.idfa_targeting:
+                mediation_group_data["targeting"]["idfaTargeting"] = params.targeting.idfa_targeting.value
+
+            # Add mediation group lines (waterfall configuration)
+            if params.mediation_group_lines:
+                lines_data = {}
+                for idx, line in enumerate(params.mediation_group_lines):
+                    # Use provided line_id or generate one
+                    line_id = line.line_id or f"line_{idx}"
+                    line_data = {
+                        "displayName": line.display_name,
+                        "adSourceId": line.ad_source_id,
+                        "cpmMode": line.cpm_mode.value,
+                        "state": line.state.value,
+                    }
+                    if line.cpm_micros is not None:
+                        line_data["cpmMicros"] = str(line.cpm_micros)
+                    if line.ad_unit_mappings:
+                        line_data["adUnitMappings"] = line.ad_unit_mappings
+                    if line.experiment_variant:
+                        line_data["experimentVariant"] = line.experiment_variant.value
+                    lines_data[line_id] = line_data
+                mediation_group_data["mediationGroupLines"] = lines_data
+
             response = await client.create_mediation_group(params.account_id, mediation_group_data)
 
             if params.response_format == ResponseFormat.MARKDOWN:
@@ -143,9 +170,49 @@ def register_mediation_group_tools(mcp: FastMCP) -> None:
                 mediation_group_data["state"] = params.state.value
                 update_fields.append("state")
 
-            if params.targeting_ad_unit_ids:
+            # Handle targeting updates - prefer full targeting object if provided
+            if params.targeting:
+                targeting_data = {}
+                if params.targeting.ad_unit_ids:
+                    targeting_data["adUnitIds"] = params.targeting.ad_unit_ids
+                    update_fields.append("targeting.adUnitIds")
+                if params.targeting.targeted_region_codes:
+                    targeting_data["targetedRegionCodes"] = params.targeting.targeted_region_codes
+                    update_fields.append("targeting.targetedRegionCodes")
+                if params.targeting.excluded_region_codes:
+                    targeting_data["excludedRegionCodes"] = params.targeting.excluded_region_codes
+                    update_fields.append("targeting.excludedRegionCodes")
+                if params.targeting.idfa_targeting:
+                    targeting_data["idfaTargeting"] = params.targeting.idfa_targeting.value
+                    update_fields.append("targeting.idfaTargeting")
+                if targeting_data:
+                    mediation_group_data["targeting"] = targeting_data
+            elif params.targeting_ad_unit_ids:
+                # Backward compatibility: use shorthand targeting_ad_unit_ids
                 mediation_group_data["targeting"] = {"adUnitIds": params.targeting_ad_unit_ids}
                 update_fields.append("targeting.adUnitIds")
+
+            # Handle mediation group lines (waterfall) updates
+            if params.mediation_group_lines:
+                lines_data = {}
+                for idx, line in enumerate(params.mediation_group_lines):
+                    # Use provided line_id or generate one
+                    line_id = line.line_id or f"line_{idx}"
+                    line_data = {
+                        "displayName": line.display_name,
+                        "adSourceId": line.ad_source_id,
+                        "cpmMode": line.cpm_mode.value,
+                        "state": line.state.value,
+                    }
+                    if line.cpm_micros is not None:
+                        line_data["cpmMicros"] = str(line.cpm_micros)
+                    if line.ad_unit_mappings:
+                        line_data["adUnitMappings"] = line.ad_unit_mappings
+                    if line.experiment_variant:
+                        line_data["experimentVariant"] = line.experiment_variant.value
+                    lines_data[line_id] = line_data
+                mediation_group_data["mediationGroupLines"] = lines_data
+                update_fields.append("mediationGroupLines")
 
             if not update_fields:
                 return "Error: No fields to update. Provide at least one field to change."
@@ -191,6 +258,26 @@ def register_mediation_group_tools(mcp: FastMCP) -> None:
                 "displayName": params.display_name,
                 "trafficPercentage": params.traffic_percentage,
             }
+
+            # Add treatment mediation lines if provided
+            if params.treatment_mediation_lines:
+                lines_data = {}
+                for idx, line in enumerate(params.treatment_mediation_lines):
+                    line_id = line.line_id or f"line_{idx}"
+                    line_data = {
+                        "displayName": line.display_name,
+                        "adSourceId": line.ad_source_id,
+                        "cpmMode": line.cpm_mode.value,
+                        "state": line.state.value,
+                    }
+                    if line.cpm_micros is not None:
+                        line_data["cpmMicros"] = str(line.cpm_micros)
+                    if line.ad_unit_mappings:
+                        line_data["adUnitMappings"] = line.ad_unit_mappings
+                    if line.experiment_variant:
+                        line_data["experimentVariant"] = line.experiment_variant.value
+                    lines_data[line_id] = line_data
+                experiment_data["treatmentMediationLines"] = lines_data
 
             response = await client.create_mediation_ab_experiment(
                 params.account_id, params.mediation_group_id, experiment_data

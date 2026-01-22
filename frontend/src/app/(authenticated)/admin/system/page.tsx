@@ -1,20 +1,20 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import {
-  Save, RotateCcw, AlertTriangle, Check, Clock,
-  MessageSquare, Shield, Zap
+  Save, RotateCcw, AlertTriangle, Clock
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
+import { Button } from "@/atoms/button"
+import { Input } from "@/atoms/input"
+import { Switch } from "@/atoms/switch"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/molecules/select"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,16 +25,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/molecules/alert-dialog"
 import {
   PageContainer,
   PageHeader,
-  SectionCard,
-  SectionCardHeader,
-  SectionCardContent,
+  SettingsSection,
   ConfigField,
+  ConfigFieldGroup,
   LoadingSpinner,
-} from "@/components/ui/theme"
+} from "@/organisms/theme"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 
@@ -73,8 +72,6 @@ export default function SystemPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [resetting, setResetting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(originalConfig)
 
@@ -88,7 +85,7 @@ export default function SystemPage() {
       setOriginalConfig(data.config)
       setMetadata(data.metadata || {})
     } catch {
-      setError("Failed to load configuration")
+      toast.error("Failed to load configuration")
     } finally {
       setLoading(false)
     }
@@ -100,8 +97,6 @@ export default function SystemPage() {
 
   const handleSave = async () => {
     setSaving(true)
-    setError(null)
-    setSuccess(null)
 
     try {
       const updates = Object.entries(config)
@@ -109,7 +104,7 @@ export default function SystemPage() {
         .map(([key, value]) => ({ key, value }))
 
       if (updates.length === 0) {
-        setSuccess("No changes to save")
+        toast.info("No changes to save")
         setSaving(false)
         return
       }
@@ -125,13 +120,13 @@ export default function SystemPage() {
       const data = await res.json()
       if (data.success) {
         setOriginalConfig(config)
-        setSuccess("Configuration saved successfully")
+        toast.success("Configuration saved")
         fetchConfig() // Refresh metadata
       } else {
         throw new Error(data.results?.find((r: { success: boolean }) => !r.success)?.error || "Save failed")
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save configuration")
+      toast.error(err instanceof Error ? err.message : "Failed to save configuration")
     } finally {
       setSaving(false)
     }
@@ -139,8 +134,6 @@ export default function SystemPage() {
 
   const handleReset = async () => {
     setResetting(true)
-    setError(null)
-    setSuccess(null)
 
     try {
       const token = await getAccessToken()
@@ -155,10 +148,10 @@ export default function SystemPage() {
         setConfig(data.config)
         setOriginalConfig(data.config)
         setMetadata({})
-        setSuccess("Configuration reset to defaults")
+        toast.success("Configuration reset to defaults")
       }
     } catch {
-      setError("Failed to reset configuration")
+      toast.error("Failed to reset configuration")
     } finally {
       setResetting(false)
     }
@@ -243,28 +236,11 @@ export default function SystemPage() {
         </div>
       </PageHeader>
 
-      {/* Status messages */}
-      {error && (
-        <div className="px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded flex items-center gap-3">
-          <AlertTriangle className="h-4 w-4 text-rose-500" />
-          <span className="text-xs text-rose-500">{error}</span>
-        </div>
-      )}
-      {success && (
-        <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded flex items-center gap-3">
-          <Check className="h-4 w-4 text-emerald-500" />
-          <span className="text-xs text-emerald-500">{success}</span>
-        </div>
-      )}
-
-      {/* Response Settings */}
-      <SectionCard>
-        <SectionCardHeader
-          icon={MessageSquare}
-          title="Response Settings"
-        />
-        <SectionCardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+      {/* Sections container with proper gaps */}
+      <div className="flex flex-col gap-[var(--section-gap)]">
+        {/* Response Settings */}
+        <SettingsSection title="Response Settings">
+          <ConfigFieldGroup>
             <ConfigField
               label="Default Response Style"
               description="How detailed should AI responses be by default"
@@ -300,98 +276,88 @@ export default function SystemPage() {
                 </SelectContent>
               </Select>
             </ConfigField>
-          </div>
 
-          <ConfigField
-            label="Max Tokens Per Response"
-            description="Maximum number of tokens in AI responses (256 - 16,384)"
-          >
-            <Input
-              type="number"
-              min={256}
-              max={16384}
-              value={config.maxTokensPerResponse}
-              onChange={(e) => setConfig(c => ({ ...c, maxTokensPerResponse: parseInt(e.target.value) || 4096 }))}
-              className="w-28 h-8 text-xs font-mono"
-            />
-          </ConfigField>
+            <ConfigField
+              label="Max Tokens Per Response"
+              description="Maximum number of tokens in AI responses (256 - 16,384)"
+            >
+              <Input
+                type="number"
+                min={256}
+                max={16384}
+                value={config.maxTokensPerResponse}
+                onChange={(e) => setConfig(c => ({ ...c, maxTokensPerResponse: parseInt(e.target.value) || 4096 }))}
+                className="w-28 h-8 text-xs font-mono"
+              />
+            </ConfigField>
+          </ConfigFieldGroup>
           {metadata.maxTokensPerResponse?.updatedAt && (
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-2 text-[length:var(--text-small)] text-muted-foreground px-[var(--item-padding-x)] py-2">
               <Clock className="h-3 w-3" />
               <span>Last modified {formatDate(metadata.maxTokensPerResponse.updatedAt)}</span>
             </div>
           )}
-        </SectionCardContent>
-      </SectionCard>
+        </SettingsSection>
 
-      {/* Execution Settings */}
-      <SectionCard>
-        <SectionCardHeader
-          icon={Zap}
-          title="Execution Settings"
-        />
-        <SectionCardContent>
-          <ConfigField
-            label="Tool Execution Timeout"
-            description="Maximum time (in seconds) for tool execution before timeout (5 - 300)"
-          >
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={5}
-                max={300}
-                value={config.toolExecutionTimeout}
-                onChange={(e) => setConfig(c => ({ ...c, toolExecutionTimeout: parseInt(e.target.value) || 30 }))}
-                className="w-20 h-8 text-xs font-mono"
+        {/* Execution Settings */}
+        <SettingsSection title="Execution Settings">
+          <ConfigFieldGroup>
+            <ConfigField
+              label="Tool Execution Timeout"
+              description="Maximum time (in seconds) for tool execution before timeout (5 - 300)"
+            >
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={5}
+                  max={300}
+                  value={config.toolExecutionTimeout}
+                  onChange={(e) => setConfig(c => ({ ...c, toolExecutionTimeout: parseInt(e.target.value) || 30 }))}
+                  className="w-20 h-8 text-xs font-mono"
+                />
+                <span className="text-[length:var(--text-small)] text-muted-foreground">seconds</span>
+              </div>
+            </ConfigField>
+          </ConfigFieldGroup>
+        </SettingsSection>
+
+        {/* Safety Settings */}
+        <SettingsSection title="Safety & Operations">
+          <ConfigFieldGroup>
+            <ConfigField
+              label="Safe Mode Default"
+              description="Enable safe mode by default for all new sessions (requires tool approval)"
+            >
+              <Switch
+                checked={config.safeModeDefault}
+                onCheckedChange={(checked) => setConfig(c => ({ ...c, safeModeDefault: checked }))}
               />
-              <span className="text-xs text-muted-foreground">seconds</span>
-            </div>
-          </ConfigField>
-        </SectionCardContent>
-      </SectionCard>
+            </ConfigField>
 
-      {/* Safety Settings */}
-      <SectionCard>
-        <SectionCardHeader
-          icon={Shield}
-          title="Safety & Operations"
-        />
-        <SectionCardContent className="space-y-4">
-          <ConfigField
-            label="Safe Mode Default"
-            description="Enable safe mode by default for all new sessions (requires tool approval)"
-          >
-            <Switch
-              checked={config.safeModeDefault}
-              onCheckedChange={(checked) => setConfig(c => ({ ...c, safeModeDefault: checked }))}
-            />
-          </ConfigField>
-
-          <div className="border-t border-border/20 pt-4">
             <ConfigField
               label="Maintenance Mode"
               description="When enabled, the chat service will be unavailable to users"
-              highlight={config.maintenanceMode}
+              highlight={config.maintenanceMode ? "warning" : undefined}
             >
               <Switch
                 checked={config.maintenanceMode}
                 onCheckedChange={(checked) => setConfig(c => ({ ...c, maintenanceMode: checked }))}
               />
             </ConfigField>
-            {config.maintenanceMode && (
-              <div className="mt-3 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-xs text-amber-500">
-                  Users will not be able to access the chat service while maintenance mode is active.
-                </span>
-              </div>
-            )}
-          </div>
-        </SectionCardContent>
-      </SectionCard>
+          </ConfigFieldGroup>
+          {config.maintenanceMode && (
+            <div className="mx-[var(--item-padding-x)] mb-[var(--item-padding-y)] px-3 py-2 bg-warning/10 border border-warning/20 rounded-[5px] flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+              <span className="text-[length:var(--text-small)] text-warning">
+                Users will not be able to access the chat service while maintenance mode is active.
+              </span>
+            </div>
+          )}
+        </SettingsSection>
+      </div>
 
       {/* Footer with audit info */}
-      <div className="text-center text-[10px] text-muted-foreground">
+      <div className="text-center text-[10px] text-muted-foreground mt-[var(--section-gap)]">
         <p>All configuration changes are logged to the admin audit trail</p>
       </div>
     </PageContainer>

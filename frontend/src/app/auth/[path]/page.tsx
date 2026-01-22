@@ -1,7 +1,5 @@
 import { AuthView } from "@neondatabase/auth/react"
 
-export const dynamicParams = false
-
 export function generateStaticParams() {
   return [
     { path: "sign-in" },

@@ -1,8 +1,8 @@
 import Link from "next/link"
 import { ArrowRight, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/atoms/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/molecules/card"
+import { Badge } from "@/atoms/badge"
 
 const platforms = [
   {

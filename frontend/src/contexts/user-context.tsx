@@ -5,6 +5,7 @@ import { useCallback, useState, createContext, useContext } from "react"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/neon-auth/client"
 import { User, Organization, ReceivedInvitation } from "@/lib/types"
+import { storage } from "@/lib/storage"
 
 const ORG_STORAGE_KEY = "adagent_selected_org"
 
@@ -54,34 +55,22 @@ interface _NeonAuthOrg {
 
 // Initialize selected org from localStorage (runs only once)
 function getInitialOrgId(): string | null {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem(ORG_STORAGE_KEY)
-  }
-  return null
+  return storage.get<string | null>(ORG_STORAGE_KEY, null)
 }
 
 // E2E Test Mode Detection
 // When running Playwright tests, we bypass Neon Auth SDK validation
 // and use the test user stored in localStorage by global.setup.ts
 function isE2ETestMode(): boolean {
-  if (typeof window === 'undefined') return false
-  return localStorage.getItem('e2e-test-mode') === 'true'
+  return storage.get<string>('e2e-test-mode', '') === 'true'
 }
 
 function getE2ETestUser(): { id: string; email: string; name: string } | null {
-  if (typeof window === 'undefined') return null
-  const userJson = localStorage.getItem('e2e-test-user')
-  if (!userJson) return null
-  try {
-    return JSON.parse(userJson)
-  } catch {
-    return null
-  }
+  return storage.get<{ id: string; email: string; name: string } | null>('e2e-test-user', null)
 }
 
 function getE2ESessionToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('neon-auth.session_token')
+  return storage.get<string | null>('neon-auth.session_token', null)
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
@@ -299,7 +288,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     // Clear local storage
-    localStorage.removeItem(ORG_STORAGE_KEY)
+    storage.remove(ORG_STORAGE_KEY)
 
     // Clear all auth-related cookies (Neon Auth / Better Auth uses these)
     // Must handle both localhost (no Secure flag) and production (Secure flag)
@@ -395,21 +384,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Uses Neon Auth's organization.setActive() API
   const selectOrganization = useCallback(async (orgId: string | null) => {
     setSelectedOrgId(orgId)
-    if (typeof window !== 'undefined') {
-      if (orgId) {
-        localStorage.setItem(ORG_STORAGE_KEY, orgId)
-        try {
-          await authClient.organization.setActive({ organizationId: orgId })
-        } catch (error) {
-          console.error('Failed to set active organization:', error)
-        }
-      } else {
-        localStorage.removeItem(ORG_STORAGE_KEY)
-        try {
-          await authClient.organization.setActive({ organizationId: null })
-        } catch (error) {
-          console.error('Failed to clear active organization:', error)
-        }
+    if (orgId) {
+      storage.set(ORG_STORAGE_KEY, orgId)
+      try {
+        await authClient.organization.setActive({ organizationId: orgId })
+      } catch (error) {
+        console.error('Failed to set active organization:', error)
+      }
+    } else {
+      storage.remove(ORG_STORAGE_KEY)
+      try {
+        await authClient.organization.setActive({ organizationId: null })
+      } catch (error) {
+        console.error('Failed to clear active organization:', error)
       }
     }
   }, [])

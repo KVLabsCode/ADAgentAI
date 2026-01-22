@@ -10,37 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langsmith import traceable
 
 from ..state import GraphState
-
-# Classification prompt
-ROUTER_SYSTEM_PROMPT = """You are a routing assistant for an ad platform AI. Analyze the user's query and determine the best specialist to handle it.
-
-## Available Specialists
-
-**AdMob (Mobile App Monetization)**
-- admob_inventory: Managing accounts, apps, ad units (list, create, configure)
-- admob_reporting: Revenue, eCPM, impressions, performance analytics
-- admob_mediation: Mediation groups, ad sources, waterfall optimization
-- admob_experimentation: A/B tests, experiments
-
-**Google Ad Manager (Web/Advanced Ads)**
-- admanager_inventory: Networks, ad units, placements, sites, apps
-- admanager_reporting: Reports, analytics, performance metrics
-- admanager_orders: Orders, line items, campaigns, creatives
-- admanager_deals: Private auctions, programmatic deals
-- admanager_targeting: Custom targeting, audiences, geo targeting
-
-**General**
-- general: Greetings, help, capabilities, unclear queries
-
-## Your Task
-Think step-by-step:
-1. What is the user asking about?
-2. Does conversation context suggest a specific platform/area?
-3. Which specialist has the right tools for this?
-
-Then respond in this exact format:
-THINKING: <your brief reasoning>
-ROUTE: <category_name>"""
+from ...utils.prompts import get_router_prompt
 
 # Route map: category -> (service, capability)
 ROUTE_MAP = {
@@ -98,7 +68,7 @@ def _parse_router_response(response_text: str) -> tuple[str, str, str]:
 
 
 @traceable(name="router_node", run_type="chain")
-def router_node(state: GraphState) -> dict:
+async def router_node(state: GraphState) -> dict:
     """Classify the user query to determine routing.
 
     Args:
@@ -121,14 +91,16 @@ def router_node(state: GraphState) -> dict:
         max_tokens=150,
     )
 
-    # Build messages
+    # Build messages with prompt from LangSmith
+    router_prompt = get_router_prompt()
     messages = [
-        SystemMessage(content=ROUTER_SYSTEM_PROMPT),
+        SystemMessage(content=router_prompt),
         HumanMessage(content=f"Context:\n{context_str}\n\nQuery: {user_query}"),
     ]
 
     try:
-        response = router_llm.invoke(messages)
+        # Use async invoke to avoid blocking on Windows
+        response = await router_llm.ainvoke(messages)
         response_text = response.content if hasattr(response, "content") else str(response)
 
         service, capability, thinking = _parse_router_response(response_text)
@@ -142,7 +114,7 @@ def router_node(state: GraphState) -> dict:
         }
 
     except Exception as e:
-        print(f"[router] Error classifying query: {e}")
+        print(f"[router] Error classifying query: {e}", flush=True)
         return {
             "routing": {
                 "service": "general",

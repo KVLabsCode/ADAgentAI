@@ -81,6 +81,11 @@ def register_app_tools(mcp: FastMCP) -> None:
                 app_data["linkedAppInfo"] = {
                     "appStoreId": params.app_store_id
                 }
+                # Add Android app stores if specified (only for ANDROID platform)
+                if params.android_app_stores:
+                    app_data["linkedAppInfo"]["androidAppStores"] = [
+                        store.value for store in params.android_app_stores
+                    ]
 
             response = await client.create_app(params.account_id, app_data)
 

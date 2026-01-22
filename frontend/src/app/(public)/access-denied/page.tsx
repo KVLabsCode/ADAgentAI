@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Clock, Scroll, ArrowLeft, XCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/atoms/button"
 import { useUser } from "@/hooks/use-user"
 import { AuthenticatedWaitlistDialog } from "@/components/authenticated-waitlist-dialog"
 

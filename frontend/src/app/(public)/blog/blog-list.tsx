@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowRight, Calendar, Clock } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/atoms/badge"
 import type { BlogPostMeta } from "@/lib/blog"
 
 function formatDate(dateString: string) {

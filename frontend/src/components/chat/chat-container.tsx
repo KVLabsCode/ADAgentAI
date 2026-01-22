@@ -17,6 +17,8 @@ import {
   useChatSession,
 } from "@/hooks/chat"
 import type { Message, Provider, StreamEventItem, RJSFSchema } from "@/lib/types"
+import { extractMcpContent } from "@/lib/step-utils"
+import { Zap } from "lucide-react"
 
 interface ChatContainerProps {
   initialMessages?: Message[]
@@ -214,6 +216,7 @@ export function ChatContainer({
     const toolCalls: { name: string; params: Record<string, unknown> }[] = []
     const toolResults: { name: string; result: unknown }[] = []
     let finalContent = ""
+    let pendingContent = "" // Content accumulated before tool calls (for chain of thought)
 
     const history: ChatHistoryMessage[] = messages
       .filter((m): m is Message & { role: "user" | "assistant" } =>
@@ -253,6 +256,13 @@ export function ChatContainer({
           )
         },
         onToolCall: (tool, inputPreview, inputFull, approved) => {
+          // Flush any pending content as a "content" event BEFORE the tool event
+          // This creates the chain of thought: "I'll help you..." → Tool: get_data
+          if (pendingContent.trim()) {
+            events.push({ type: "content", content: pendingContent.trim() })
+            pendingContent = "" // Reset for next segment
+          }
+
           let params: Record<string, unknown> = {}
           try {
             const inputStr = inputFull || inputPreview
@@ -274,6 +284,8 @@ export function ChatContainer({
           if (dataType === "json" || dataType === "json_list") {
             try {
               result = JSON.parse(full || preview)
+              // Extract actual content from MCP content blocks if present
+              result = extractMcpContent(result)
             } catch {
               result = preview
             }
@@ -314,21 +326,26 @@ export function ChatContainer({
           )
         },
         onContent: (chunk) => {
+          // Accumulate content for live display AND for chain of thought
+          // Content will be pushed as "content" event when a tool call arrives (see onToolCall)
+          // This creates the flow: intermediate text → tool call → tool result → final answer
           finalContent += chunk
-          events.push({ type: "content", content: chunk })
+          pendingContent += chunk
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
-                ? { ...m, content: finalContent, events: [...events] }
+                ? { ...m, content: finalContent }
                 : m
             )
           )
         },
         onResult: (resultContent) => {
           finalContent = resultContent
+          // Push result event for final answer (distinct from intermediate content)
+          events.push({ type: "result", content: resultContent })
           setMessages(prev =>
             prev.map(m =>
-              m.id === assistantId ? { ...m, content: resultContent } : m
+              m.id === assistantId ? { ...m, content: resultContent, events: [...events] } : m
             )
           )
         },
@@ -376,6 +393,15 @@ export function ChatContainer({
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
+    // Mark current assistant message as aborted so we don't show intermediate content as final answer
+    const currentAssistantId = currentAssistantIdRef.current
+    if (currentAssistantId) {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === currentAssistantId ? { ...m, aborted: true } : m
+        )
+      )
+    }
     setIsLoading(false)
   }, [])
 
@@ -385,19 +411,15 @@ export function ChatContainer({
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
           <div className="max-w-xl w-full space-y-6">
             <div className="text-center space-y-1">
-              <h2 className="text-lg font-medium tracking-tight">
+              <h1 className="text-[length:var(--text-page-title)] font-semibold tracking-tight">
                 {hasProviders ? "How can I help you today?" : "Connect a provider to start"}
-              </h2>
-              <p className="text-xs text-muted-foreground/70">
+              </h1>
+              <p className="text-sm text-muted-foreground">
                 {hasProviders
                   ? "Ask about your ad performance, create reports, or get optimization tips."
                   : "Link your AdMob account to begin."}
               </p>
             </div>
-
-            {hasProviders && (
-              <ExamplePrompts onPromptClick={handlePromptClick} />
-            )}
 
             <div className="w-full">
               <ChatInput
@@ -407,7 +429,21 @@ export function ChatContainer({
                 isLoading={isLoading}
                 placeholder={hasProviders ? "Ask anything about your ads..." : "Connect a provider first"}
                 providers={providers}
-              />
+                isCentered
+              >
+                {hasProviders && (
+                  <ExamplePrompts onPromptClick={handlePromptClick} />
+                )}
+              </ChatInput>
+
+              {/* Dev quick action */}
+              <button
+                onClick={() => handlePromptClick("Create any admob mediation group. You must use the tool.")}
+                className="mt-4 flex items-center gap-1.5 px-3 py-1.5 mx-auto rounded-full text-xs text-violet-500 hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-colors"
+              >
+                <Zap className="h-3 w-3" />
+                Dev: Create Mediation Group
+              </button>
             </div>
           </div>
         </div>
@@ -422,8 +458,10 @@ export function ChatContainer({
             />
           </div>
 
-          <div className="sticky bottom-0 z-50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 border-t border-border/30 px-4 py-4">
-            <div className="max-w-3xl mx-auto w-full">
+          <div className="sticky bottom-0 z-50 px-4 pt-16 pb-4">
+            {/* Gradient fade so text fades behind */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background from-40% via-background/80 via-70% to-transparent pointer-events-none" />
+            <div className="relative max-w-3xl mx-auto w-full">
               <ChatInput
                 onSend={handleSendMessage}
                 onStop={handleStop}

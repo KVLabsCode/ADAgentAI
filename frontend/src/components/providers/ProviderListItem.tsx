@@ -1,9 +1,9 @@
 "use client"
 
 import { Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
+import { Button } from "@/atoms/button"
+import { Badge } from "@/atoms/badge"
+import { Switch } from "@/atoms/switch"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/molecules/alert-dialog"
 import { ProviderLogoBadge } from "@/components/icons/provider-logos"
 import type { ProviderWithEnabled } from "@/hooks/useProviderManagement"
 
@@ -34,13 +34,13 @@ export function ProviderListItem({
   onDisconnect,
 }: ProviderListItemProps) {
   return (
-    <div className="px-4 py-3">
+    <div className="px-[var(--item-padding-x)] py-[var(--item-padding-y)]">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-[var(--item-gap)]">
           <ProviderLogoBadge type={provider.type} size="sm" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
+              <span className="text-[length:var(--text-label)] font-medium">
                 {provider.displayName}
               </span>
               <Badge variant="outline" className="text-[9px] h-4 px-1.5">
@@ -48,10 +48,10 @@ export function ProviderListItem({
               </Badge>
               <div className="flex items-center gap-1">
                 <div className="h-1.5 w-1.5 rounded-full bg-success" />
-                <span className="text-[10px] text-muted-foreground">Connected</span>
+                <span className="text-[length:var(--text-small)] text-muted-foreground">Connected</span>
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+            <p className="text-[length:var(--text-small)] text-muted-foreground font-mono mt-0.5">
               {provider.type === "admob"
                 ? provider.identifiers.publisherId
                 : `${provider.identifiers.networkCode} • ${provider.identifiers.accountName}`
@@ -60,9 +60,9 @@ export function ProviderListItem({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-[var(--item-gap)]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[length:var(--text-small)] text-muted-foreground">
               {provider.isEnabled ? "Enabled" : "Disabled"}
             </span>
             <Switch
@@ -78,6 +78,7 @@ export function ProviderListItem({
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
+                  <span className="sr-only">Disconnect provider</span>
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">

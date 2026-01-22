@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
 import { useUser } from "@/hooks/use-user"
 
 export default function AdminLayout({
@@ -24,7 +24,7 @@ export default function AdminLayout({
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Spinner size="md" className="text-muted-foreground" />
       </div>
     )
   }
@@ -33,7 +33,7 @@ export default function AdminLayout({
   if (!isAdmin) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Spinner size="md" className="text-muted-foreground" />
       </div>
     )
   }

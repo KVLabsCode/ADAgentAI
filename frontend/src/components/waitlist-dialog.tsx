@@ -2,10 +2,8 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { Check, Loader2, Copy, CheckCheck, ArrowRight, Briefcase, MessageSquareText, User } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
+import { Check, Copy, CheckCheck, ArrowRight, User } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
 import {
   Dialog,
   DialogContent,
@@ -13,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/molecules/dialog"
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 import {
   Select,
@@ -21,7 +19,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/molecules/select"
 import { cn } from "@/lib/utils"
 import { useWaitlistFlow } from "@/hooks/useWaitlistFlow"
 
@@ -71,93 +69,101 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
     }}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button size="sm" className={cn("h-9", className)}>
+          <button className={cn(
+            "h-9 px-4 flex items-center justify-center gap-2 rounded-lg text-[13px] font-medium",
+            "bg-[#f7f8f8] text-[#08090a] hover:bg-white transition-colors duration-100",
+            className
+          )}>
             Join Waitlist
-            <ArrowRight className="ml-2 h-3.5 w-3.5" />
-          </Button>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        {/* Success Step */}
+      {/* Linear-style dialog content */}
+      <DialogContent className="sm:max-w-[450px] p-0 gap-0 bg-[#08090a] border-[0.8px] border-white/[0.05] rounded-lg overflow-hidden">
+        {/* Success Step - Linear style */}
         {step === "success" && (
-          <div className="py-6 text-center space-y-4">
+          <div className="py-12 px-6 text-center space-y-4">
             <VisuallyHidden.Root>
               <DialogTitle>Waitlist Confirmation</DialogTitle>
             </VisuallyHidden.Root>
-            <div className="mx-auto w-14 h-14 rounded-full bg-success/10 flex items-center justify-center">
-              <Check className="h-7 w-7 text-success" />
+            {/* Muted gray checkmark - Linear style */}
+            <div className="mx-auto w-8 h-8 flex items-center justify-center">
+              <Check className="h-8 w-8 text-white/40" strokeWidth={1.5} />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-xl font-semibold">You&apos;re in!</h3>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-2">
+              <h3 className="text-[16px] font-medium text-[#f7f8f8]">You&apos;re on the list</h3>
+              <p className="text-[16px] text-white/60">
                 We&apos;ll reach out when it&apos;s your turn.
               </p>
               {position && (
-                <p className="text-sm font-medium pt-2">
-                  Position <span className="text-success">#{position}</span> in line
+                <p className="text-[14px] text-white/60 pt-2">
+                  Position <span className="text-[#f7f8f8] font-medium">#{position}</span> in line
                 </p>
               )}
             </div>
 
             {referralCode && (
-              <div className="pt-4 space-y-3">
-                <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-2">
-                  <p className="text-xs font-medium">Share to move up the list</p>
+              <div className="pt-6 space-y-3">
+                <div className="p-4 rounded-lg bg-white/[0.03] border-[0.8px] border-white/[0.05] space-y-3">
+                  <p className="text-[13px] font-medium text-[#f7f8f8]">Share to move up the list</p>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs font-mono bg-background px-3 py-2 rounded border truncate">
+                    <code className="flex-1 text-[13px] font-mono bg-white/[0.05] text-[#b4bcd0] px-3 py-2 rounded-md border-[0.8px] border-white/[0.05] truncate">
                       {typeof window !== 'undefined' ? `${window.location.origin}?ref=${referralCode}` : `?ref=${referralCode}`}
                     </code>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 shrink-0"
+                    <button
                       onClick={copyReferralLink}
+                      className="h-9 w-9 flex items-center justify-center rounded-md bg-[#28282c] border-[0.8px] border-[#3e3e44] text-[#f7f8f8] hover:bg-[#323236] transition-colors duration-100"
                     >
                       {copied ? (
-                        <CheckCheck className="h-3.5 w-3.5" />
+                        <CheckCheck className="h-4 w-4" />
                       ) : (
-                        <Copy className="h-3.5 w-3.5" />
+                        <Copy className="h-4 w-4" />
                       )}
-                    </Button>
+                    </button>
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[13px] text-white/40">
                   Each referral moves you up 3 spots
                 </p>
               </div>
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
+            <button
               onClick={() => setOpen(false)}
+              className="mt-4 h-8 px-4 rounded-lg text-[13px] font-medium bg-[#28282c] border-[0.8px] border-[#3e3e44] text-[#f7f8f8] hover:bg-[#323236] transition-colors duration-100"
             >
               Done
-            </Button>
+            </button>
           </div>
         )}
 
-        {/* Email Step (Google only) */}
+        {/* Email Step - Linear style */}
         {step === "email" && (
           <>
-            <DialogHeader>
-              <DialogTitle>Join the Waitlist</DialogTitle>
-              <DialogDescription>
-                Get early access to ADAgent. Sign in with Google to get started.
-              </DialogDescription>
-            </DialogHeader>
+            {/* Title with bottom border - Linear style */}
+            <div className="px-5 py-4 border-b-[0.8px] border-white/[0.05]">
+              <DialogHeader className="space-y-0">
+                <DialogTitle className="text-[16px] font-normal text-[#f7f8f8]">Join the Waitlist</DialogTitle>
+                <VisuallyHidden.Root>
+                  <DialogDescription>Get early access to ADAgent</DialogDescription>
+                </VisuallyHidden.Root>
+              </DialogHeader>
+            </div>
 
-            <div className="space-y-4 pt-4">
-              {/* Google Sign In Button */}
-              <Button
+            <div className="p-5 space-y-4">
+              <p className="text-[14px] text-white/60">
+                Get early access to ADAgent. Sign in with Google to get started.
+              </p>
+
+              {/* Google Sign In Button - Linear style */}
+              <button
                 onClick={handleGoogleAuth}
                 disabled={googleLoading}
-                variant="outline"
-                className="w-full h-11 gap-3"
+                className="w-full h-10 flex items-center justify-center gap-3 rounded-lg text-[14px] font-medium bg-white/[0.05] border-[0.8px] border-white/[0.05] text-[#f7f8f8] hover:bg-white/[0.08] disabled:opacity-50 transition-colors duration-100"
               >
                 {googleLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner size="sm" />
                 ) : (
                   <svg className="h-4 w-4" viewBox="0 0 24 24">
                     <path
@@ -179,154 +185,150 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
                   </svg>
                 )}
                 {googleLoading ? "Connecting..." : "Continue with Google"}
-              </Button>
+              </button>
 
-              <p className="text-[11px] text-center text-muted-foreground">
+              <p className="text-[13px] text-center text-white/40">
                 Use &quot;Sign in with another account&quot; in Google to switch accounts
               </p>
 
               {error && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive">{error}</p>
+                <div className="p-3 rounded-lg bg-red-500/10 border-[0.8px] border-red-500/20">
+                  <p className="text-[14px] text-red-400">{error}</p>
                 </div>
               )}
             </div>
           </>
         )}
 
-        {/* Survey Step */}
+        {/* Survey Step - Linear style */}
         {step === "survey" && (
           <>
-            <DialogHeader>
-              <DialogTitle>Almost there!</DialogTitle>
-              <DialogDescription>
-                Tell us a bit about yourself so we can prioritize your access.
-              </DialogDescription>
-            </DialogHeader>
+            {/* Title with bottom border - Linear style */}
+            <div className="px-5 py-4 border-b-[0.8px] border-white/[0.05]">
+              <DialogHeader className="space-y-0">
+                <DialogTitle className="text-[16px] font-normal text-[#f7f8f8]">Almost there!</DialogTitle>
+                <VisuallyHidden.Root>
+                  <DialogDescription>Tell us about yourself</DialogDescription>
+                </VisuallyHidden.Root>
+              </DialogHeader>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 pt-2">
-              {/* User Info Section */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+            <form onSubmit={handleSubmit} className="p-5 space-y-5">
+              {/* User Info Section - Linear style */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.03] border-[0.8px] border-white/[0.05]">
                 {/* Avatar */}
                 {picture ? (
                   <Image
                     src={picture}
                     alt="Profile"
-                    width={48}
-                    height={48}
-                    className="rounded-full border border-border shrink-0"
+                    width={40}
+                    height={40}
+                    className="rounded-full border-[0.8px] border-white/[0.08] shrink-0"
                     referrerPolicy="no-referrer"
                     unoptimized
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-5 w-5 text-primary" />
+                  <div className="w-10 h-10 rounded-full bg-white/[0.05] flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4 text-white/60" />
                   </div>
                 )}
 
                 <div className="flex-1 min-w-0">
                   {name && (
-                    <p className="text-sm font-medium truncate">{name}</p>
+                    <p className="text-[14px] font-medium text-[#f7f8f8] truncate">{name}</p>
                   )}
-                  <p className="text-xs text-muted-foreground truncate">{email}</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                    You can update your name in settings after joining
-                  </p>
+                  <p className="text-[13px] text-white/60 truncate">{email}</p>
                 </div>
 
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
                   onClick={goToEmailStep}
-                  className="h-8 px-2 text-xs text-muted-foreground shrink-0"
+                  className="h-7 px-2.5 text-[12px] text-white/60 hover:text-[#f7f8f8] hover:bg-white/[0.05] rounded-md transition-colors duration-100 shrink-0"
                 >
                   Change
-                </Button>
+                </button>
               </div>
 
-              {/* Survey Section */}
-              <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-4">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary">
-                    <Briefcase className="h-3 w-3" />
-                  </span>
-                  Quick Survey
-                </div>
+              {/* Survey Section - Linear style */}
+              <div className="space-y-4">
+                <p className="text-[14px] text-white/60">
+                  Tell us a bit about yourself so we can prioritize your access.
+                </p>
 
                 {/* Role Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm">
-                    What best describes you? <span className="text-destructive">*</span>
-                  </Label>
+                <div className="space-y-2.5">
+                  <label htmlFor="role" className="block text-[13px] text-[#f7f8f8]">
+                    What best describes you? <span className="text-red-400">*</span>
+                  </label>
                   <Select value={role} onValueChange={setRole} disabled={loading} required>
-                    <SelectTrigger id="role" className="bg-background">
+                    <SelectTrigger
+                      id="role"
+                      className="h-10 bg-white/[0.05] border-[0.8px] border-white/[0.05] rounded-lg text-[14px] text-[#f7f8f8] focus:ring-0 focus:border-white/[0.15]"
+                    >
                       <SelectValue placeholder="Select your role..." />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="publisher">App Publisher</SelectItem>
-                      <SelectItem value="developer">Developer</SelectItem>
-                      <SelectItem value="marketer">Marketer / Ad Ops</SelectItem>
-                      <SelectItem value="agency">Agency</SelectItem>
-                      <SelectItem value="indie">Indie Developer</SelectItem>
-                      <SelectItem value="enterprise">Enterprise / Large Publisher</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                    <SelectContent className="bg-[#1c1c1f] border-[0.8px] border-white/[0.08]">
+                      <SelectItem value="publisher" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">App Publisher</SelectItem>
+                      <SelectItem value="developer" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">Developer</SelectItem>
+                      <SelectItem value="marketer" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">Marketer / Ad Ops</SelectItem>
+                      <SelectItem value="agency" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">Agency</SelectItem>
+                      <SelectItem value="indie" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">Indie Developer</SelectItem>
+                      <SelectItem value="enterprise" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">Enterprise / Large Publisher</SelectItem>
+                      <SelectItem value="other" className="text-[#b4bcd0] focus:bg-white/[0.05] focus:text-[#f7f8f8]">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Use Case */}
-                <div className="space-y-2">
-                  <Label htmlFor="useCase" className="text-sm flex items-center gap-1.5">
-                    <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground" />
-                    What would you use ADAgent for? <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
+                <div className="space-y-2.5">
+                  <label htmlFor="useCase" className="block text-[13px] text-[#f7f8f8]">
+                    What would you use ADAgent for? <span className="text-red-400">*</span>
+                  </label>
+                  <textarea
                     id="useCase"
-                    placeholder="e.g., I want to quickly check my daily revenue across multiple apps without logging into each dashboard..."
+                    placeholder="e.g., Check daily revenue, optimize waterfalls..."
                     value={useCase}
                     onChange={(e) => setUseCase(e.target.value)}
-                    className="min-h-[80px] resize-none bg-background"
+                    className="w-full min-h-[100px] px-3 py-2.5 rounded-lg text-[14px] text-[#f7f8f8] placeholder:text-white/40 bg-white/[0.05] border-[0.8px] border-white/[0.05] focus:border-white/[0.15] focus:outline-none resize-none transition-colors duration-100"
                     required
                     disabled={loading}
                     maxLength={500}
                   />
-                  <p className="text-[10px] text-muted-foreground text-right">
+                  <p className="text-[12px] text-white/40 text-right">
                     {useCase.length}/500
                   </p>
                 </div>
               </div>
 
               {error && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive">{error}</p>
+                <div className="p-3 rounded-lg bg-red-500/10 border-[0.8px] border-red-500/20">
+                  <p className="text-[14px] text-red-400">{error}</p>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-1">
-                <Button
+              <div className="flex justify-end gap-2 pt-2">
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
                   onClick={() => setOpen(false)}
                   disabled={loading}
+                  className="h-8 px-3 rounded-lg text-[13px] font-medium text-white/60 hover:text-[#f7f8f8] hover:bg-white/[0.05] disabled:opacity-50 transition-colors duration-100"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   type="submit"
-                  size="sm"
                   disabled={loading || !isValid}
+                  className="h-8 px-4 rounded-lg text-[13px] font-medium bg-[#28282c] border-[0.8px] border-[#3e3e44] text-[#f7f8f8] hover:bg-[#323236] disabled:opacity-50 transition-colors duration-100"
                 >
                   {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span className="flex items-center gap-2">
+                      <Spinner size="sm" />
                       Joining...
-                    </>
+                    </span>
                   ) : (
                     "Join Waitlist"
                   )}
-                </Button>
+                </button>
               </div>
             </form>
           </>

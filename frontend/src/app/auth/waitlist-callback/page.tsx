@@ -2,7 +2,7 @@
 
 import { useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Spinner } from "@/atoms/spinner"
 
 function CallbackHandler() {
   const searchParams = useSearchParams()
@@ -31,7 +31,7 @@ function CallbackHandler() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <Spinner size="md" className="text-muted-foreground" />
       <p className="text-sm text-muted-foreground">Completing authentication...</p>
     </div>
   )
@@ -42,7 +42,7 @@ export default function WaitlistCallbackPage() {
     <Suspense
       fallback={
         <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Spinner size="md" className="text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       }

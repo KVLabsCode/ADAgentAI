@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
+import { WebVitals } from "@/components/web-vitals";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,10 +34,39 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* SSR flash prevention - apply theme before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('theme');
+                  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  const isDark = theme === 'dark' || (!theme && systemDark) || (theme === 'system' && systemDark);
+                  document.documentElement.classList.add(isDark ? 'dark' : 'light');
+                  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <WebVitals />
+          {children}
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            richColors
+            toastOptions={{
+              duration: 3000,
+            }}
+          />
+        </Providers>
       </body>
     </html>
   );

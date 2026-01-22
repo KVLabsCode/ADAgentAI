@@ -10,6 +10,7 @@ from .events import (
     DoneEvent,
     ToolApprovalRequiredEvent,
     ToolDeniedEvent,
+    ToolExecutingEvent,
     format_sse,
 )
 
@@ -44,6 +45,7 @@ __all__ = [
     "DoneEvent",
     "ToolApprovalRequiredEvent",
     "ToolDeniedEvent",
+    "ToolExecutingEvent",
     "format_sse",
     # State
     "is_streaming_active",

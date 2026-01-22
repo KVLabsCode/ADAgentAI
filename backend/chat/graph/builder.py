@@ -206,9 +206,13 @@ async def run_graph(
     import uuid
     from langsmith import get_current_run_tree
 
+    print(f"[run_graph] Starting with query: {user_query[:50]}...", flush=True)
+
     # Generate thread ID if not provided
     if not thread_id:
         thread_id = str(uuid.uuid4())
+
+    print(f"[run_graph] Thread ID: {thread_id}", flush=True)
 
     # Add metadata to current LangSmith run for observability
     run_tree = get_current_run_tree()
@@ -247,22 +251,33 @@ async def run_graph(
         "recursion_limit": 25,  # Prevent infinite loops
     }
 
+    print(f"[run_graph] Building graph...", flush=True)
     # Build graph and use checkpointer context manager
     graph = build_graph()
+    print(f"[run_graph] Graph built, getting checkpointer context...", flush=True)
+
     async with get_checkpointer_context() as checkpointer:
+        print(f"[run_graph] Inside checkpointer context, setting up tables...", flush=True)
         # Setup tables on first use
         await checkpointer.setup()
+        print(f"[run_graph] Tables setup complete, compiling graph...", flush=True)
 
         # Compile with checkpointer
         compiled_graph = graph.compile(checkpointer=checkpointer)
+        print(f"[run_graph] Graph compiled, starting astream...", flush=True)
 
         # Stream graph execution
+        event_count = 0
         async for event in compiled_graph.astream(
             initial_state,
             config=config,
             stream_mode="updates",  # Get state updates per node
         ):
+            event_count += 1
+            print(f"[run_graph] Got event #{event_count}: keys={list(event.keys())}", flush=True)
             yield event
+
+        print(f"[run_graph] Finished streaming, total events: {event_count}", flush=True)
 
 
 async def resume_graph(
