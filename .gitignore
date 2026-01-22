@@ -25,6 +25,10 @@ __pycache__/
 .venv/
 venv/
 ENV/
+*.egg-info/
+
+# LangGraph local cache
+.langgraph_api/
 
 # IDE
 .idea/

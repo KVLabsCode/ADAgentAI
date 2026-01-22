@@ -45,7 +45,8 @@ export async function authFetch(
 }
 
 export interface StreamEvent {
-  type: "routing" | "agent" | "thinking" | "tool" | "tool_result" | "tool_approval_required" | "tool_denied" | "result" | "content" | "error" | "done" | "stream_id";
+  type: "routing" | "agent" | "thinking" | "tool" | "tool_executing" | "tool_result" | "tool_approval_required" | "tool_denied" | "result" | "content" | "error" | "done" | "stream_id";
+  message?: string;  // Used by tool_executing
   content?: string;
   service?: string;
   capability?: string;
