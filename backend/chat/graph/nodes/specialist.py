@@ -635,6 +635,7 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
                 tools = _sanitize_tools_for_gemini(tools)
 
             llm_with_tools = llm.bind_tools(tools)
+            print(f"[specialist] Successfully bound {len(tools)} tools to LLM")
         else:
             llm_with_tools = llm
             print(f"[specialist] Warning: No tools loaded for {service}")
@@ -809,6 +810,9 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                 }
 
             # Get tool calls from final merged response
+            print(f"[specialist] final_response has tool_calls attr: {hasattr(final_response, 'tool_calls')}")
+            if hasattr(final_response, "tool_calls"):
+                print(f"[specialist] final_response.tool_calls: {final_response.tool_calls}")
             if hasattr(final_response, "tool_calls") and final_response.tool_calls:
                 tool_calls_accumulated = []
                 for tc in final_response.tool_calls:
