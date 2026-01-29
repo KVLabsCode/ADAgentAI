@@ -639,7 +639,9 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
             llm_with_tools = llm
             print(f"[specialist] Warning: No tools loaded for {service}")
     except Exception as e:
-        print(f"[specialist] Error loading tools: {e}")
+        print(f"[specialist] Error loading tools: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         llm_with_tools = llm
 
     # Build messages for LLM

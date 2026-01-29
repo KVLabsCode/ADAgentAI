@@ -239,11 +239,18 @@ async def get_tools_for_service(
     config = await _get_service_config(service, user_id, organization_id)
 
     print(f"[mcp_loader] Loading tool schemas for service: {service}")
+    print(f"[mcp_loader] Config: {list(config.keys())}")
 
     # As of langchain-mcp-adapters 0.1.0, no context manager needed
-    client = MultiServerMCPClient(config)
-    tools = await client.get_tools()
-    print(f"[mcp_loader] Loaded {len(tools)} tool schemas: {[t.name for t in tools]}")
+    try:
+        client = MultiServerMCPClient(config)
+        tools = await client.get_tools()
+        print(f"[mcp_loader] Loaded {len(tools)} tool schemas: {[t.name for t in tools]}")
+    except Exception as e:
+        print(f"[mcp_loader] ERROR loading tools: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
     # Populate the tool registry with metadata
     if populate_registry:
