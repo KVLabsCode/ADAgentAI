@@ -235,7 +235,7 @@ pyyaml==6.0.3
     #   huggingface-hub
     #   langchain-core
     #   uvicorn
-referencing==0.37.0
+referencing>=0.31.0,<0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
