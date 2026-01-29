@@ -136,6 +136,19 @@ async def _get_mcp_server_config_async(
             if token:
                 oauth_tokens[network] = token
 
+    # Get the venv directory from sys.executable
+    # e.g., /opt/render/project/src/.venv/bin/python -> /opt/render/project/src/.venv
+    venv_dir = None
+    if 'venv' in python_exe or '.venv' in python_exe:
+        # Extract venv path from executable
+        exe_path = Path(python_exe)
+        # Go up from bin/python to venv root
+        if exe_path.parent.name in ('bin', 'Scripts'):
+            venv_dir = exe_path.parent.parent
+
+    print(f"[mcp_loader] Python executable: {python_exe}")
+    print(f"[mcp_loader] Detected venv: {venv_dir}")
+
     for network in SUPPORTED_NETWORKS:
         # Base environment with user and network context
         # IMPORTANT: Set PYTHONPATH so subprocess can import mcp_servers package
@@ -148,6 +161,16 @@ async def _get_mcp_server_config_async(
             "CURRENT_USER_ID": user_id or "",
             "PYTHONPATH": pythonpath,
         }
+
+        # If running from a venv, ensure the subprocess knows about it
+        # This helps Python find packages installed in the venv
+        if venv_dir:
+            env["VIRTUAL_ENV"] = str(venv_dir)
+            # Ensure venv bin directory is in PATH
+            venv_bin = venv_dir / ("Scripts" if sys.platform == "win32" else "bin")
+            current_path = env.get("PATH", "")
+            if str(venv_bin) not in current_path:
+                env["PATH"] = f"{venv_bin}{os.pathsep}{current_path}"
 
         # Add OAuth token if available for this network
         if network in oauth_tokens:
