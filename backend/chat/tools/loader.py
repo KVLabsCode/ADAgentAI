@@ -138,9 +138,15 @@ async def _get_mcp_server_config_async(
 
     for network in SUPPORTED_NETWORKS:
         # Base environment with user and network context
+        # IMPORTANT: Set PYTHONPATH so subprocess can import mcp_servers package
+        # The parent process uses sys.path.insert(), but subprocess doesn't inherit that
+        existing_pythonpath = os.environ.get("PYTHONPATH", "")
+        pythonpath = f"{BACKEND_DIR}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(BACKEND_DIR)
+
         env = {
             **os.environ,
             "CURRENT_USER_ID": user_id or "",
+            "PYTHONPATH": pythonpath,
         }
 
         # Add OAuth token if available for this network

@@ -30,6 +30,7 @@
     "@neondatabase/auth": "0.1.0-beta.21",
     "@next/mdx": "^16.1.4",
     "@portabletext/react": "^6.0.2",
+    "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-slot": "^1.2.4",
     "@rjsf/core": "^6.2.5",
     "@rjsf/utils": "^6.2.5",
