@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useTheme } from "next-themes"
 import { Moon, Sun, LayoutDashboard, LogOut, Menu, LogIn } from "lucide-react"
-import { Button } from "@/atoms/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/atoms/avatar"
 import {
   DropdownMenu,
@@ -17,12 +16,10 @@ import { Logo, LogoSvgWide } from "@/components/brand/logo"
 
 interface PublicLayoutClientProps {
   children: React.ReactNode
-  currentYear: number
 }
 
 export function PublicLayoutClient({
   children,
-  currentYear,
 }: PublicLayoutClientProps) {
   const { theme, setTheme } = useTheme()
   const { user, isAuthenticated, isLoading, signOut } = useUser()
@@ -78,15 +75,13 @@ export function PublicLayoutClient({
               <div className="h-8 w-8 rounded-full bg-white/[0.05] animate-pulse" />
             ) : isAuthenticated && user ? (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="h-8 w-8 rounded-full overflow-hidden ring-1 ring-white/[0.08] hover:ring-white/[0.15] transition-all duration-100">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback className="text-xs bg-[#1c1c1f] text-[#f7f8f8]">
-                        {user.name?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </button>
+                <DropdownMenuTrigger className="h-8 w-8 rounded-full overflow-hidden ring-1 ring-white/[0.08] hover:ring-white/[0.15] transition-all duration-100">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatar} alt={user.name} />
+                    <AvatarFallback className="text-xs bg-[#1c1c1f] text-[#f7f8f8]">
+                      {user.name?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-[#1c1c1f] border-white/[0.08]">
                   <div className="px-2 py-1.5">
@@ -94,11 +89,9 @@ export function PublicLayoutClient({
                     <p className="text-xs text-[#8a8f98] truncate">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator className="bg-white/[0.08]" />
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard" className="cursor-pointer text-[#b4bcd0] hover:text-[#f7f8f8]">
-                      <LayoutDashboard className="h-4 w-4 mr-2" />
-                      Dashboard
-                    </Link>
+                  <DropdownMenuItem render={<Link href="/dashboard" className="cursor-pointer text-[#b4bcd0] hover:text-[#f7f8f8]" />}>
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Dashboard
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/[0.08]" />
                   <DropdownMenuItem onClick={signOut} className="cursor-pointer text-red-400 focus:text-red-400">
@@ -128,27 +121,25 @@ export function PublicLayoutClient({
 
             {/* Mobile menu */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="md:hidden h-8 w-8 flex items-center justify-center rounded-md text-[#8a8f98] hover:text-[#f7f8f8] hover:bg-white/[0.05] transition-colors duration-100">
-                  <Menu className="h-4 w-4" />
-                  <span className="sr-only">Menu</span>
-                </button>
+              <DropdownMenuTrigger className="md:hidden h-8 w-8 flex items-center justify-center rounded-md text-[#8a8f98] hover:text-[#f7f8f8] hover:bg-white/[0.05] transition-colors duration-100">
+                <Menu className="h-4 w-4" />
+                <span className="sr-only">Menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40 bg-[#1c1c1f] border-white/[0.08]">
-                <DropdownMenuItem asChild>
-                  <Link href="/platforms" className="cursor-pointer text-[#b4bcd0]">Platforms</Link>
+                <DropdownMenuItem render={<Link href="/platforms" className="cursor-pointer text-[#b4bcd0]" />}>
+                  Platforms
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/pricing" className="cursor-pointer text-[#b4bcd0]">Pricing</Link>
+                <DropdownMenuItem render={<Link href="/pricing" className="cursor-pointer text-[#b4bcd0]" />}>
+                  Pricing
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/blog" className="cursor-pointer text-[#b4bcd0]">Blog</Link>
+                <DropdownMenuItem render={<Link href="/blog" className="cursor-pointer text-[#b4bcd0]" />}>
+                  Blog
                 </DropdownMenuItem>
                 {isAuthenticated && (
                   <>
                     <DropdownMenuSeparator className="bg-white/[0.08]" />
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard" className="cursor-pointer text-[#b4bcd0]">Dashboard</Link>
+                    <DropdownMenuItem render={<Link href="/dashboard" className="cursor-pointer text-[#b4bcd0]" />}>
+                      Dashboard
                     </DropdownMenuItem>
                   </>
                 )}

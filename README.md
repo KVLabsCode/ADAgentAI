@@ -45,9 +45,9 @@ AI-powered assistant for managing AdMob and Google Ad Manager accounts. Ask ques
 | **Database** | Neon PostgreSQL |
 | **Auth** | Better Auth + Google OAuth |
 | **Billing** | Polar |
-| **AI Agent** | FastAPI, CrewAI, SSE Streaming |
+| **AI Agent** | FastAPI, LangGraph, SSE Streaming |
 | **LLM** | Anthropic Claude |
-| **MCP Tools** | FastMCP (AdMob, Google Ad Manager) |
+| **MCP Tools** | FastMCP (Unified Master Server: 252 Verified Tools) |
 | **Blog CMS** | Sanity |
 
 ## Project Structure
@@ -74,12 +74,14 @@ AI-powered assistant for managing AdMob and Google Ad Manager accounts. Ask ques
 │   ├── chat/                # Modular chat package
 │   │   ├── streaming/       # SSE events & state
 │   │   ├── approval/        # Human-in-loop system
-│   │   ├── routing/         # Query classification
-│   │   └── hooks/           # CrewAI hooks
+│   │   ├── graph/           # LangGraph logic
+│   │   └── tools/           # MCP Tool Loader
 │   │
-│   ├── ad_platform_crew/    # CrewAI agents
-│   ├── admob_mcp/           # AdMob MCP server
-│   ├── admanager_mcp/       # Ad Manager MCP server
+│   ├── mcp_servers/         # Unified MCP Infrastructure
+│   │   ├── server.py        # Master Controller (252 tools)
+│   │   └── providers/       # Independent network logic
+│   │
+│   ├── api_specs/           # OpenAPI & Discovery specs
 │   └── chat_server.py       # FastAPI entry point
 │
 ├── studio-sanity/           # Sanity CMS studio (blog)

@@ -15,6 +15,7 @@ import {
   X,
   Circle,
   ChevronDown,
+  Shield,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -25,8 +26,11 @@ import {
 } from "@/organisms/chain-of-thought"
 import { Tool } from "@/organisms/tool"
 import { TextShimmer } from "@/atoms/text-shimmer"
+import { Loader } from "@/components/ui/loader"
+import { Button } from "@/atoms/button"
+import { RJSFParameterForm } from "./rjsf"
 import { getStepInfo, extractMcpContent, type StepIconName } from "@/lib/step-utils"
-import type { StreamEventItem } from "@/lib/types"
+import type { StreamEventItem, RJSFSchema } from "@/lib/types"
 
 export interface TimelineStep {
   id: string
@@ -40,6 +44,8 @@ interface StepsTimelineProps {
   events: StreamEventItem[]
   isStreaming?: boolean
   hasPendingApproval?: boolean
+  onToolApproval?: (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => void
+  pendingApprovals?: Map<string, boolean | null>
   className?: string
 }
 
@@ -65,14 +71,27 @@ const IconMap: Record<StepIconName, React.ComponentType<{ className?: string }>>
 function eventsToSteps(events: StreamEventItem[]): TimelineStep[] {
   const steps: TimelineStep[] = []
 
+  // Build a set of tool names that have pending approval events
+  const toolsWithApproval = new Set<string>()
+  for (const event of events) {
+    if (event.type === "tool_approval_required") {
+      toolsWithApproval.add(event.tool_name)
+    }
+  }
+
   for (let i = 0; i < events.length; i++) {
     const event = events[i]
 
     // Skip result-type events (they're paired with tool events)
     if (event.type === "tool_result") continue
-    if (event.type === "tool_approval_required") continue
     if (event.type === "tool_denied") continue
     if (event.type === "result") continue
+
+    // Skip tool events that have a corresponding approval event
+    // The approval event will show the form instead
+    if (event.type === "tool" && toolsWithApproval.has(event.name)) {
+      continue
+    }
 
     const stepInfo = getStepInfo(event)
 
@@ -119,7 +138,182 @@ function formatToolName(name: string): string {
     .join(" ")
 }
 
-export function StepsTimeline({ events, isStreaming = false, hasPendingApproval = false, className }: StepsTimelineProps) {
+/**
+ * Tool Approval Step - renders the approval form inside the timeline
+ */
+interface ToolApprovalStepProps {
+  step: TimelineStep
+  event: Extract<StreamEventItem, { type: "tool_approval_required" }>
+  isPending: boolean
+  isExecuting: boolean
+  isDenied: boolean
+  onApproval?: (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => void
+}
+
+function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, onApproval }: ToolApprovalStepProps) {
+  // Parse initial values from tool input
+  const initialValues = React.useMemo(() => {
+    try {
+      let parsed = JSON.parse(event.tool_input) as Record<string, unknown>
+
+      // Unwrap "params" wrapper if present
+      if (parsed.params && typeof parsed.params === "object") {
+        parsed = parsed.params as Record<string, unknown>
+      }
+
+      // Parse body_json string and merge its contents (common pattern for Google API tools)
+      // This ensures LLM recommendations in body_json are reflected in form fields
+      if (typeof parsed.body_json === "string") {
+        try {
+          const bodyContent = JSON.parse(parsed.body_json) as Record<string, unknown>
+          // Merge body_json contents, keeping parent/account separate
+          const { body_json: _, ...rest } = parsed
+          parsed = { ...rest, ...bodyContent }
+        } catch {
+          // body_json wasn't valid JSON, keep as-is
+        }
+      }
+
+      return parsed
+    } catch {
+      return {}
+    }
+  }, [event.tool_input])
+
+  // Track form state
+  const [currentValues, setCurrentValues] = React.useState<Record<string, unknown>>(initialValues)
+  const [hasChanges, setHasChanges] = React.useState(false)
+  const [hasErrors, setHasErrors] = React.useState(false)
+
+  const handleParamChange = React.useCallback((values: Record<string, unknown>, changed: boolean, errors: boolean) => {
+    setCurrentValues(values)
+    setHasChanges(changed)
+    setHasErrors(errors)
+  }, [])
+
+  const handleApproval = (approved: boolean) => {
+    if (onApproval) {
+      if (approved && hasChanges) {
+        onApproval(event.approval_id, true, currentValues)
+      } else {
+        onApproval(event.approval_id, approved)
+      }
+    }
+  }
+
+  // Determine tool state
+  const toolState = isPending ? "approval-pending" : isExecuting ? "input-streaming" : isDenied ? "output-error" : "output-available"
+
+  // Render icon based on state - Plus icon for pending approval
+  const renderIcon = () => {
+    if (isPending) {
+      return (
+        <span className="relative inline-flex h-4 w-4 items-center justify-center">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-500/40" />
+          <Plus className="relative h-4 w-4 text-orange-500" />
+        </span>
+      )
+    }
+    if (isExecuting) {
+      return (
+        <span className="relative inline-flex h-4 w-4 items-center justify-center">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500/40" />
+          <Plus className="relative h-4 w-4 text-violet-500" />
+        </span>
+      )
+    }
+    return <Plus className="h-4 w-4 text-muted-foreground" />
+  }
+
+  // Approval buttons
+  const approvalButtons = isPending && (
+    <div className="flex items-center justify-between gap-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-700/40">
+      <div className="flex items-center gap-2 text-[10px]">
+        <Shield className="h-3 w-3 text-muted-foreground" />
+        <span className="text-muted-foreground">
+          {hasErrors ? "Fill required fields" : hasChanges ? "Review changes" : "Approval required"}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-3 text-[11px] text-muted-foreground hover:text-destructive-foreground hover:bg-destructive/80"
+          onClick={(e) => { e.stopPropagation(); handleApproval(false) }}
+        >
+          <X className="h-3 w-3 mr-1" />
+          Deny
+        </Button>
+        <Button
+          size="sm"
+          disabled={hasErrors}
+          className={cn(
+            "h-7 px-3 text-[11px]",
+            hasErrors
+              ? "bg-muted cursor-not-allowed opacity-50"
+              : hasChanges
+                ? "bg-amber-600 hover:bg-amber-500 text-white"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white"
+          )}
+          onClick={(e) => { e.stopPropagation(); handleApproval(true) }}
+        >
+          <Check className="h-3 w-3 mr-1" />
+          {hasChanges ? "Allow with Changes" : "Allow"}
+        </Button>
+      </div>
+    </div>
+  )
+
+  return (
+    <ChainOfThoughtStep key={step.id} defaultOpen={true}>
+      <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={false}>
+        {isPending ? (
+          <TextShimmer duration={2}>{step.label}</TextShimmer>
+        ) : isExecuting ? (
+          <TextShimmer duration={2}>Executing {formatToolName(event.tool_name)}...</TextShimmer>
+        ) : (
+          step.label
+        )}
+      </ChainOfThoughtTrigger>
+      <ChainOfThoughtContent>
+        <Tool
+          toolPart={{
+            type: formatToolName(event.tool_name),
+            state: toolState,
+            input: event.parameter_schema && isPending ? undefined : initialValues,
+            errorText: isDenied ? "Execution denied" : undefined,
+          }}
+          defaultOpen={true}
+          approvalContent={
+            <>
+              {/* Editable form when schema available and pending */}
+              {event.parameter_schema && isPending && (
+                <div className="mb-4">
+                  <RJSFParameterForm
+                    rjsfSchema={event.parameter_schema as RJSFSchema}
+                    initialValues={initialValues}
+                    onChange={handleParamChange}
+                    disabled={!isPending}
+                  />
+                </div>
+              )}
+              {approvalButtons}
+            </>
+          }
+        />
+      </ChainOfThoughtContent>
+    </ChainOfThoughtStep>
+  )
+}
+
+export function StepsTimeline({
+  events,
+  isStreaming = false,
+  hasPendingApproval = false,
+  onToolApproval,
+  pendingApprovals = new Map(),
+  className
+}: StepsTimelineProps) {
   const steps = React.useMemo(() => eventsToSteps(events), [events])
 
   // Show spinner when streaming OR when waiting for approval
@@ -159,25 +353,19 @@ export function StepsTimeline({ events, isStreaming = false, hasPendingApproval 
       {/* Collapsible header - click to toggle entire section */}
       <button
         onClick={handleToggle}
-        className="flex items-center gap-1.5 mb-2 text-sm text-left hover:text-foreground transition-colors group"
+        className="flex items-center gap-1.5 mb-4 text-sm text-left hover:text-foreground transition-colors group"
       >
         {showSpinner ? (
           <>
-            <span className="relative inline-flex h-4 w-4 items-center justify-center">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500/40" />
-              <div className="relative h-4 w-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
-            </span>
+            <Loader variant="circular" size="sm" className="text-muted-foreground" />
             <TextShimmer duration={2}>
               {steps.length} {steps.length === 1 ? "step" : "steps"} in progress...
             </TextShimmer>
           </>
         ) : (
-          <>
-            <Check className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              {steps.length} {steps.length === 1 ? "step" : "steps"} completed
-            </span>
-          </>
+          <span className="text-muted-foreground">
+            {steps.length} {steps.length === 1 ? "step" : "steps"} completed
+          </span>
         )}
         <ChevronDown className={cn(
           "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
@@ -228,18 +416,52 @@ export function StepsTimeline({ events, isStreaming = false, hasPendingApproval 
             )
           }
 
-          // For routing events with thinking
-          if (event.type === "routing" && event.thinking) {
+          // For routing events (with or without thinking)
+          if (event.type === "routing") {
+            // Format model name for display
+            const modelDisplay = event.model_selected
+              ? event.model_selected.includes("haiku") ? "Haiku"
+              : event.model_selected.includes("sonnet-4") ? "Sonnet 4"
+              : event.model_selected.includes("sonnet") ? "Sonnet"
+              : event.model_selected.includes("opus") ? "Opus"
+              : null
+              : null
+
+            if (event.thinking) {
+              return (
+                <ChainOfThoughtStep key={step.id} defaultOpen={false}>
+                  <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={true}>
+                    <span className="flex items-center gap-2">
+                      {step.label}
+                      {modelDisplay && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300">
+                          {modelDisplay}
+                        </span>
+                      )}
+                    </span>
+                  </ChainOfThoughtTrigger>
+                  <ChainOfThoughtContent>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {event.thinking}
+                    </p>
+                  </ChainOfThoughtContent>
+                </ChainOfThoughtStep>
+              )
+            }
+
+            // Routing without thinking - simple display with model badge
             return (
               <ChainOfThoughtStep key={step.id} defaultOpen={false}>
-                <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={true}>
-                  {step.label}
+                <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={false}>
+                  <span className="flex items-center gap-2">
+                    {step.label}
+                    {modelDisplay && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300">
+                        {modelDisplay}
+                      </span>
+                    )}
+                  </span>
                 </ChainOfThoughtTrigger>
-                <ChainOfThoughtContent>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {event.thinking}
-                  </p>
-                </ChainOfThoughtContent>
               </ChainOfThoughtStep>
             )
           }
@@ -292,6 +514,26 @@ export function StepsTimeline({ events, isStreaming = false, hasPendingApproval 
                   <TextShimmer duration={2}>{step.label}</TextShimmer>
                 </ChainOfThoughtTrigger>
               </ChainOfThoughtStep>
+            )
+          }
+
+          // For tool_approval_required events - render approval form
+          if (event.type === "tool_approval_required") {
+            const approvalState = pendingApprovals.get(event.approval_id)
+            const isPending = approvalState === undefined || approvalState === null
+            const isExecuting = approvalState === true
+            const isDenied = approvalState === false
+
+            return (
+              <ToolApprovalStep
+                key={step.id}
+                step={step}
+                event={event}
+                isPending={isPending}
+                isExecuting={isExecuting}
+                isDenied={isDenied}
+                onApproval={onToolApproval}
+              />
             )
           }
 

@@ -27,6 +27,30 @@ export function EntitySelectWidget(props: WidgetProps) {
   // RJSF v5+: formContext is accessed via registry.formContext, NOT props.formContext
   const formContext = (registry as { formContext?: { formData?: Record<string, unknown> } })?.formContext
 
+  const fetchType = options?.fetchType as string | undefined
+
+  // Normalize account IDs: "accounts/pub-XXX" -> "pub-XXX"
+  // The LLM sends full path format, but dropdown options use short IDs
+  const normalizeAccountId = React.useCallback((val: string | undefined): string | undefined => {
+    if (!val) return val
+    if (fetchType === "accounts" && val.startsWith("accounts/")) {
+      return val.replace("accounts/", "")
+    }
+    return val
+  }, [fetchType])
+
+  // Denormalize for output: "pub-XXX" -> "accounts/pub-XXX" if original was that format
+  const denormalizeAccountId = React.useCallback((val: string): string => {
+    // If original value had prefix, preserve that format
+    if (fetchType === "accounts" && value?.startsWith("accounts/") && !val.startsWith("accounts/")) {
+      return `accounts/${val}`
+    }
+    return val
+  }, [fetchType, value])
+
+  // Normalized value for matching against dropdown options
+  const normalizedValue = normalizeAccountId(value)
+
   // Stable empty object to avoid creating new reference each render
   const emptyFormData = React.useMemo<Record<string, unknown>>(() => ({}), [])
 
@@ -38,7 +62,6 @@ export function EntitySelectWidget(props: WidgetProps) {
     getDisplayName,
   } = useEntityData()
 
-  const fetchType = options?.fetchType as string | undefined
   const explicitDependsOn = options?.dependsOn as string | undefined
   const dependsOn = explicitDependsOn ?? (fetchType ? getParentField(fetchType) : null)
 
@@ -76,6 +99,11 @@ export function EntitySelectWidget(props: WidgetProps) {
   const loading = fetchType ? isLoading(fetchType, parentId, filterParams) : false
   const error = fetchType ? getError(fetchType, parentId, filterParams) : null
 
+  // Wrap onChange to handle denormalization (must be defined before useEffects that use it)
+  const handleChange = React.useCallback((newValue: string) => {
+    onChange(denormalizeAccountId(newValue))
+  }, [onChange, denormalizeAccountId])
+
   React.useEffect(() => {
     if (!fetchType) return
     if (dependsOn && !dependencyValue) return
@@ -86,12 +114,24 @@ export function EntitySelectWidget(props: WidgetProps) {
   const prevDependencyRef = React.useRef(dependencyValue)
   React.useEffect(() => {
     if (dependsOn && prevDependencyRef.current !== dependencyValue) {
-      if (prevDependencyRef.current !== undefined && value) {
-        onChange("")
+      if (prevDependencyRef.current !== undefined && normalizedValue) {
+        handleChange("")
       }
       prevDependencyRef.current = dependencyValue
     }
-  }, [dependsOn, dependencyValue, value, onChange])
+  }, [dependsOn, dependencyValue, normalizedValue, handleChange])
+
+  // Track if we've attempted a fetch for this configuration
+  const fetchKey = `${fetchType}-${parentId}-${JSON.stringify(filterParams)}`
+  const [fetchAttempted, setFetchAttempted] = React.useState(false)
+  const prevFetchKeyRef = React.useRef(fetchKey)
+
+  React.useEffect(() => {
+    if (prevFetchKeyRef.current !== fetchKey) {
+      setFetchAttempted(false)
+      prevFetchKeyRef.current = fetchKey
+    }
+  }, [fetchKey])
 
   // Note: For filter dependencies (filterBy), we don't clear selection automatically.
 
@@ -105,13 +145,23 @@ export function EntitySelectWidget(props: WidgetProps) {
     }))
   }, [cachedItems])
 
+  // Mark as fetched when we have data or error
+  React.useEffect(() => {
+    if (dropdownOptions.length > 0 || error) {
+      setFetchAttempted(true)
+    }
+  }, [dropdownOptions.length, error])
+
   const displayValue = React.useMemo(() => {
-    if (!value || !fetchType) return ""
-    return getDisplayName(fetchType, value, parentId)
-  }, [value, fetchType, parentId, getDisplayName])
+    if (!normalizedValue || !fetchType) return ""
+    return getDisplayName(fetchType, normalizedValue, parentId)
+  }, [normalizedValue, fetchType, parentId, getDisplayName])
+
+  // Show loading if: explicitly loading, OR we haven't gotten data yet
+  const showLoading = loading || (!fetchAttempted && dropdownOptions.length === 0)
 
   if (!fetchType) {
-    return <FallbackInput id={id} value={value} onChange={onChange} disabled={disabled} readonly={readonly} placeholder="Enter value..." />
+    return <FallbackInput id={id} value={normalizedValue ?? ""} onChange={handleChange} disabled={disabled} readonly={readonly} placeholder="Enter value..." />
   }
 
   if (dependsOn && !dependencyValue) {
@@ -120,21 +170,21 @@ export function EntitySelectWidget(props: WidgetProps) {
 
   const hasData = dropdownOptions.length > 0
   if (error && !hasData) {
-    return <FallbackInput id={id} value={value} onChange={onChange} disabled={disabled} readonly={readonly} placeholder="Enter manually..." />
+    return <FallbackInput id={id} value={normalizedValue ?? ""} onChange={handleChange} disabled={disabled} readonly={readonly} placeholder="Enter manually..." />
   }
-  if (!hasData && !loading) {
-    return <FallbackInput id={id} value={value} onChange={onChange} disabled={disabled} readonly={readonly} placeholder="No options" />
+  if (!hasData && !showLoading) {
+    return <FallbackInput id={id} value={normalizedValue ?? ""} onChange={handleChange} disabled={disabled} readonly={readonly} placeholder="No options" />
   }
 
   return (
     <BaseDropdown
       id={id}
-      value={value}
+      value={normalizedValue ?? ""}
       options={dropdownOptions}
-      onChange={onChange}
+      onChange={handleChange}
       disabled={disabled}
       readonly={readonly}
-      loading={loading}
+      loading={showLoading}
       displayValue={displayValue}
     />
   )

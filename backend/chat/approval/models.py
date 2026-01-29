@@ -7,6 +7,7 @@ submit, etc.) are considered dangerous and require approval.
 LangGraph uses MCP tool names directly via interrupt().
 """
 
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -26,7 +27,7 @@ class PendingApproval:
 # These are MCP internal tool names used by LangGraph
 DANGEROUS_TOOLS: set[str] = {
     # ==========================================================================
-    # AdMob Write Operations (8 tools)
+    # AdMob Write Operations - Curated Tool Names
     # ==========================================================================
     "admob_create_app",
     "admob_create_ad_unit",
@@ -36,6 +37,20 @@ DANGEROUS_TOOLS: set[str] = {
     "admob_update_mediation_group",
     "admob_create_mediation_ab_experiment",
     "admob_stop_mediation_ab_experiment",
+
+    # ==========================================================================
+    # AdMob Write Operations - Discovery-generated Tool Names
+    # These are auto-generated from Google Discovery JSON specs.
+    # Pattern: accounts_<resource>_<action>
+    # ==========================================================================
+    "accounts_apps_create",
+    "accounts_adUnits_create",
+    "accounts_adUnitMappings_create",
+    "accounts_adUnits_adUnitMappings_create",
+    "accounts_mediationGroups_create",
+    "accounts_mediationGroups_patch",
+    "accounts_mediationGroups_mediationAbExperiments_create",
+    "accounts_mediationGroups_mediationAbExperiments_stop",
 
     # ==========================================================================
     # Ad Manager Write Operations (62 tools)
@@ -149,6 +164,7 @@ def get_tool_display_name(mcp_tool_name: str) -> str:
     Examples:
         "admob_create_app" -> "Create App"
         "admanager_batch_activate_networks_ad_units" -> "Batch Activate Ad Units"
+        "accounts_mediationGroups_create" -> "Create Mediation Group" (Discovery)
     """
     # Remove prefix
     name = mcp_tool_name
@@ -159,6 +175,25 @@ def get_tool_display_name(mcp_tool_name: str) -> str:
 
     # Remove "networks_" from Ad Manager tool names
     name = name.replace("networks_", "")
+
+    # Handle Discovery-generated names: accounts_<resource>_<action>
+    # E.g., "accounts_mediationGroups_create" -> "Create Mediation Group"
+    if name.startswith("accounts_"):
+        name = name[9:]  # Remove "accounts_"
+        # Split on underscores but preserve camelCase parts
+        parts = name.split("_")
+        if len(parts) >= 2:
+            # Last part is the action (create, patch, list, etc.)
+            action = parts[-1].capitalize()
+            # Rest is the resource (may be camelCase)
+            resource_parts = parts[:-1]
+            # Convert camelCase to spaces: "mediationGroups" -> "Mediation Groups"
+            resource_words = []
+            for part in resource_parts:
+                # Split on uppercase letters (camelCase to spaces)
+                words = re.sub(r'([A-Z])', r' \1', part).strip().split()
+                resource_words.extend(word.capitalize() for word in words)
+            return f"{action} {' '.join(resource_words)}"
 
     # Convert snake_case to Title Case
     words = name.split("_")

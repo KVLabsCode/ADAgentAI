@@ -35,10 +35,12 @@ export default function DashboardPage() {
   const { data, isLoading: isDataLoading } = useDashboardData()
 
   const providers = data?.providers ?? []
+  const networks = data?.networks ?? []
   const recentChats = data?.sessions ?? []
 
   const userName = user?.name || user?.email?.split('@')[0] || 'User'
-  const connectedProviders = providers.length
+  // Combined count of OAuth providers + API-key networks
+  const connectedProviders = providers.length + networks.length
   const chatCount = recentChats.length
 
   // Show skeleton only on initial load, not during background refetch

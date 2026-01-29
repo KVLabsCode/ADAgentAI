@@ -164,6 +164,7 @@ export function validateEntityId(fetchType: string, id: string): boolean {
 export const PARAM_DISPLAY_NAMES: Record<string, string> = {
   // Entity IDs
   account_id: "Account",
+  parent: "Account", // API uses "parent" field but it's actually the account selector
   app_id: "App",
   ad_unit_id: "Ad Unit",
   ad_unit_ids: "Ad Units",

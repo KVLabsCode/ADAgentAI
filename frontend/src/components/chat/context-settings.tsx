@@ -128,16 +128,17 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
     setEnabledProviderIds,
   } = useChatSettings()
 
-  const admobProviders = providers.filter((p) => p.type === "admob")
-  const gamProviders = providers.filter((p) => p.type === "gam")
-  const hasProviders = providers.length > 0
+  const activeProviders = providers.filter((p) => p.isEnabled !== false)
+  const admobProviders = activeProviders.filter((p) => p.type === "admob")
+  const gamProviders = activeProviders.filter((p) => p.type === "gam")
+  const hasProviders = activeProviders.length > 0
 
   // Initialize enabled providers
   React.useEffect(() => {
-    if (providers.length > 0 && enabledProviderIds.length === 0) {
-      setEnabledProviderIds(providers.map((p) => p.id))
+    if (activeProviders.length > 0 && enabledProviderIds.length === 0) {
+      setEnabledProviderIds(activeProviders.map((p) => p.id))
     }
-  }, [providers, enabledProviderIds.length, setEnabledProviderIds])
+  }, [activeProviders, enabledProviderIds.length, setEnabledProviderIds])
 
   // Auto-expand providers when searching and they have matching apps
   React.useEffect(() => {
@@ -268,8 +269,8 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
   }
 
   const enabledProviderCount = enabledProviderIds.length === 0
-    ? providers.length
-    : enabledProviderIds.filter((id) => providers.some((p) => p.id === id)).length
+    ? activeProviders.length
+    : enabledProviderIds.filter((id) => activeProviders.some((p) => p.id === id)).length
 
   const filteredAdmobProviders = filterProviders(admobProviders)
   const filteredGamProviders = filterProviders(gamProviders)
@@ -573,21 +574,23 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-7 w-7 rounded-full transition-all duration-200",
-            hasProviders
-              ? "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50"
-              : "text-muted-foreground/30 cursor-not-allowed"
-          )}
-          disabled={!hasProviders}
-        >
-          <Plug className="h-3.5 w-3.5" />
-          <span className="sr-only">Context settings</span>
-        </Button>
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 rounded-full transition-all duration-200",
+              hasProviders
+                ? "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50"
+                : "text-muted-foreground/30 cursor-not-allowed"
+            )}
+            disabled={!hasProviders}
+          />
+        }
+      >
+        <Plug className="h-3.5 w-3.5" />
+        <span className="sr-only">Context settings</span>
       </DialogTrigger>
 
       <DialogContent
@@ -635,7 +638,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
 
         {/* Content */}
         <div className="flex-1 min-h-0 bg-background">
-          <ScrollArea type="hover" style={{ maxHeight: "calc(65vh - 180px)" }}>
+          <ScrollArea  style={{ maxHeight: "calc(65vh - 180px)" }}>
             <div className="py-2">
             {/* AdMob Section */}
             {admobProviders.length > 0 &&
@@ -842,7 +845,7 @@ export function ContextSettings({ providers }: ContextSettingsProps) {
             {/* Summary and Done button inline */}
             <div className="flex-1 flex items-center justify-end gap-2">
               <span className="text-[9px] lg:text-[10px] text-muted-foreground">
-                <span className="font-medium text-foreground">{enabledProviderCount}</span>/{providers.length}
+                <span className="font-medium text-foreground">{enabledProviderCount}</span>/{activeProviders.length}
               </span>
               <Button
                 size="sm"

@@ -196,16 +196,43 @@ export function EntityDataProvider({ children }: { children: React.ReactNode }) 
         const items = toEntityItems(response.options)
 
         // Update cache (use full key for filtered queries)
+        // IMPORTANT: Also merge items into unfiltered cache so getDisplayNames works
         setCache((prev) => {
           const newCache = new Map(prev)
           if (!newCache.has(fetchType)) {
             newCache.set(fetchType, new Map())
           }
+          const typeCache = newCache.get(fetchType)!
           const cacheKey = filters ? key : (parentId ?? null)
-          newCache.get(fetchType)!.set(cacheKey, {
+          typeCache.set(cacheKey, {
             items,
             timestamp: Date.now(),
           })
+
+          // If filtered query, also merge items into unfiltered cache for name lookups
+          // This ensures getDisplayNames can find names even when data was fetched with filters
+          if (filters) {
+            const unfilteredKey = parentId ?? null
+            const existingUnfiltered = typeCache.get(unfilteredKey)
+            if (existingUnfiltered) {
+              // Merge new items into existing unfiltered cache (dedupe by id)
+              const existingIds = new Set(existingUnfiltered.items.map(i => i.id))
+              const newItems = items.filter(i => !existingIds.has(i.id))
+              if (newItems.length > 0) {
+                typeCache.set(unfilteredKey, {
+                  items: [...existingUnfiltered.items, ...newItems],
+                  timestamp: Date.now(),
+                })
+              }
+            } else {
+              // No unfiltered cache exists, create one with filtered items
+              typeCache.set(unfilteredKey, {
+                items,
+                timestamp: Date.now(),
+              })
+            }
+          }
+
           // Persist to sessionStorage
           saveStoredCache(newCache)
           return newCache

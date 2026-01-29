@@ -1,0 +1,522 @@
+openapi: 3.0.0
+info:
+  title: AppLovin MAX API
+  version: 1.0.0
+  description: API for AppLovin MAX Management, Reporting, and A/B Testing.
+servers:
+  - url: https://o.applovin.com/mediation/v1
+  - url: https://r.applovin.com
+paths:
+  /ad_units:
+    get:
+      summary: List Ad Units
+      operationId: list_ad_units
+      responses:
+        '200':
+          description: OK
+  /ad_unit:
+    post:
+      summary: Create Ad Unit
+      operationId: create_ad_unit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdUnitRequest'
+      responses:
+        '200':
+          description: OK
+  /ad_unit/{id}:
+    get:
+      summary: Get Ad Unit Details
+      operationId: get_ad_unit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Update Ad Unit
+      operationId: update_ad_unit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdUnitRequest'
+      responses:
+        '200':
+          description: OK
+  /ad_unit/{id}/{segmentId}:
+    get:
+      summary: Get Waterfall for Segment
+      operationId: get_waterfall_segment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+        - name: segmentId
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Manage Waterfall for Segment
+      operationId: manage_waterfall_segment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+        - name: segmentId
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManageWaterfallRequest'
+      responses:
+        '200':
+          description: OK
+  /ad_unit_experiment/{id}:
+    get:
+      summary: View Ad Unit Experiment
+      operationId: get_ad_unit_experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Manage Ad Unit Experiment
+      operationId: manage_ad_unit_experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManageExperimentRequest'
+      responses:
+        '200':
+          description: OK
+  /ad_unit_experiment/{id}/{segmentId}:
+    get:
+      summary: Get Segment Experiment Waterfall
+      operationId: get_segment_experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+        - name: segmentId
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Manage Segment Experiment Waterfall
+      operationId: manage_segment_experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+        - name: segmentId
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManageWaterfallRequest'
+      responses:
+        '200':
+          description: OK
+  /test_devices:
+    get:
+      summary: List Test Devices
+      operationId: list_test_devices
+      responses:
+        '200':
+          description: OK
+  /test_device:
+    post:
+      summary: Create Test Device
+      operationId: create_test_device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTestDeviceRequest'
+      responses:
+        '200':
+          description: OK
+  /test_device/{id}:
+    get:
+      summary: Get Test Device Details
+      operationId: get_test_device
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Manage Test Device
+      operationId: update_test_device
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTestDeviceRequest'
+      responses:
+        '200':
+          description: OK
+  /maxReport:
+    get:
+      summary: Aggregated Revenue Report
+      operationId: get_max_report
+      responses:
+        '200':
+          description: OK
+  /report:
+    get:
+      summary: Axon Aggregated Performance Report
+      operationId: get_axon_report
+      responses:
+        '200':
+          description: OK
+  /maxCohort:
+    get:
+      summary: MAX Cohort Report
+      operationId: get_max_cohort
+      responses:
+        '200':
+          description: OK
+  /maxCohort/imp:
+    get:
+      summary: MAX Cohort Impression Report
+      operationId: get_max_cohort_impressions
+      responses:
+        '200':
+          description: OK
+  /maxCohort/session:
+    get:
+      summary: MAX Cohort Session Report
+      operationId: get_max_cohort_sessions
+      responses:
+        '200':
+          description: OK
+  /max/userAdRevenueReport:
+    get:
+      summary: User-Level Ad Revenue Report
+      operationId: get_user_ad_revenue_report
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    CountryFilter:
+      type: object
+      required: [type, values]
+      properties:
+        type:
+          type: string
+          enum: [INCLUDE, EXCLUDE]
+          example: INCLUDE
+        values:
+          type: array
+          items:
+            type: string
+          example: [US, GB, CA]
+
+    AdNetworkAdUnit:
+      type: object
+      required: [ad_network_ad_unit_id]
+      properties:
+        ad_network_ad_unit_id:
+          type: string
+          description: Network-specific ad unit ID
+          example: ca-app-pub-xxx/123
+        disabled:
+          type: boolean
+          default: false
+        cpm:
+          type: string
+          description: CPM value (required for non-bidding)
+          example: "2.50"
+        countries:
+          $ref: '#/components/schemas/CountryFilter'
+
+    AdNetworkSettings:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          disabled:
+            type: boolean
+            default: false
+          ad_network_app_id:
+            type: string
+            description: Network app ID
+          ad_network_app_key:
+            type: string
+            description: Network app key
+          ad_network_ad_units:
+            type: array
+            items:
+              $ref: '#/components/schemas/AdNetworkAdUnit'
+
+    TimeCappingSettings:
+      type: object
+      properties:
+        day_limit:
+          type: integer
+          example: 10
+        minute_frequency:
+          type: integer
+          example: 60
+
+    SessionCappingSettings:
+      type: object
+      properties:
+        session_limit:
+          type: integer
+          example: 5
+
+    FrequencyCappingSetting:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [time, session]
+          example: time
+        time_capping_settings:
+          $ref: '#/components/schemas/TimeCappingSettings'
+        session_capping_settings:
+          $ref: '#/components/schemas/SessionCappingSettings'
+        countries:
+          $ref: '#/components/schemas/CountryFilter'
+
+    BidFloor:
+      type: object
+      required: [country_group_name, cpm, countries]
+      properties:
+        country_group_name:
+          type: string
+          example: Tier 1
+        cpm:
+          type: string
+          example: "1.50"
+        countries:
+          $ref: '#/components/schemas/CountryFilter'
+
+    RefreshSettings:
+      type: object
+      properties:
+        interval:
+          type: integer
+          enum: [0, 10, 15, 20, 30, 45, 60, 300]
+          example: 30
+
+    CreateAdUnitRequest:
+      type: object
+      required: [name, platform, package_name, ad_format]
+      properties:
+        name:
+          type: string
+          description: Ad unit name
+          example: Banner Ad Unit
+        platform:
+          type: string
+          enum: [ios, android]
+          example: android
+        package_name:
+          type: string
+          description: App bundle ID
+          example: com.example.app
+        ad_format:
+          type: string
+          enum: [INTER, BANNER, REWARD, NATIVE]
+          example: BANNER
+        template_size:
+          type: string
+          description: Required for native ads only
+
+    UpdateAdUnitRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        platform:
+          type: string
+          enum: [ios, android]
+        ad_format:
+          type: string
+          enum: [INTER, BANNER, REWARD, NATIVE]
+        package_name:
+          type: string
+        disabled:
+          type: boolean
+        ad_network_settings:
+          $ref: '#/components/schemas/AdNetworkSettings'
+        frequency_capping_settings:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrequencyCappingSetting'
+        bid_floors:
+          type: array
+          items:
+            $ref: '#/components/schemas/BidFloor'
+        banner_refresh_settings:
+          $ref: '#/components/schemas/RefreshSettings'
+        mrec_refresh_settings:
+          $ref: '#/components/schemas/RefreshSettings'
+
+    SegmentConfig:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Waterfall/segment name
+        id_type:
+          type: string
+          enum: [all, id_only, no_id]
+          example: all
+        device_type:
+          type: string
+          enum: [all, phones, tablets]
+          example: all
+        segment_keys:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+
+    ManageWaterfallRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Ad unit ID
+        name:
+          type: string
+        platform:
+          type: string
+          enum: [ios, android]
+        ad_format:
+          type: string
+          enum: [INTER, BANNER, REWARD, NATIVE]
+        package_name:
+          type: string
+        disabled:
+          type: boolean
+        segment:
+          $ref: '#/components/schemas/SegmentConfig'
+        ad_network_settings:
+          $ref: '#/components/schemas/AdNetworkSettings'
+
+    ManageExperimentRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Null or omit for create, required for edit/promote/deprecate
+        experiment_name:
+          type: string
+          description: Required for create/edit
+          example: A/B Test CPM
+        promote:
+          type: boolean
+          description: Promote experiment to main waterfall
+        deprecate:
+          type: boolean
+          description: Deprecate experiment
+        disabled:
+          type: boolean
+        test_group_allocation:
+          type: integer
+          enum: [50, 25, 10, 5]
+          example: 50
+        ad_network_settings:
+          $ref: '#/components/schemas/AdNetworkSettings'
+        frequency_capping_settings:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrequencyCappingSetting'
+        bid_floors:
+          type: array
+          items:
+            $ref: '#/components/schemas/BidFloor'
+
+    CreateTestDeviceRequest:
+      type: object
+      required: [name, device_id, disabled]
+      properties:
+        name:
+          type: string
+          example: Test iPhone
+        device_id:
+          type: string
+          description: IDFA or GAID
+          example: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+        disabled:
+          type: boolean
+          default: false
+        network:
+          type: string
+          description: Network to test
+          example: APPLOVIN_NETWORK
+
+    UpdateTestDeviceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        device_id:
+          type: string
+        disabled:
+          type: boolean
+        network:
+          type: string

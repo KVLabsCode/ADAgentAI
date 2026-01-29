@@ -9,9 +9,10 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
       data-slot="input"
       className={cn(
         // Linear input styling via design tokens
+        // UPDATED 2026-01-28: Use --input-bg (elevated tertiary surface) instead of card-bg
         "h-[var(--input-height)] w-full min-w-0 rounded-[var(--input-radius)] border-[length:var(--input-border-width)]",
         "px-[var(--input-padding-x)] py-[var(--input-padding-y)] text-[length:var(--input-font-size)] font-normal",
-        "bg-transparent dark:bg-[var(--card-bg)] border-[color:var(--card-border)]",
+        "bg-[var(--input-bg)] border-[color:var(--input-border)]",
         "placeholder:text-muted-foreground text-foreground caret-foreground",
         "transition-[color,box-shadow] outline-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",

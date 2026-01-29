@@ -1,8 +1,13 @@
 {
-  "$schema": "https://langchain-ai.github.io/langgraph/langgraph.json",
-  "dependencies": ["."],
+  "$schema": "https://langchain-ai.github.io/langgraph/schema.json",
   "graphs": {
-    "agent": "chat.graph.builder:build_graph"
+    "agent": "./chat/graph/studio.py:graph"
   },
-  "env": ".env"
+  "env": ".env",
+  "dependencies": [
+    "langchain-anthropic",
+    "langchain-mcp-adapters",
+    "httpx",
+    "python-dotenv"
+  ]
 }

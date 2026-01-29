@@ -2,11 +2,15 @@
 
 Uses LangGraph's interrupt() mechanism for human-in-loop approval.
 When a dangerous tool is detected, execution pauses and waits for user approval.
+
+Progress streaming: Uses LangGraph's get_stream_writer() to emit progress events
+during tool execution, providing real-time feedback to the frontend.
 """
 
 import json
 from typing import Any
 from langgraph.types import interrupt
+from langgraph.config import get_stream_writer
 from langchain_core.messages import ToolMessage
 from langsmith import traceable
 
@@ -92,18 +96,43 @@ from ..validators import (
     build_validation_error_response,
     build_detailed_validation_error,
 )
-from ...approval.models import DANGEROUS_TOOLS, is_dangerous_tool
+from ...approval.models import DANGEROUS_TOOLS, is_dangerous_tool as is_dangerous_tool_legacy
 from ...approval.schema_extractor import get_tool_schema_by_mcp_name
 from ...approval.handlers import create_pending_approval
 from ...tools import execute_tool
+from ...tools.registry import get_tool_registry
+
+# Import credential error types for action_required detection
+try:
+    from mcp_servers.dependencies import CredentialsNotFoundError, CredentialsExpiredError
+except ImportError:
+    # Fallback if module not available
+    class CredentialsNotFoundError(Exception):
+        pass
+    class CredentialsExpiredError(Exception):
+        pass
 
 
 def _is_tool_dangerous(tool_name: str) -> bool:
     """Check if a tool requires human approval.
 
-    Checks against the list of dangerous tools (write/delete operations).
+    Uses the tool registry for pattern-based detection, with fallback
+    to the legacy hardcoded list for backwards compatibility.
+
+    Args:
+        tool_name: MCP tool name (e.g., "admob_create_app")
+
+    Returns:
+        True if tool requires approval before execution
     """
-    return is_dangerous_tool(tool_name)
+    registry = get_tool_registry()
+
+    # First check registry (pattern-based detection)
+    if registry.tool_count > 0:
+        return registry.is_dangerous(tool_name)
+
+    # Fallback to legacy hardcoded list if registry not populated
+    return is_dangerous_tool_legacy(tool_name)
 
 
 async def _validate_entity_ids(
@@ -134,7 +163,14 @@ async def _validate_entity_ids(
     from ...utils import get_resolver_for_account
 
     # Only validate mediation group tools
-    if tool_name not in ("admob_create_mediation_group", "admob_update_mediation_group"):
+    # Support both curated names and Discovery-generated names
+    MEDIATION_GROUP_TOOLS = (
+        "admob_create_mediation_group",
+        "admob_update_mediation_group",
+        "accounts_mediationGroups_create",  # Discovery-generated
+        "accounts_mediationGroups_patch",   # Discovery-generated
+    )
+    if tool_name not in MEDIATION_GROUP_TOOLS:
         return True, None, []
 
     if not user_id:
@@ -145,7 +181,13 @@ async def _validate_entity_ids(
     if not isinstance(params, dict):
         return True, None, []
 
+    # Support both 'account_id' and 'parent' field formats
+    # 'parent' format: "accounts/pub-XXXXX" -> extract "pub-XXXXX"
     account_id = params.get("account_id")
+    if not account_id:
+        parent = params.get("parent", "")
+        if parent.startswith("accounts/"):
+            account_id = parent.replace("accounts/", "")
     if not account_id:
         return True, None, []
 
@@ -159,13 +201,33 @@ async def _validate_entity_ids(
     # Validate ad sources - support both UI format and API format
     # UI format: separate bidding_lines and waterfall_lines arrays
     # API format: combined mediation_group_lines with cpm_mode field
-    bidding_lines = params.get("bidding_lines", [])
-    waterfall_lines = params.get("waterfall_lines", [])
-    mediation_group_lines = params.get("mediation_group_lines", [])
+    # Note: LLM sometimes sends these as JSON strings instead of arrays, so parse if needed
+    def parse_lines(value):
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, list) else []
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return value if isinstance(value, list) else []
+
+    bidding_lines = parse_lines(params.get("bidding_lines", []))
+    waterfall_lines = parse_lines(params.get("waterfall_lines", []))
+    mediation_group_lines = parse_lines(params.get("mediation_group_lines", []))
 
     # Helper to validate a line's ad_source_id
-    async def validate_line(line: dict, field_prefix: str, index: int) -> dict | None:
-        ad_source_id = line.get("ad_source_id")
+    async def validate_line(line: dict | str, field_prefix: str, index: int) -> dict | None:
+        # Handle case where line is a string (just the ad_source_id) instead of dict
+        if isinstance(line, str):
+            ad_source_id = line
+            display_name = "Unknown"
+        elif isinstance(line, dict):
+            ad_source_id = line.get("ad_source_id")
+            display_name = line.get("display_name", "Unknown")
+        else:
+            # Skip unknown types
+            return None
+
         if ad_source_id:
             resolved = await resolver.resolve_ad_source(ad_source_id)
             if not resolved["valid"]:
@@ -173,7 +235,7 @@ async def _validate_entity_ids(
                     "type": "ad_source",
                     "field": f"{field_prefix}[{index}].ad_source_id",
                     "id": ad_source_id,
-                    "display_name": line.get("display_name", "Unknown"),
+                    "display_name": display_name,
                 }
         return None
 
@@ -191,8 +253,12 @@ async def _validate_entity_ids(
 
     # Validate mediation_group_lines (API format - combined list)
     for i, line in enumerate(mediation_group_lines):
-        cpm_mode = line.get("cpm_mode", "LIVE")
-        line_type = "bidding" if cpm_mode == "LIVE" else "waterfall"
+        # Handle case where line is not a dict
+        if isinstance(line, dict):
+            cpm_mode = line.get("cpm_mode", "LIVE")
+            line_type = "bidding" if cpm_mode == "LIVE" else "waterfall"
+        else:
+            line_type = "unknown"
         invalid = await validate_line(line, f"mediation_group_lines({line_type})", i)
         if invalid:
             invalid_entities.append(invalid)
@@ -223,15 +289,22 @@ async def _validate_entity_ids(
 
     if invalid_entities:
         # Build error message for LLM
-        error_parts = [f"Entity validation failed ({context}). The following IDs do not exist in the user's AdMob account:"]
+        error_parts = [f"Entity validation failed ({context}). The following IDs are invalid:"]
         for entity in invalid_entities:
             if entity["type"] == "ad_source":
                 error_parts.append(f"  - Ad Source ID '{entity['id']}' (line: {entity.get('display_name', 'Unknown')})")
             else:
-                error_parts.append(f"  - Ad Unit ID '{entity['id']}'")
+                ad_unit_id = entity['id']
+                # Check if it's a format error (app ID vs ad unit ID)
+                if "~" in ad_unit_id and "/" not in ad_unit_id:
+                    error_parts.append(f"  - '{ad_unit_id}' is an APP ID (uses ~), not an AD UNIT ID (uses /)")
+                    error_parts.append(f"    Ad unit IDs have format: ca-app-pub-XXXXX/YYYYY (slash separator)")
+                else:
+                    error_parts.append(f"  - Ad Unit ID '{ad_unit_id}' does not exist")
 
         error_parts.append("")
-        error_parts.append("Use admob_list_ad_sources to get valid ad source IDs and retry with corrected values.")
+        error_parts.append("IMPORTANT: Ad unit IDs use SLASH (/), app IDs use TILDE (~).")
+        error_parts.append("Use accounts_adUnits_list to get valid ad unit IDs and retry with corrected values.")
 
         return False, "\n".join(error_parts), invalid_entities
 
@@ -296,7 +369,7 @@ async def _create_approval_request(
 
 
 @traceable(name="tool_executor_node", run_type="tool")
-async def tool_executor_node(state: GraphState) -> dict:
+async def tool_executor_node(state: GraphState, config: dict | None = None) -> dict:
     """Execute pending tool calls, with interrupt() for dangerous tools.
 
     For each pending tool call:
@@ -305,8 +378,12 @@ async def tool_executor_node(state: GraphState) -> dict:
     3. If approved or safe: execute the tool
     4. Return results
 
+    Progress streaming: Emits custom events via get_stream_writer() to provide
+    real-time feedback during tool execution.
+
     Args:
         state: Current graph state with tool_calls
+        config: LangGraph config for accessing stream writer
 
     Returns:
         Updated state with tool results or pending_approval
@@ -489,10 +566,11 @@ async def tool_executor_node(state: GraphState) -> dict:
     service = routing.get("service", "admob")
     user_context = state.get("user_context", {})
     user_id = user_context.get("user_id")
+    organization_id = user_context.get("organization_id")
 
     # Execute the tool
     try:
-        result = await _execute_tool(tool_name, tool_args, service, user_id)
+        result = await _execute_tool(tool_name, tool_args, service, user_id, organization_id)
 
         # Serialize result to JSON (not Python str representation)
         result_str = _serialize_result(result)
@@ -515,12 +593,54 @@ async def tool_executor_node(state: GraphState) -> dict:
         }
 
     except Exception as e:
-        error_result = f"Error executing {tool_name}: {str(e)}"
+        # Build actionable error message for LLM self-correction
+        error_result = _build_actionable_error_message(tool_name, tool_args, e)
         updated_call = {
             **tool_call,
             "result": error_result,
         }
-        return {
+
+        # Check if this is a credential-related error and set action_required
+        action_required = None
+        error_str = str(e).lower()
+
+        if isinstance(e, CredentialsNotFoundError) or ("credentials" in error_str and "not found" in error_str):
+            # Determine the provider from the tool name
+            provider = "admob" if tool_name.startswith("admob") else "gam" if tool_name.startswith("gam") else None
+            action_required = {
+                "action_type": "connect_provider",
+                "message": f"Your {provider or 'ad platform'} account is not connected. Please connect it to use this feature.",
+                "deep_link": "/providers",
+                "blocking": True,
+                "metadata": {"provider": provider, "tool_name": tool_name},
+            }
+        elif isinstance(e, CredentialsExpiredError) or "expired" in error_str or "reauthenticate" in error_str:
+            provider = "admob" if tool_name.startswith("admob") else "gam" if tool_name.startswith("gam") else None
+            action_required = {
+                "action_type": "reauthenticate",
+                "message": f"Your {provider or 'ad platform'} session has expired. Please reconnect your account.",
+                "deep_link": "/providers",
+                "blocking": True,
+                "metadata": {"provider": provider, "tool_name": tool_name},
+            }
+        elif "rate limit" in error_str or "quota exceeded" in error_str or "too many requests" in error_str:
+            action_required = {
+                "action_type": "upgrade_plan",
+                "message": "You've exceeded the rate limit for API calls. Please try again later or upgrade your plan.",
+                "deep_link": "/billing",
+                "blocking": False,  # User can retry later
+                "metadata": {"tool_name": tool_name},
+            }
+        elif "permission" in error_str or "forbidden" in error_str or "unauthorized" in error_str:
+            action_required = {
+                "action_type": "grant_permissions",
+                "message": "Additional permissions are required. Please reconnect your account with the necessary permissions.",
+                "deep_link": "/providers",
+                "blocking": True,
+                "metadata": {"tool_name": tool_name},
+            }
+
+        result = {
             "tool_calls": [updated_call],
             "messages": [
                 ToolMessage(
@@ -529,6 +649,169 @@ async def tool_executor_node(state: GraphState) -> dict:
                 )
             ],
         }
+
+        if action_required:
+            result["action_required"] = action_required
+
+        return result
+
+
+def _build_actionable_error_message(tool_name: str, tool_args: dict, error: Exception) -> str:
+    """Build an actionable error message that helps the LLM self-correct.
+
+    Analyzes the error and provides specific guidance on how to fix it,
+    including which tools to use to get valid values.
+
+    Args:
+        tool_name: Name of the tool that failed
+        tool_args: Arguments that were passed to the tool
+        error: The exception that was raised
+
+    Returns:
+        Detailed error message with actionable guidance
+    """
+    error_str = str(error)
+    error_lower = error_str.lower()
+
+    # Start with the basic error
+    parts = [f"Error executing {tool_name}: {error_str}"]
+    parts.append("")  # Empty line for readability
+
+    # Detect error type and provide specific guidance
+
+    # Invalid ID errors
+    if any(phrase in error_lower for phrase in ["not found", "invalid", "does not exist", "no such"]):
+        # Determine which entity type based on error and tool name
+        if "ad_source" in error_lower or "adsource" in error_lower:
+            parts.append("ISSUE: Invalid ad source ID provided.")
+            parts.append("")
+            parts.append("TO FIX: Use accounts_adSources_list to get valid ad source IDs for the account.")
+            parts.append("Example: accounts_adSources_list(parent='accounts/pub-XXXXX')")
+        elif "ad_unit" in error_lower or "adunit" in error_lower:
+            parts.append("ISSUE: Invalid ad unit ID provided.")
+            parts.append("")
+            parts.append("TO FIX: Use accounts_adUnits_list to get valid ad unit IDs for the account.")
+            parts.append("Example: accounts_adUnits_list(parent='accounts/pub-XXXXX')")
+        elif "app" in error_lower:
+            parts.append("ISSUE: Invalid app ID provided.")
+            parts.append("")
+            parts.append("TO FIX: Use accounts_apps_list to get valid app IDs for the account.")
+            parts.append("Example: accounts_apps_list(parent='accounts/pub-XXXXX')")
+        elif "account" in error_lower or "pub-" in error_str:
+            parts.append("ISSUE: Invalid account ID provided.")
+            parts.append("")
+            parts.append("TO FIX: Use accounts_list to get valid account IDs.")
+            parts.append("The account ID format should be 'pub-XXXXXXXXXXXXXXXX'")
+        elif "mediation" in error_lower:
+            parts.append("ISSUE: Invalid mediation group ID provided.")
+            parts.append("")
+            parts.append("TO FIX: Use accounts_mediationGroups_list to get valid mediation group IDs.")
+        else:
+            parts.append("ISSUE: An entity ID in your request does not exist.")
+            parts.append("")
+            parts.append("TO FIX: Use the appropriate list endpoint to get valid IDs:")
+            parts.append("  - accounts_list - for account IDs")
+            parts.append("  - accounts_apps_list - for app IDs")
+            parts.append("  - accounts_adUnits_list - for ad unit IDs")
+            parts.append("  - accounts_adSources_list - for ad source IDs")
+
+    # Field/parameter errors
+    elif any(phrase in error_lower for phrase in ["required", "missing", "must provide", "cannot be empty"]):
+        parts.append("ISSUE: A required field is missing.")
+        parts.append("")
+
+        # Try to identify which field from the error message
+        if "platform" in error_lower:
+            parts.append("TO FIX: Add the 'platform' field. Valid values: 'ANDROID' or 'IOS'")
+        elif "format" in error_lower or "ad_format" in error_lower:
+            parts.append("TO FIX: Add the 'ad_format' field. Valid values:")
+            parts.append("  BANNER, INTERSTITIAL, REWARDED, REWARDED_INTERSTITIAL, APP_OPEN, NATIVE")
+        elif "ad_unit" in error_lower:
+            parts.append("TO FIX: Add 'ad_unit_ids' field with valid ad unit IDs.")
+            parts.append("Use accounts_adUnits_list to get valid IDs first.")
+        elif "display_name" in error_lower or "name" in error_lower:
+            parts.append("TO FIX: Add a 'display_name' field with a descriptive name (max 120 chars).")
+        else:
+            parts.append("TO FIX: Check the tool schema and provide all required fields.")
+            parts.append("The error message above indicates which field is missing.")
+
+    # Validation/constraint errors
+    elif any(phrase in error_lower for phrase in ["invalid value", "invalid format", "must be", "should be", "expected"]):
+        parts.append("ISSUE: A field has an invalid value format.")
+        parts.append("")
+
+        if "platform" in error_lower:
+            parts.append("TO FIX: 'platform' must be exactly 'ANDROID' or 'IOS' (uppercase).")
+        elif "cpm" in error_lower or "micros" in error_lower:
+            parts.append("TO FIX: CPM values must be in micros (1 USD = 1,000,000 micros).")
+            parts.append("Example: $1.50 = 1500000 micros")
+        elif "state" in error_lower:
+            parts.append("TO FIX: 'state' must be 'ENABLED' or 'DISABLED'.")
+        elif "region" in error_lower or "country" in error_lower:
+            parts.append("TO FIX: Region codes must be ISO 3166-1 alpha-2 (e.g., 'US', 'GB', 'DE').")
+        else:
+            parts.append("TO FIX: Check the format of your input values.")
+            parts.append("The error message above indicates the expected format.")
+
+    # Duplicate/conflict errors
+    elif any(phrase in error_lower for phrase in ["already exists", "duplicate", "conflict"]):
+        parts.append("ISSUE: This entity already exists or conflicts with an existing one.")
+        parts.append("")
+        parts.append("TO FIX: Either use a different name/ID, or use the update/patch endpoint instead of create.")
+
+    # AdMob-specific errors
+    elif "targeting" in error_lower:
+        parts.append("ISSUE: Invalid targeting configuration.")
+        parts.append("")
+        parts.append("TO FIX: Ensure targeting fields are correctly structured:")
+        parts.append("  - platform: 'ANDROID' or 'IOS'")
+        parts.append("  - format: 'BANNER', 'INTERSTITIAL', 'REWARDED', etc.")
+        parts.append("  - ad_unit_ids: List of valid ad unit IDs (use accounts_adUnits_list)")
+
+    elif "mediation" in error_lower and "line" in error_lower:
+        parts.append("ISSUE: Invalid mediation line configuration.")
+        parts.append("")
+        parts.append("TO FIX:")
+        parts.append("  - Ensure ad_source_id is valid (use accounts_adSources_list)")
+        parts.append("  - For bidding lines: cpm_mode should be 'LIVE'")
+        parts.append("  - For waterfall lines: cpm_mode should be 'MANUAL' or 'ANO'")
+        parts.append("  - AdMob Network (ID: 5450213213286189855) is BIDDING-ONLY")
+
+    # JSON parsing errors
+    elif any(phrase in error_lower for phrase in ["json", "parse", "decode", "syntax"]):
+        parts.append("ISSUE: Invalid JSON format in request body.")
+        parts.append("")
+        parts.append("TO FIX: Ensure JSON strings are properly escaped and formatted.")
+        parts.append("Common issues:")
+        parts.append("  - Missing quotes around strings")
+        parts.append("  - Trailing commas in arrays/objects")
+        parts.append("  - Unescaped special characters")
+
+    # Generic guidance if no specific pattern matched
+    else:
+        parts.append("TO FIX: Review the error message and adjust your request accordingly.")
+        parts.append("")
+        parts.append("Common debugging steps:")
+        parts.append("  1. Verify all entity IDs exist using the appropriate list endpoint")
+        parts.append("  2. Check required fields are provided with correct formats")
+        parts.append("  3. Ensure enum values match exactly (case-sensitive)")
+
+    # Add what was attempted (for context)
+    if tool_args:
+        parts.append("")
+        parts.append("ATTEMPTED:")
+        # Show key arguments without dumping the entire object
+        params = tool_args.get("params", tool_args)
+        if isinstance(params, dict):
+            key_fields = ["parent", "account_id", "display_name", "platform", "ad_format"]
+            shown = []
+            for field in key_fields:
+                if field in params:
+                    shown.append(f"  {field}: {params[field]}")
+            if shown:
+                parts.extend(shown[:5])  # Limit to 5 fields
+
+    return "\n".join(parts)
 
 
 def _euros_to_micros(euros: float | int | str | None) -> int | None:
@@ -638,35 +921,229 @@ def _maybe_transform_tool_args_for_ui(tool_name: str, tool_args: dict) -> dict:
     This is the REVERSE of _maybe_transform_tool_args, applied BEFORE
     the approval interrupt so the UI can display the data correctly.
 
+    Handles two formats:
+    1. Curated tools: admob_create_mediation_group with direct fields
+    2. Discovery tools: accounts_mediationGroups_create with parent + body_json
+
     Args:
         tool_name: Name of the tool
-        tool_args: Tool arguments from LLM (may have 'params' wrapper)
+        tool_args: Tool arguments from LLM (may have 'params' wrapper or body_json)
 
     Returns:
-        Transformed tool args in UI format
+        Transformed tool args in UI format for RJSF form display
     """
-    if tool_name not in ("admob_create_mediation_group", "admob_update_mediation_group"):
+    import copy
+
+    # Map Discovery tool names to their curated equivalents
+    MEDIATION_CREATE_TOOLS = (
+        "admob_create_mediation_group",
+        "accounts_mediationGroups_create",
+    )
+    MEDIATION_UPDATE_TOOLS = (
+        "admob_update_mediation_group",
+        "accounts_mediationGroups_patch",
+    )
+
+    if tool_name not in MEDIATION_CREATE_TOOLS + MEDIATION_UPDATE_TOOLS:
         return tool_args
 
     # Make a deep copy to avoid mutating original
-    import copy
     transformed = copy.deepcopy(tool_args)
+
+    # Handle Discovery-generated tools with parent + body_json format
+    if "body_json" in transformed:
+        transformed = _transform_discovery_format_to_ui(transformed, tool_name)
+
+    # Helper to parse JSON strings to arrays (LLM sometimes outputs arrays as strings)
+    def parse_json_array(value):
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, list) else value
+            except (json.JSONDecodeError, TypeError):
+                return value
+        return value
 
     # Handle 'params' wrapper - LLM often sends args as {'params': {...}}
     if "params" in transformed and isinstance(transformed["params"], dict):
         params = transformed["params"]
+        # Parse JSON strings for array fields
+        if "bidding_lines" in params:
+            params["bidding_lines"] = parse_json_array(params["bidding_lines"])
+        if "waterfall_lines" in params:
+            params["waterfall_lines"] = parse_json_array(params["waterfall_lines"])
+        # Transform mediation_group_lines to UI format
         mediation_lines = params.pop("mediation_group_lines", None)
         if mediation_lines:
             ui_lines = _transform_mediation_lines_to_ui(mediation_lines)
             params.update(ui_lines)
     else:
         # No params wrapper - transform at top level
+        # Parse JSON strings for array fields
+        if "bidding_lines" in transformed:
+            transformed["bidding_lines"] = parse_json_array(transformed["bidding_lines"])
+        if "waterfall_lines" in transformed:
+            transformed["waterfall_lines"] = parse_json_array(transformed["waterfall_lines"])
+        # Transform mediation_group_lines to UI format
         mediation_lines = transformed.pop("mediation_group_lines", None)
         if mediation_lines:
             ui_lines = _transform_mediation_lines_to_ui(mediation_lines)
             transformed.update(ui_lines)
 
     return transformed
+
+
+def _transform_discovery_format_to_ui(tool_args: dict, tool_name: str) -> dict:
+    """Transform Discovery-generated tool format to UI format.
+
+    Discovery tools use:
+        {
+            "parent": "accounts/pub-xxx",
+            "body_json": "{ ...JSON string... }"
+        }
+
+    UI format expects:
+        {
+            "account_id": "pub-xxx",
+            "display_name": "...",
+            "platform": "ANDROID",
+            "ad_format": "BANNER",
+            ...
+        }
+
+    Args:
+        tool_args: Discovery format tool args
+        tool_name: Tool name for context
+
+    Returns:
+        Transformed args in UI format
+    """
+    import copy
+    result = {}
+
+    # Extract account_id from parent path
+    parent = tool_args.get("parent", "")
+    if parent.startswith("accounts/"):
+        account_id = parent.replace("accounts/", "")
+        result["account_id"] = account_id
+
+    # Parse body_json
+    body_json = tool_args.get("body_json", "{}")
+    try:
+        body = json.loads(body_json) if isinstance(body_json, str) else body_json
+    except (json.JSONDecodeError, TypeError):
+        body = {}
+
+    # Map Google API fields to UI fields
+    if "displayName" in body:
+        result["display_name"] = body["displayName"]
+
+    if "state" in body:
+        result["state"] = body["state"]
+
+    # Handle platform and format at root level (Discovery API format)
+    if "platform" in body:
+        result["platform"] = body["platform"]
+    if "format" in body:
+        result["ad_format"] = body["format"]
+
+    # Handle targeting object
+    targeting = body.get("targeting", {})
+    if targeting:
+        # Also check inside targeting (legacy format)
+        if "platform" in targeting and "platform" not in result:
+            result["platform"] = targeting["platform"]
+        if "format" in targeting and "ad_format" not in result:
+            result["ad_format"] = targeting["format"]
+        if "adUnitIds" in targeting:
+            ad_unit_ids = targeting["adUnitIds"]
+            if isinstance(ad_unit_ids, list):
+                result["ad_unit_ids"] = ", ".join(ad_unit_ids)
+            else:
+                result["ad_unit_ids"] = ad_unit_ids
+        # Handle geo targeting
+        if "targetedRegionCodes" in targeting:
+            result.setdefault("advanced_targeting", {})["targeted_region_codes"] = ", ".join(targeting["targetedRegionCodes"])
+        if "excludedRegionCodes" in targeting:
+            result.setdefault("advanced_targeting", {})["excluded_region_codes"] = ", ".join(targeting["excludedRegionCodes"])
+        if "idfaTargeting" in targeting:
+            result.setdefault("advanced_targeting", {})["idfa_targeting"] = targeting["idfaTargeting"]
+
+    # Handle mediationGroupLines - transform to UI format
+    # Discovery API uses: { "biddingLines": [...], "waterfallLines": [...] }
+    mediation_lines = body.get("mediationGroupLines", {})
+    if mediation_lines:
+        bidding_lines = []
+        waterfall_lines = []
+
+        # Handle Discovery API structure (object with biddingLines/waterfallLines)
+        if isinstance(mediation_lines, dict):
+            # Process bidding lines
+            for line in mediation_lines.get("biddingLines", []):
+                if isinstance(line, dict):
+                    ui_line = {
+                        "display_name": line.get("displayName", ""),
+                        "ad_source_id": line.get("adSourceId", ""),
+                        "state": line.get("state", "ENABLED"),
+                    }
+                    bidding_lines.append(ui_line)
+
+            # Process waterfall lines
+            for line in mediation_lines.get("waterfallLines", []):
+                if isinstance(line, dict):
+                    ui_line = {
+                        "display_name": line.get("displayName", ""),
+                        "ad_source_id": line.get("adSourceId", ""),
+                        "state": line.get("state", "ENABLED"),
+                    }
+                    # Handle pricing mode
+                    pricing_mode = line.get("pricingMode", "")
+                    cpm_mode = line.get("cpmMode", "")
+                    if pricing_mode == "FIXED" or cpm_mode == "MANUAL":
+                        ui_line["pricing_mode"] = "FIXED"
+                        cpm_micros = line.get("cpmMicros")
+                        if cpm_micros:
+                            ui_line["cpm_floor"] = int(cpm_micros) / 1_000_000
+                    else:
+                        ui_line["pricing_mode"] = "NETWORK_OPTIMIZED"
+                    waterfall_lines.append(ui_line)
+
+        # Handle legacy flat list format (for backwards compatibility)
+        elif isinstance(mediation_lines, list):
+            for line in mediation_lines:
+                if not isinstance(line, dict):
+                    continue
+                ui_line = {
+                    "display_name": line.get("displayName", ""),
+                    "ad_source_id": line.get("adSourceId", ""),
+                    "state": line.get("state", "ENABLED"),
+                }
+                cpm_mode = line.get("cpmMode")
+                if cpm_mode in ("MANUAL", "ANO", "NETWORK_OPTIMIZED"):
+                    if cpm_mode == "MANUAL":
+                        ui_line["pricing_mode"] = "FIXED"
+                        cpm_micros = line.get("cpmMicros")
+                        if cpm_micros:
+                            ui_line["cpm_floor"] = int(cpm_micros) / 1_000_000
+                    else:
+                        ui_line["pricing_mode"] = "NETWORK_OPTIMIZED"
+                    waterfall_lines.append(ui_line)
+                else:
+                    bidding_lines.append(ui_line)
+
+        if bidding_lines:
+            result["bidding_lines"] = bidding_lines
+        if waterfall_lines:
+            result["waterfall_lines"] = waterfall_lines
+
+    # For update tools, include mediation_group_id
+    if "mediationGroups_patch" in tool_name or "update_mediation_group" in tool_name:
+        # Extract from parent path: accounts/pub-xxx/mediationGroups/yyy
+        parts = parent.split("/")
+        if len(parts) >= 4 and parts[2] == "mediationGroups":
+            result["mediation_group_id"] = parts[3]
+
+    return result
 
 
 async def _enrich_tool_args_with_names(
@@ -692,10 +1169,18 @@ async def _enrich_tool_args_with_names(
         Enriched tool args with _resolved_name and _valid fields
     """
     from chat.utils.entity_resolver import get_resolver_for_account
+    from chat.constants import is_coming_soon_bidding, is_coming_soon_waterfall
     import copy
 
     # Only enrich mediation group tools for now
-    if tool_name not in ("admob_create_mediation_group", "admob_update_mediation_group"):
+    # Support both curated and Discovery-generated names
+    MEDIATION_TOOLS = (
+        "admob_create_mediation_group",
+        "admob_update_mediation_group",
+        "accounts_mediationGroups_create",
+        "accounts_mediationGroups_patch",
+    )
+    if tool_name not in MEDIATION_TOOLS:
         return tool_args
 
     if not user_id:
@@ -707,8 +1192,12 @@ async def _enrich_tool_args_with_names(
     # Get params (may be nested under 'params' key)
     params = enriched.get("params", enriched)
     if isinstance(params, dict):
-        # Get account_id to create resolver
+        # Get account_id to create resolver - support both 'account_id' and 'parent' formats
         account_id = params.get("account_id")
+        if not account_id:
+            parent = params.get("parent", "")
+            if parent.startswith("accounts/"):
+                account_id = parent.replace("accounts/", "")
         if not account_id:
             return enriched
 
@@ -717,21 +1206,39 @@ async def _enrich_tool_args_with_names(
         if not resolver:
             return enriched
 
-        # Enrich bidding_lines
-        for line in params.get("bidding_lines", []):
+        # Enrich bidding_lines and filter out coming soon items
+        bidding_lines = params.get("bidding_lines", [])
+        filtered_bidding = []
+        for line in bidding_lines:
             ad_source_id = line.get("ad_source_id")
             if ad_source_id:
                 resolved = await resolver.resolve_ad_source(ad_source_id)
                 line["_ad_source_name"] = resolved["name"]
                 line["_ad_source_valid"] = resolved["valid"]
+                # Filter out coming soon networks
+                if resolved["name"] and is_coming_soon_bidding(resolved["name"]):
+                    print(f"[tool_executor] Filtering out coming soon bidding network: {resolved['name']}")
+                    continue
+            filtered_bidding.append(line)
+        if "bidding_lines" in params:
+            params["bidding_lines"] = filtered_bidding
 
-        # Enrich waterfall_lines
-        for line in params.get("waterfall_lines", []):
+        # Enrich waterfall_lines and filter out coming soon items
+        waterfall_lines = params.get("waterfall_lines", [])
+        filtered_waterfall = []
+        for line in waterfall_lines:
             ad_source_id = line.get("ad_source_id")
             if ad_source_id:
                 resolved = await resolver.resolve_ad_source(ad_source_id)
                 line["_ad_source_name"] = resolved["name"]
                 line["_ad_source_valid"] = resolved["valid"]
+                # Filter out coming soon networks
+                if resolved["name"] and is_coming_soon_waterfall(resolved["name"]):
+                    print(f"[tool_executor] Filtering out coming soon waterfall network: {resolved['name']}")
+                    continue
+            filtered_waterfall.append(line)
+        if "waterfall_lines" in params:
+            params["waterfall_lines"] = filtered_waterfall
 
         # Enrich ad_unit_ids - check both root level and inside targeting
         ad_unit_ids_str = params.get("ad_unit_ids", "")
@@ -992,21 +1499,34 @@ async def _execute_tool(
     tool_args: dict,
     service: str = "admob",
     user_id: str | None = None,
+    organization_id: str | None = None,
+    max_retries: int = 3,
 ) -> Any:
-    """Execute a tool by name with given arguments.
+    """Execute a tool by name with given arguments, with retry for transient errors.
 
     Uses the execute_tool function which keeps the MCP client context
     open during tool execution.
+
+    Progress streaming: Creates a progress callback that forwards MCP tool
+    progress events to LangGraph's custom stream for real-time UI updates.
+
+    Retry logic: Retries on transient errors (connection, timeout, 5xx) up to
+    max_retries times with exponential backoff. Does NOT retry on auth errors
+    or 4xx client errors.
 
     Args:
         tool_name: Name of the tool to execute
         tool_args: Arguments to pass to the tool
         service: Service name for loading tools ("admob", "admanager")
         user_id: User ID for OAuth tokens
+        organization_id: Organization ID for org-scoped operations
+        max_retries: Maximum number of retry attempts for transient errors
 
     Returns:
         Tool execution result
     """
+    import asyncio
+
     # Transform args if needed (e.g., merge bidding/waterfall lines)
     print(f"[tool_executor] BEFORE transform - tool_args: {tool_args}")
     print(f"[tool_executor] BEFORE transform - has 'params' key: {'params' in tool_args}")
@@ -1014,13 +1534,66 @@ async def _execute_tool(
     print(f"[tool_executor] AFTER transform - transformed_args: {transformed_args}")
     print(f"[tool_executor] AFTER transform - has 'params' key: {'params' in transformed_args}")
 
-    result = await execute_tool(
-        tool_name=tool_name,
-        tool_args=transformed_args,
-        service=service,
-        user_id=user_id,
-    )
-    return result
+    def _is_retryable_error(error: Exception) -> bool:
+        """Check if an error is transient and should be retried."""
+        error_str = str(error).lower()
+
+        # Don't retry auth/credential errors
+        if any(keyword in error_str for keyword in [
+            "credential", "unauthorized", "forbidden", "permission",
+            "authentication", "401", "403"
+        ]):
+            return False
+
+        # Don't retry client errors (4xx except rate limits)
+        if any(keyword in error_str for keyword in [
+            "bad request", "not found", "invalid", "400", "404", "422"
+        ]):
+            return False
+
+        # Retry transient errors
+        if any(keyword in error_str for keyword in [
+            "timeout", "connection", "network", "temporary", "unavailable",
+            "rate limit", "too many requests", "429", "500", "502", "503", "504"
+        ]):
+            return True
+
+        # Retry generic server errors
+        if "server error" in error_str or "internal error" in error_str:
+            return True
+
+        return False
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            result = await execute_tool(
+                tool_name=tool_name,
+                tool_args=transformed_args,
+                service=service,
+                user_id=user_id,
+                organization_id=organization_id,
+            )
+            return result
+        except Exception as e:
+            last_error = e
+            if not _is_retryable_error(e):
+                print(f"[tool_executor] Non-retryable error on {tool_name}: {e}")
+                raise
+
+            if attempt < max_retries - 1:
+                # Exponential backoff: 1s, 2s, 4s
+                delay = 2 ** attempt
+                print(f"[tool_executor] Retryable error on {tool_name} (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"[tool_executor] Retrying in {delay}s...")
+                await asyncio.sleep(delay)
+            else:
+                print(f"[tool_executor] Max retries ({max_retries}) exceeded for {tool_name}: {e}")
+                raise
+
+    # Should not reach here, but just in case
+    if last_error:
+        raise last_error
 
 
 def should_continue_after_tools(state: GraphState) -> str:

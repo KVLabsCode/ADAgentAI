@@ -12,30 +12,72 @@ import {
   StatusMessage,
 } from "@/organisms/theme"
 import {
-  ConnectProviderDropdown,
   ProviderListItem,
-  SupportedPlatformsContent,
+  AllPlatformsGrid,
   AccountSelectionModal,
+  NetworkCredentialDialog,
+  NetworkListItem,
 } from "@/components/providers"
 import { useProviderManagement } from "@/hooks/useProviderManagement"
+import { useNetworkManagement } from "@/hooks/useNetworkManagement"
+import type { NetworkName } from "@/lib/types"
 
 function ProvidersContent() {
+  // OAuth provider management (AdMob, GAM)
   const {
     providers,
     canManage,
     pendingAccounts,
-    isLoading,
-    connectingType,
-    statusMessage,
+    isLoading: isLoadingProviders,
+    connectingType: _connectingType,
+    statusMessage: providerStatusMessage,
     accountSelectionOpen,
     togglingProvider,
-    handleConnect,
-    handleDisconnect,
-    handleToggleEnabled,
+    handleConnect: handleConnectOAuth,
+    handleDisconnect: handleDisconnectProvider,
+    handleToggleEnabled: handleToggleProvider,
     handleAccountSelected,
     handleAccountSelectionCancel,
     setAccountSelectionOpen,
   } = useProviderManagement()
+
+  // API-key network management
+  const {
+    networks,
+    configs,
+    isLoading: isLoadingNetworks,
+    connectingNetwork,
+    statusMessage: networkStatusMessage,
+    togglingNetwork,
+    handleConnect: handleConnectNetwork,
+    handleDisconnect: handleDisconnectNetwork,
+    handleToggle: handleToggleNetwork,
+  } = useNetworkManagement()
+
+  // Dialog state for network credentials
+  const [networkDialogOpen, setNetworkDialogOpen] = React.useState(false)
+  const [selectedNetworkName, setSelectedNetworkName] = React.useState<NetworkName | null>(null)
+
+  const isLoading = isLoadingProviders || isLoadingNetworks
+  const statusMessage = providerStatusMessage || networkStatusMessage
+
+  // Handle clicking connect on a network
+  const handleNetworkConnectClick = (networkName: NetworkName) => {
+    setSelectedNetworkName(networkName)
+    setNetworkDialogOpen(true)
+  }
+
+  // Get the config for the selected network
+  const selectedNetworkConfig = selectedNetworkName && configs
+    ? configs[selectedNetworkName]
+    : null
+
+  // Calculate connected provider types and network names for the grid
+  const connectedProviderTypes = providers.map(p => p.type)
+  const connectedNetworkNames = networks.map(n => n.networkName)
+
+  // Combined count of all connections
+  const totalConnections = providers.length + networks.length
 
   return (
     <PageContainer>
@@ -46,14 +88,7 @@ function ProvidersContent() {
       <PageHeader
         title="Connected Providers"
         description="Manage your ad platform connections."
-      >
-        {canManage && (
-          <ConnectProviderDropdown
-            connectingType={connectingType}
-            onConnect={handleConnect}
-          />
-        )}
-      </PageHeader>
+      />
 
       {isLoading ? (
         <SettingsSection title="Connected Accounts">
@@ -69,46 +104,79 @@ function ProvidersContent() {
             ))}
           </div>
         </SettingsSection>
-      ) : providers.length === 0 ? (
+      ) : totalConnections === 0 ? (
         <SettingsSection title="Connected Accounts">
           <EmptyState
             icon={Plug}
             title="No providers connected"
             description={canManage === false
               ? "Contact your admin to connect providers."
-              : "Connect your AdMob account to start."}
+              : "Connect your ad platforms below to get started."}
             className="py-8"
-          >
-            {canManage && (
-              <ConnectProviderDropdown
-                connectingType={connectingType}
-                onConnect={handleConnect}
-                variant="empty"
-              />
-            )}
-          </EmptyState>
+          />
         </SettingsSection>
       ) : (
-        <SettingsSection title="Connected Accounts">
-          <ConfigFieldGroup>
-            {providers.map((provider) => (
-              <ProviderListItem
-                key={provider.id}
-                provider={provider}
-                canManage={canManage ?? false}
-                togglingProvider={togglingProvider}
-                onToggleEnabled={handleToggleEnabled}
-                onDisconnect={handleDisconnect}
-              />
-            ))}
-          </ConfigFieldGroup>
-        </SettingsSection>
+        <>
+          {/* OAuth Providers Section */}
+          {providers.length > 0 && (
+            <SettingsSection title="Google Platforms">
+              <ConfigFieldGroup>
+                {providers.map((provider) => (
+                  <ProviderListItem
+                    key={provider.id}
+                    provider={provider}
+                    canManage={canManage ?? false}
+                    togglingProvider={togglingProvider}
+                    onToggleEnabled={handleToggleProvider}
+                    onDisconnect={handleDisconnectProvider}
+                  />
+                ))}
+              </ConfigFieldGroup>
+            </SettingsSection>
+          )}
+
+          {/* API-Key Networks Section */}
+          {networks.length > 0 && (
+            <SettingsSection title="Ad Networks">
+              <ConfigFieldGroup>
+                {networks.map((network) => (
+                  <NetworkListItem
+                    key={network.id}
+                    network={network}
+                    canManage={canManage ?? false}
+                    togglingNetwork={togglingNetwork}
+                    onToggle={handleToggleNetwork}
+                    onDisconnect={handleDisconnectNetwork}
+                  />
+                ))}
+              </ConfigFieldGroup>
+            </SettingsSection>
+          )}
+        </>
       )}
 
-      <SettingsSection title="Supported Platforms" bare>
-        <SupportedPlatformsContent />
+      {/* All Platforms Grid */}
+      <SettingsSection title="All Platforms" bare>
+        <AllPlatformsGrid
+          connectedProviders={connectedProviderTypes}
+          connectedNetworks={connectedNetworkNames}
+          onConnectOAuth={handleConnectOAuth}
+          onConnectNetwork={handleNetworkConnectClick}
+          canManage={canManage ?? false}
+        />
       </SettingsSection>
 
+      {/* Network Credentials Dialog */}
+      <NetworkCredentialDialog
+        open={networkDialogOpen}
+        onOpenChange={setNetworkDialogOpen}
+        networkName={selectedNetworkName}
+        config={selectedNetworkConfig}
+        onConnect={handleConnectNetwork}
+        isConnecting={connectingNetwork !== null}
+      />
+
+      {/* GAM Account Selection Modal */}
       <AccountSelectionModal
         open={accountSelectionOpen}
         onOpenChange={setAccountSelectionOpen}

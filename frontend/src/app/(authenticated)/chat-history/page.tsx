@@ -282,8 +282,8 @@ export default function ChatHistoryPage() {
             : "Start a new chat to see your history here."}
         >
           {!searchQuery && (
-            <Button asChild size="sm" className="h-8 text-xs">
-              <Link href="/chat">Start New Chat</Link>
+            <Button render={<Link href="/chat" />} size="sm" className="h-8 text-xs">
+              Start New Chat
             </Button>
           )}
         </EmptyState>
@@ -343,15 +343,17 @@ export default function ChatHistoryPage() {
 
                 {/* Dropdown menu */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                    >
-                      <MoreHorizontal className="h-3.5 w-3.5" />
-                      <span className="sr-only">Chat options</span>
-                    </Button>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      />
+                    }
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    <span className="sr-only">Chat options</span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-[length:var(--text-small)]">

@@ -79,7 +79,18 @@ export function MultiSelectWidget(props: WidgetProps) {
   const filterBy = options?.filterBy as string[] | undefined
 
   const formData = formContext?.formData || emptyFormData
-  const dependencyValue = dependsOn ? (formData[dependsOn] as string | undefined) : undefined
+  const rawDependencyValue = dependsOn ? (formData[dependsOn] as string | undefined) : undefined
+
+  // Normalize account IDs: "accounts/pub-XXX" -> "pub-XXX"
+  // The LLM sends full path format, but API expects short IDs
+  const dependencyValue = React.useMemo(() => {
+    if (!rawDependencyValue) return undefined
+    if (rawDependencyValue.startsWith("accounts/")) {
+      return rawDependencyValue.replace("accounts/", "")
+    }
+    return rawDependencyValue
+  }, [rawDependencyValue])
+
   const parentId = dependencyValue ?? null
 
   // Build filter params from filterBy fields
@@ -115,6 +126,18 @@ export function MultiSelectWidget(props: WidgetProps) {
 
   const loading = fetchType ? isLoading(fetchType, parentId, filterParams) : false
   const error = fetchType ? getError(fetchType, parentId, filterParams) : null
+
+  // Track if we've attempted a fetch for this configuration
+  const fetchKey = `${fetchType}-${parentId}-${JSON.stringify(filterParams)}`
+  const [fetchAttempted, setFetchAttempted] = React.useState(false)
+  const prevFetchKeyRef = React.useRef(fetchKey)
+
+  React.useEffect(() => {
+    if (prevFetchKeyRef.current !== fetchKey) {
+      setFetchAttempted(false)
+      prevFetchKeyRef.current = fetchKey
+    }
+  }, [fetchKey])
 
   // Get backend-resolved ad units from enrichedFields (if available)
   const enrichedFields = formContext?.enrichedFields
@@ -168,19 +191,38 @@ export function MultiSelectWidget(props: WidgetProps) {
   }, [selectedIds, selectedNames, resolvedMap])
 
   const filteredItems = React.useMemo(() => {
-    if (!search) return cachedItems
-    const lower = search.toLowerCase()
-    return cachedItems.filter((item) =>
-      item.name.toLowerCase().includes(lower) ||
-      item.id.toLowerCase().includes(lower)
-    )
-  }, [cachedItems, search])
+    let items = cachedItems
+
+    // Filter by search
+    if (search) {
+      const lower = search.toLowerCase()
+      items = items.filter((item) =>
+        item.name.toLowerCase().includes(lower) ||
+        item.id.toLowerCase().includes(lower)
+      )
+    }
+
+    // Sort selected items to top
+    return [...items].sort((a, b) => {
+      const aSelected = selectedIds.includes(a.id) ? 0 : 1
+      const bSelected = selectedIds.includes(b.id) ? 0 : 1
+      if (aSelected !== bSelected) return aSelected - bSelected
+      return a.name.localeCompare(b.name)
+    })
+  }, [cachedItems, search, selectedIds])
 
   React.useEffect(() => {
     if (!fetchType) return
     if (dependsOn && !dependencyValue) return
     fetchEntities(fetchType, parentId, false, filterParams)
   }, [fetchType, dependsOn, dependencyValue, parentId, filterParams, fetchEntities])
+
+  // Mark as fetched when we have data or error
+  React.useEffect(() => {
+    if (cachedItems.length > 0 || error) {
+      setFetchAttempted(true)
+    }
+  }, [cachedItems.length, error])
 
   // Clear selection when structural dependency (dependsOn) changes
   const prevDependencyRef = React.useRef(dependencyValue)
@@ -260,7 +302,7 @@ export function MultiSelectWidget(props: WidgetProps) {
       placeholder={placeholder}
       className={cn(
         "flex h-7 w-full rounded border px-2 py-1 text-xs",
-        "bg-transparent dark:bg-input/30 border-input",
+        "bg-[var(--input-bg)] border-[var(--input-border)]",
         "text-foreground placeholder:text-muted-foreground",
         "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
       )}
@@ -274,7 +316,7 @@ export function MultiSelectWidget(props: WidgetProps) {
     return (
       <div className={cn(
         "flex h-7 w-full items-center rounded border px-2 text-xs",
-        "bg-transparent dark:bg-input/30 border-input text-muted-foreground"
+        "bg-[var(--input-bg)] border-[var(--input-border)] text-muted-foreground"
       )}>
         Select {parentLabel} first
       </div>
@@ -282,8 +324,11 @@ export function MultiSelectWidget(props: WidgetProps) {
   }
 
   const hasData = cachedItems.length > 0
+  // Show loading if: explicitly loading, OR we haven't gotten data yet
+  const showLoading = loading || (!fetchAttempted && !hasData)
+
   if (error && !hasData) return renderInput("Enter manually...")
-  if (!hasData && !loading) return renderInput("No options")
+  if (!hasData && !showLoading) return renderInput("No options")
 
   return (
     <div className="relative">
@@ -293,7 +338,7 @@ export function MultiSelectWidget(props: WidgetProps) {
         onClick={() => !disabled && !readonly && setOpen(!open)}
         className={cn(
           "flex min-h-7 w-full flex-wrap items-center gap-1 rounded border px-1.5 py-1",
-          "bg-transparent dark:bg-input/30 border-input",
+          "bg-[var(--input-bg)] border-[var(--input-border)]",
           "cursor-pointer transition-[color,box-shadow]",
           open && "border-ring ring-ring/50 ring-[3px]",
           disabled && "cursor-not-allowed opacity-50",
@@ -303,6 +348,10 @@ export function MultiSelectWidget(props: WidgetProps) {
         {selectedItems.length > 0 ? (
           selectedItems.map((item) => {
             const isInvalid = "valid" in item && item.valid === false
+            // Show friendly name, or extract meaningful part from ID
+            const displayName = item.name !== item.id
+              ? item.name
+              : item.id.split("/").pop() || item.id // Get last part of path-like IDs
             return (
               <span
                 key={item.id}
@@ -312,16 +361,16 @@ export function MultiSelectWidget(props: WidgetProps) {
                 data-is-resolved={item.name !== item.id}
                 data-is-invalid={isInvalid}
                 className={cn(
-                  "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0 text-[10px]",
+                  "inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px]",
                   isInvalid
                     ? "bg-destructive/10 text-destructive border-destructive/30"
-                    : "bg-secondary text-secondary-foreground border-transparent"
+                    : "bg-muted text-foreground border-border"
                 )}
               >
-                {isInvalid && <AlertTriangle className="h-2.5 w-2.5 shrink-0" />}
-                <span className="truncate max-w-[80px]">{isInvalid ? "Invalid" : item.name}</span>
+                {isInvalid && <AlertTriangle className="h-3 w-3 shrink-0" />}
+                <span className="truncate max-w-[120px]">{isInvalid ? "Invalid" : displayName}</span>
                 <X
-                  className="h-2.5 w-2.5 cursor-pointer opacity-70 hover:opacity-100"
+                  className="h-3 w-3 cursor-pointer opacity-60 hover:opacity-100"
                   onClick={(e) => removeItem(item.id, e)}
                 />
               </span>
@@ -329,7 +378,7 @@ export function MultiSelectWidget(props: WidgetProps) {
           })
         ) : (
           <span className="text-xs text-muted-foreground px-0.5">
-            {loading ? "Loading..." : "Select..."}
+            {showLoading ? "Loading..." : "Select..."}
           </span>
         )}
         <ChevronDown className={cn(
@@ -360,7 +409,7 @@ export function MultiSelectWidget(props: WidgetProps) {
               placeholder="Search..."
               className={cn(
                 "flex h-6 w-full rounded border px-2 py-1 text-xs",
-                "bg-transparent border-input",
+                "bg-[var(--input-bg)] border-[var(--input-border)]",
                 "text-foreground placeholder:text-muted-foreground",
                 "focus-visible:outline-none focus-visible:border-ring"
               )}
@@ -431,9 +480,17 @@ export function MultiSelectWidget(props: WidgetProps) {
 
       {/* Error message for invalid items */}
       {hasInvalidItems && (
-        <div className="flex items-center gap-1 mt-1 text-[10px] text-destructive">
-          <AlertTriangle className="h-3 w-3" />
-          <span>Some IDs are invalid - select valid options from dropdown</span>
+        <div className="flex items-start gap-1 mt-1 text-[10px] text-destructive">
+          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-medium">Invalid IDs detected.</span>
+            {" "}Select valid options from the dropdown.
+            {selectedItems.some(item => item.id.includes("~") && !item.id.includes("/")) && (
+              <span className="block text-muted-foreground mt-0.5">
+                Note: Ad unit IDs use / (slash), app IDs use ~ (tilde)
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>

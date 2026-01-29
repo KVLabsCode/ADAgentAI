@@ -15,12 +15,9 @@ export default function PublicLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Static year - updated annually, avoids Date() issues with cacheComponents
-  const currentYear = 2025
-
   return (
     <Suspense fallback={<PublicLayoutFallback />}>
-      <PublicLayoutClient currentYear={currentYear}>{children}</PublicLayoutClient>
+      <PublicLayoutClient>{children}</PublicLayoutClient>
     </Suspense>
   )
 }

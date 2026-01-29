@@ -41,8 +41,7 @@ export function TosModal({ open }: TosModalProps) {
     <Dialog open={open}>
       <DialogContent
         className="sm:max-w-[500px] [&>button]:hidden"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        showCloseButton={false}
       >
         <DialogHeader className="space-y-3">
           <div className="mx-auto rounded-full bg-primary/10 p-3">

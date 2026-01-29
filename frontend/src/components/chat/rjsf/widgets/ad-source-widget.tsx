@@ -51,9 +51,12 @@ function getResolvedEntityData(
 export function AdSourceSelectWidget(props: WidgetProps) {
   const { id, value, onChange, disabled, readonly, options, registry } = props
 
-  // Get form data from registry
+  // Get form data from registry - memoize to prevent new object on every render
   const formContext = (registry as { formContext?: { formData?: Record<string, unknown> } })?.formContext
-  const formData = formContext?.formData || {}
+  const formData = React.useMemo(
+    () => formContext?.formData ?? {},
+    [formContext?.formData]
+  )
 
   // Get backend-resolved entity data (if available)
   const resolvedData = React.useMemo(

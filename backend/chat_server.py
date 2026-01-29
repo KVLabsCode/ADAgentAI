@@ -8,22 +8,25 @@ Uses modular chat/ package for:
 - Dangerous tool approval workflow with interrupt()
 """
 
+import warnings
+# Suppress Pydantic V1 warning from langchain_core on Python 3.14+
+# Issue: https://github.com/langchain-ai/langchain/issues/33926 (CLOSED - fix in progress)
+# Fix: Pydantic 2.13 will remove this warning. Currently on 2.12.5.
+# TODO: Remove this suppression once upgraded to pydantic>=2.13
+warnings.filterwarnings("ignore", message="Core Pydantic V1 functionality", category=UserWarning)
+
 import json
 import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-# Windows: Configure for psycopg async compatibility
-# Must be done BEFORE any async imports
+# Windows: Configure UTF-8 encoding for proper Unicode handling
 if sys.platform == "win32":
-    # Force UTF-8 encoding
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-
-    # psycopg requires SelectorEventLoop on Windows (ProactorEventLoop not supported)
-    import asyncio
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # Note: SelectorEventLoop for psycopg compatibility is configured via
+    # asyncio.run(loop_factory=...) in the main entry point (avoids deprecated policy API)
 
 # Load environment variables FIRST before any imports from chat package
 # This ensures DATABASE_URL is available when chat.graph.builder is imported
@@ -374,16 +377,8 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
                     #
                     # Source: https://developers.google.com/admob/api/v1/ad-sources-reference
                     #
-                    # Networks marked as "coming soon" (disabled in UI, not yet integrated):
-                    # - Bidding: AppLovin, Unity Ads, Meta Audience Network, DT Exchange, ironSource Ads
-                    # - Waterfall: AppLovin, DT Exchange
-                    COMING_SOON_BIDDING = {
-                        "applovin", "unity ads", "meta audience network", "dt exchange", "ironsource ads",
-                        "liftoff monetize"  # Also known as Vungle
-                    }
-                    COMING_SOON_WATERFALL = {
-                        "applovin", "dt exchange"
-                    }
+                    # Import coming soon helper functions
+                    from chat.constants import is_coming_soon_bidding, is_coming_soon_waterfall
 
                     if ad_source_filter and key == "adSources":
                         print(f"[field-options] Filtering ad sources: filter={ad_source_filter}, total={len(items)}")
@@ -393,16 +388,16 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
                         if ad_source_filter == "bidding":
                             for item in items:
                                 # API returns "title", not "label"
-                                title = item.get("title", item.get("label", "")).lower()
+                                title = item.get("title", item.get("label", ""))
+                                title_lower = title.lower()
                                 # Include if has "(bidding)" OR is exactly "AdMob Network" (special case)
-                                is_admob_bidding = title == "admob network"
-                                has_bidding_suffix = "(bidding)" in title
+                                is_admob_bidding = title_lower == "admob network"
+                                has_bidding_suffix = "(bidding)" in title_lower
 
                                 if is_admob_bidding or has_bidding_suffix:
-                                    # Check if coming soon
-                                    base_name = title.replace("(bidding)", "").strip()
-                                    if any(coming in base_name for coming in COMING_SOON_BIDDING):
-                                        print(f"[field-options] Marking as coming soon: {base_name}")
+                                    # Check if coming soon (whitelist approach)
+                                    if is_coming_soon_bidding(title):
+                                        print(f"[field-options] Marking as coming soon: {title}")
                                         item = {**item, "disabled": True, "comingSoon": True}
                                     filtered_items.append(item)
                             items = filtered_items
@@ -413,14 +408,15 @@ async def get_field_options(request: Request, body: DynamicFieldRequest):
                         elif ad_source_filter == "waterfall":
                             for item in items:
                                 # API returns "title", not "label"
-                                title = item.get("title", item.get("label", "")).lower()
+                                title = item.get("title", item.get("label", ""))
+                                title_lower = title.lower()
                                 # Exclude bidding variants (has "(bidding)") but NOT "AdMob Network" (that's bidding-only)
-                                is_admob_bidding = title == "admob network"
-                                has_bidding_suffix = "(bidding)" in title
+                                is_admob_bidding = title_lower == "admob network"
+                                has_bidding_suffix = "(bidding)" in title_lower
 
                                 if not has_bidding_suffix and not is_admob_bidding:
-                                    # Check if coming soon
-                                    if any(coming in title for coming in COMING_SOON_WATERFALL):
+                                    # Check if coming soon (all waterfall supported currently)
+                                    if is_coming_soon_waterfall(title):
                                         print(f"[field-options] Marking as coming soon: {title}")
                                         item = {**item, "disabled": True, "comingSoon": True}
                                     filtered_items.append(item)

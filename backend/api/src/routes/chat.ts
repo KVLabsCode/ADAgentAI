@@ -69,7 +69,7 @@ const saveMessageSchema = z.object({
   content: z.string().min(1).max(50000),
   role: z.enum(["user", "assistant"]),
   agentName: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const exportFormatSchema = z.object({

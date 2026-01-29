@@ -4,11 +4,10 @@ import "../src/app/globals.css";
 const preview: Preview = {
   parameters: {
     backgrounds: {
-      default: "dark",
-      values: [
-        { name: "dark", value: "#08080a" },
-        { name: "light", value: "#ffffff" },
-      ],
+      options: {
+        dark: { name: "dark", value: "#08080a" },
+        light: { name: "light", value: "#ffffff" }
+      }
     },
     controls: {
       matchers: {
@@ -17,6 +16,7 @@ const preview: Preview = {
       },
     },
   },
+
   globalTypes: {
     theme: {
       description: "Global theme",
@@ -29,6 +29,7 @@ const preview: Preview = {
       },
     },
   },
+
   decorators: [
     (Story, context) => {
       const theme = context.globals.theme || "dark";
@@ -37,6 +38,12 @@ const preview: Preview = {
       return <Story />;
     },
   ],
+
+  initialGlobals: {
+    backgrounds: {
+      value: "dark"
+    }
+  }
 };
 
 export default preview;

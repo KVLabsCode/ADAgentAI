@@ -1,0 +1,659 @@
+openapi: 3.0.0
+info:
+  title: Unity LevelPlay (ironSource) API
+  version: 4.0.0
+  description: Full Management and Reporting suite for Unity LevelPlay.
+servers:
+  - url: https://platform.ironsrc.com
+paths:
+  /partners/publisher/auth:
+    get:
+      summary: Authenticate (Bearer Token)
+      operationId: auth_bearer
+      responses:
+        '200':
+          description: OK
+  /partners/publisher/applications/v6:
+    get:
+      summary: List Applications (v6)
+      operationId: list_applications_v6
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Application
+      operationId: create_application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApplicationRequest'
+      responses:
+        '200':
+          description: OK
+  /levelPlay/groups/v4/{appKey}:
+    get:
+      summary: Get Mediation Groups (v4)
+      operationId: list_groups_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Mediation Group (v4)
+      operationId: create_group_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupV4Request'
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Mediation Group (v4)
+      operationId: update_group_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupV4Request'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete Mediation Group (v4)
+      operationId: delete_group_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+  /levelPlay/network/instances/v4/{appKey}:
+    get:
+      summary: List Ad Network Instances (v4)
+      operationId: list_instances_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Instance (v4)
+      operationId: create_instance_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceV4Request'
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Instance (v4)
+      operationId: update_instance_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstanceV4Request'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete Instance (v4)
+      operationId: delete_instance_v4
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+  /levelPlay/adUnits/v1/{appKey}:
+    get:
+      summary: List Ad Units (v1)
+      operationId: list_ad_units_v1
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Ad Unit (v1)
+      operationId: create_ad_unit_v1
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdUnitV1Request'
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Ad Unit (v1)
+      operationId: update_ad_unit_v1
+      parameters:
+        - name: appKey
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdUnitV1Request'
+      responses:
+        '200':
+          description: OK
+  /partners/publisher/placements/v1:
+    get:
+      summary: List Placements
+      operationId: list_placements
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Placement
+      operationId: create_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Placement
+      operationId: update_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Archive Placement
+      operationId: archive_placement
+      responses:
+        '200':
+          description: OK
+  /levelPlay/reporting/v1/monetization:
+    get:
+      summary: Reporting API
+      operationId: get_monetization_report
+      responses:
+        '200':
+          description: OK
+  /partners/publisher/mediation/management/v2:
+    get:
+      summary: Get Mediation Groups (v2)
+      operationId: get_mediation_groups_v2
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Mediation Group (v2)
+      operationId: create_mediation_group_v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMediationGroupV2Request'
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Mediation Group (v2)
+      operationId: update_mediation_group_v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMediationGroupV2Request'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete Mediation Group (v2)
+      operationId: delete_mediation_group_v2
+      responses:
+        '200':
+          description: OK
+  /levelPlay/reporting/v1:
+    get:
+      summary: Reporting API (v1)
+      operationId: get_reporting_v1
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    CountryRate:
+      type: object
+      required: [countryCode, rate]
+      properties:
+        countryCode:
+          type: string
+          description: ISO 3166-1 Alpha-2 country code
+          example: US
+        rate:
+          type: number
+          description: CPM rate (0.01-3000)
+          example: 3.0
+
+    GroupInstance:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          description: Instance ID from Instances API
+          example: 123456
+        groupRate:
+          type: number
+          description: Default CPM rate (0.01-3000)
+          example: 2.5
+        countriesRate:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryRate'
+
+    CreateApplicationRequest:
+      type: object
+      required: [appName, platform, bundleId]
+      properties:
+        appName:
+          type: string
+          description: Application name
+          example: My Mobile Game
+        platform:
+          type: string
+          enum: [Android, iOS]
+          example: Android
+        bundleId:
+          type: string
+          description: Package name / Bundle ID
+          example: com.example.game
+        coppa:
+          type: boolean
+          description: COPPA compliance flag
+          default: false
+        adSettings:
+          type: object
+          properties:
+            bannerEnabled:
+              type: boolean
+              default: true
+            interstitialEnabled:
+              type: boolean
+              default: true
+            rewardedEnabled:
+              type: boolean
+              default: true
+
+    CreateGroupV4Request:
+      type: object
+      required: [groupName, adFormat, position]
+      properties:
+        groupName:
+          type: string
+          description: Group name (1-32 chars)
+          example: Mediation Group
+        adFormat:
+          type: string
+          enum: [rewarded, interstitial, banner, native]
+          example: rewarded
+        mediationAdUnitId:
+          type: string
+          description: Ad unit ID to associate
+        position:
+          type: integer
+          description: Priority position (1 to max)
+          example: 1
+        abTest:
+          type: string
+          enum: [A, B]
+          description: A/B test variant
+        floorPrice:
+          type: number
+          description: Floor price CPM
+          example: 0.5
+        countries:
+          type: array
+          items:
+            type: string
+          description: Target country codes
+          example: [US, GB, CA]
+        segments:
+          type: array
+          items:
+            type: string
+          description: User segment IDs
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupInstance'
+
+    UpdateGroupV4Request:
+      type: object
+      required: [groupId]
+      properties:
+        groupId:
+          type: integer
+          description: Group ID to update
+          example: 123456
+        groupName:
+          type: string
+          description: Updated group name
+        position:
+          type: integer
+          description: New priority position
+        floorPrice:
+          type: number
+          description: Updated floor price
+        countries:
+          type: array
+          items:
+            type: string
+        segments:
+          type: array
+          items:
+            type: string
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupInstance'
+
+    CreateInstanceV4Request:
+      type: object
+      required: [instanceName, networkName, adFormat, isBidder]
+      properties:
+        instanceName:
+          type: string
+          description: Instance display name
+          example: AdMob Instance
+        networkName:
+          type: string
+          description: Ad network name
+          example: AdMob
+        adFormat:
+          type: string
+          enum: [rewarded, interstitial, banner, native]
+          example: rewarded
+        isBidder:
+          type: boolean
+          description: Whether this is a bidding instance
+          example: true
+        appConfig1:
+          type: string
+          description: Network app ID/key
+          example: ca-app-pub-xxx
+        appConfig2:
+          type: string
+          description: Additional network config
+        instanceConfig1:
+          type: string
+          description: Network ad unit ID
+          example: ca-app-pub-xxx/123
+        instanceConfig2:
+          type: string
+          description: Additional instance config
+        groups:
+          type: array
+          items:
+            type: integer
+          description: Group IDs to add instance to
+          example: [123, 456]
+        isLive:
+          type: boolean
+          description: Whether instance is active
+          default: true
+        rate:
+          type: number
+          description: Default CPM rate
+          example: 2.5
+
+    UpdateInstanceV4Request:
+      type: object
+      required: [instanceId]
+      properties:
+        instanceId:
+          type: integer
+          description: Instance ID to update
+          example: 123456
+        instanceName:
+          type: string
+        appConfig1:
+          type: string
+        instanceConfig1:
+          type: string
+        groups:
+          type: array
+          items:
+            type: integer
+        isLive:
+          type: boolean
+        rate:
+          type: number
+
+    PlacementSettings:
+      type: object
+      properties:
+        cappingEnabled:
+          type: boolean
+          default: true
+        cappingValue:
+          type: integer
+          description: Max impressions
+          example: 5
+        cappingInterval:
+          type: string
+          enum: [day, hour, session]
+          example: day
+        pacingEnabled:
+          type: boolean
+          default: true
+        pacingValue:
+          type: integer
+          description: Seconds between impressions
+          example: 60
+
+    CreateAdUnitV1Request:
+      type: object
+      required: [adUnitName, adFormat]
+      properties:
+        adUnitName:
+          type: string
+          example: Rewarded Video
+        adFormat:
+          type: string
+          enum: [rewarded, interstitial, banner, native]
+          example: rewarded
+        status:
+          type: string
+          enum: [active, inactive]
+          default: active
+        placementSettings:
+          $ref: '#/components/schemas/PlacementSettings'
+
+    UpdateAdUnitV1Request:
+      type: object
+      required: [adUnitId]
+      properties:
+        adUnitId:
+          type: integer
+          example: 123456
+        adUnitName:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        placementSettings:
+          $ref: '#/components/schemas/PlacementSettings'
+
+    CappingConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        value:
+          type: integer
+          example: 5
+        interval:
+          type: string
+          enum: [day, hour, session]
+          example: day
+
+    PacingConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        value:
+          type: integer
+          description: Seconds between impressions
+          example: 60
+
+    CreatePlacementRequest:
+      type: object
+      required: [placementName, adUnit]
+      properties:
+        placementName:
+          type: string
+          example: Main Rewarded
+        adUnit:
+          type: string
+          enum: [rewarded_video, interstitial, banner, offerwall]
+          example: rewarded_video
+        capping:
+          $ref: '#/components/schemas/CappingConfig'
+        pacing:
+          $ref: '#/components/schemas/PacingConfig'
+
+    UpdatePlacementRequest:
+      type: object
+      required: [placementId]
+      properties:
+        placementId:
+          type: integer
+          example: 123456
+        placementName:
+          type: string
+        capping:
+          $ref: '#/components/schemas/CappingConfig'
+        pacing:
+          $ref: '#/components/schemas/PacingConfig'
+
+    TierInstance:
+      type: object
+      properties:
+        instanceId:
+          type: integer
+          example: 123
+        rate:
+          type: number
+          example: 2.5
+
+    Tier:
+      type: object
+      properties:
+        tierType:
+          type: string
+          enum: [manual, sortByCpm, optimized]
+          example: manual
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/TierInstance'
+
+    CreateMediationGroupV2Request:
+      type: object
+      required: [groupName, adUnit]
+      properties:
+        groupName:
+          type: string
+          example: Mediation Group v2
+        adUnit:
+          type: string
+          enum: [rewarded_video, interstitial, banner, offerwall]
+          example: rewarded_video
+        groupPosition:
+          type: integer
+          example: 1
+        adSourcePriority:
+          type: string
+          enum: [manual, sortByCpm, optimized]
+          example: manual
+        tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tier'
+
+    UpdateMediationGroupV2Request:
+      type: object
+      required: [groupId]
+      properties:
+        groupId:
+          type: integer
+          example: 123456
+        groupName:
+          type: string
+        groupPosition:
+          type: integer

@@ -3,7 +3,7 @@
  */
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5001";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 /**
  * Create fetch headers with session token and optional organization context
@@ -45,12 +45,15 @@ export async function authFetch(
 }
 
 export interface StreamEvent {
-  type: "routing" | "agent" | "thinking" | "tool" | "tool_executing" | "tool_result" | "tool_approval_required" | "tool_denied" | "result" | "content" | "error" | "done" | "stream_id";
-  message?: string;  // Used by tool_executing
+  type: "routing" | "agent" | "thinking" | "tool" | "tool_executing" | "tool_result" | "tool_approval_required" | "tool_denied" | "action_required" | "result" | "content" | "error" | "done" | "stream_id";
+  message?: string;  // Used by status, tool_executing
+  icon?: string;  // Icon hint for status events
   content?: string;
   service?: string;
   capability?: string;
   thinking?: string;  // Router's reasoning for routing decision
+  execution_path?: string;  // "reactive" or "workflow"
+  model_selected?: string;  // Auto-selected model based on execution path
   agent?: string;
   task?: string;
   tool?: string;
@@ -69,18 +72,24 @@ export interface StreamEvent {
   approved?: boolean;
   // Stream ID for reconnection
   stream_id?: string;
+  // Action required fields
+  action_type?: string;
+  deep_link?: string;
+  blocking?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ChatStreamCallbacks {
   onStreamId?: (streamId: string) => void;  // Called with stream ID for reconnection
-  onRouting?: (service: string, capability: string, thinking?: string) => void;
+  onRouting?: (service: string, capability: string, thinking?: string, executionPath?: string, modelSelected?: string) => void;
   onAgent?: (agent: string, task: string) => void;
   onThinking?: (content: string) => void;
   onToolCall?: (tool: string, inputPreview: string, inputFull?: string, approved?: boolean) => void;
-  onToolExecuting?: (toolName: string, message: string) => void;  // Tool started executing (progress UI)
+  onToolExecuting?: (toolName: string, message: string) => void;  // Tool started executing (shows spinner)
   onToolResult?: (preview: string, full?: string, dataType?: string) => void;
   onToolApprovalRequired?: (approvalId: string, toolName: string, toolInput: string, parameterSchema?: Record<string, unknown>) => void;
   onToolDenied?: (toolName: string, reason: string) => void;
+  onActionRequired?: (actionType: string, message: string, deepLink?: string, blocking?: boolean, metadata?: Record<string, unknown>) => void;
   onContent?: (chunk: string) => void;  // Streaming content chunks
   onResult?: (content: string) => void;
   onError?: (error: string) => void;
@@ -221,7 +230,7 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       callbacks.onStreamId?.(event.stream_id || "");
       break;
     case "routing":
-      callbacks.onRouting?.(event.service || "", event.capability || "", event.thinking);
+      callbacks.onRouting?.(event.service || "", event.capability || "", event.thinking, event.execution_path, event.model_selected);
       break;
     case "agent":
       callbacks.onAgent?.(event.agent || "", event.task || "");
@@ -253,6 +262,15 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       break;
     case "tool_denied":
       callbacks.onToolDenied?.(event.tool_name || "", event.reason || "User denied");
+      break;
+    case "action_required":
+      callbacks.onActionRequired?.(
+        event.action_type || "",
+        event.content || event.message || "",
+        event.deep_link,
+        event.blocking,
+        event.metadata
+      );
       break;
     case "content":
       callbacks.onContent?.(event.content || "");

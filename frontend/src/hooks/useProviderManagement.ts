@@ -30,16 +30,33 @@ export function useProviderManagement() {
   const [canManage, setCanManage] = React.useState<boolean | null>(null)
   const [togglingProvider, setTogglingProvider] = React.useState<string | null>(null)
 
+  // Track if we have a valid token to prevent race conditions
+  const [hasToken, setHasToken] = React.useState(false)
+
+  // Check for token availability when auth state changes
+  React.useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      getAccessToken().then(token => {
+        if (token) {
+          setHasToken(true)
+        }
+      })
+    } else if (!isAuthenticated) {
+      setHasToken(false)
+    }
+  }, [isAuthLoading, isAuthenticated, getAccessToken])
+
   // Fetch providers
   const fetchProviders = React.useCallback(async () => {
     try {
       const accessToken = await getAccessToken()
 
       if (!accessToken) {
+        // Don't set isLoading to false if we're still waiting for token
+        // This prevents showing "no providers" before auth is ready
         if (!selectedOrganizationId) {
           setCanManage(true)
         }
-        setIsLoading(false)
         return
       }
 
@@ -73,14 +90,14 @@ export function useProviderManagement() {
     }
   }, [getAccessToken, selectedOrganizationId])
 
-  // Wait for auth to be ready before fetching
+  // Wait for auth AND token to be ready before fetching
   React.useEffect(() => {
-    if (!isAuthLoading && isAuthenticated) {
+    if (!isAuthLoading && isAuthenticated && hasToken) {
       fetchProviders()
     } else if (!isAuthLoading && !isAuthenticated) {
       setIsLoading(false)
     }
-  }, [fetchProviders, isAuthLoading, isAuthenticated])
+  }, [fetchProviders, isAuthLoading, isAuthenticated, hasToken])
 
   // Handle OAuth callback messages
   React.useEffect(() => {

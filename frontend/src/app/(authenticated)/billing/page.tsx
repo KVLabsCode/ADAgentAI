@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { AlertCircle, ArrowRight } from "lucide-react"
 import { Button } from "@/atoms/button"
@@ -12,6 +12,101 @@ import {
 } from "@/organisms/theme"
 import { useBilling } from "@/hooks/useBilling"
 import { PlanCards, RecentInvoicesCard } from "@/components/billing"
+import { useUser } from "@/contexts/user-context"
+import { authFetch } from "@/lib/api"
+import { cn } from "@/lib/utils"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+
+interface UsageData {
+  queries: number       // Number of user messages
+  toolCalls: number     // Number of MCP tools executed
+  tokens: number        // Total tokens used
+  cost: number          // Estimated cost in USD
+  limits: {
+    queries: number
+    tokens: number
+  }
+  isPro: boolean
+  isAdmin: boolean
+  periodStart: string
+  periodEnd: string
+}
+
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
+  return tokens.toString()
+}
+
+function UsageCard({ usage, loading }: { usage: UsageData | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)] p-4">
+        <div className="flex items-center gap-6">
+          <Skeleton className="h-10 w-20" />
+          <Skeleton className="h-10 w-20" />
+          <Skeleton className="h-10 w-20" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!usage) return null
+
+  return (
+    <div className="rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)] p-4">
+      <div className="flex items-center justify-between gap-4">
+        {/* Stats row - inline */}
+        <div className="flex items-center gap-5">
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Queries</p>
+            <p className="text-base font-semibold tabular-nums">{usage.queries}</p>
+          </div>
+          <div className="w-px h-8 bg-border/50" />
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Tool Calls</p>
+            <p className="text-base font-semibold tabular-nums">{usage.toolCalls}</p>
+          </div>
+          <div className="w-px h-8 bg-border/50" />
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Tokens</p>
+            <p className="text-base font-semibold tabular-nums">{formatTokens(usage.tokens)}</p>
+          </div>
+          <div className="w-px h-8 bg-border/50" />
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Cost</p>
+            <p className="text-base font-semibold tabular-nums">${usage.cost.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* Progress or period info */}
+        <div className="flex items-center gap-4">
+          {!usage.isPro && usage.limits.queries > 0 && (
+            <div className="w-32">
+              <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                <span>Quota</span>
+                <span>{Math.round((usage.queries / usage.limits.queries) * 100)}%</span>
+              </div>
+              <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full",
+                    (usage.queries / usage.limits.queries) >= 0.9 ? "bg-destructive" : "bg-primary"
+                  )}
+                  style={{ width: `${Math.min((usage.queries / usage.limits.queries) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground whitespace-nowrap">
+            Resets {new Date(usage.periodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function BillingContent() {
   const {
@@ -24,6 +119,29 @@ function BillingContent() {
     handleUpgrade,
     retry,
   } = useBilling()
+
+  const { getAccessToken } = useUser()
+  const [usage, setUsage] = useState<UsageData | null>(null)
+  const [usageLoading, setUsageLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchUsage() {
+      try {
+        const token = await getAccessToken()
+        if (!token) return
+        const res = await authFetch(`${API_URL}/api/billing/usage`, token)
+        if (res.ok) {
+          const data = await res.json()
+          setUsage(data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch usage:", err)
+      } finally {
+        setUsageLoading(false)
+      }
+    }
+    fetchUsage()
+  }, [getAccessToken])
 
   if (isLoading) {
     return (
@@ -117,8 +235,13 @@ function BillingContent() {
         </Link>
       </div>
 
+      {/* Usage stats */}
+      <div className="mt-6">
+        <UsageCard usage={usage} loading={usageLoading} />
+      </div>
+
       {/* Plan cards - two column grid */}
-      <div className="mt-8">
+      <div className="mt-6">
         <PlanCards
           isPro={isPro}
           isUpgrading={isUpgrading}
@@ -127,7 +250,7 @@ function BillingContent() {
       </div>
 
       {/* Recent invoices */}
-      <div className="mt-8">
+      <div className="mt-6">
         <h2 className="text-[length:var(--text-label)] font-[var(--font-weight-medium)] mb-3">
           Recent invoices
         </h2>

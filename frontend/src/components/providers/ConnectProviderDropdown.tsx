@@ -27,11 +27,9 @@ export function ConnectProviderDropdown({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm" className="h-8 text-xs">
-          <Plus className="mr-1 h-3 w-3" />
-          {buttonText}
-        </Button>
+      <DropdownMenuTrigger render={<Button size="sm" className="h-8 text-xs" />}>
+        <Plus className="mr-1 h-3 w-3" />
+        {buttonText}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem

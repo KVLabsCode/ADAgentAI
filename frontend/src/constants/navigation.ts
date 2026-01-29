@@ -6,12 +6,6 @@ import {
   CreditCard,
   HelpCircle,
   Settings,
-  Shield,
-  BarChart3,
-  MessageSquare,
-  Cog,
-  FileCode,
-  PenSquare,
   UserPlus,
 } from "lucide-react"
 
@@ -29,11 +23,6 @@ export const bottomNavItems = [
 ]
 
 export const adminNavItems = [
-  { title: "Admin Home", url: "/admin", icon: Shield },
-  { title: "Usage", url: "/admin/usage", icon: BarChart3 },
-  { title: "Conversations", url: "/admin/conversations", icon: MessageSquare },
-  { title: "System", url: "/admin/system", icon: Cog },
-  { title: "Prompts", url: "/admin/prompts", icon: FileCode },
-  { title: "Blog", url: "/dashboard/blog", icon: PenSquare },
-  { title: "Waitlist", url: "/dashboard/waitlist", icon: UserPlus },
+  { title: "Panel", url: "/admin", icon: LayoutDashboard },
+  { title: "Waitlist", url: "/admin/waitlist", icon: UserPlus },
 ]

@@ -1,0 +1,448 @@
+openapi: 3.0.0
+info:
+  title: DT Exchange (FairBid) API
+  version: 1.0.0
+  description: Enterprise suite for DT Exchange.
+servers:
+  - url: https://console.fyber.com/api/management/v1
+paths:
+  /apps:
+    get:
+      summary: List FairBid Apps
+      operationId: list_apps
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create App
+      operationId: create_app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /apps/{id}:
+    get:
+      summary: Get App Details
+      operationId: get_app
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update App
+      operationId: update_app
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAppRequest'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete App
+      operationId: delete_app
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+  /placements:
+    get:
+      summary: List Placements
+      operationId: list_placements
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Placement
+      operationId: create_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /placements/{id}:
+    get:
+      summary: Get Placement Details
+      operationId: get_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Placement
+      operationId: update_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete Placement
+      operationId: delete_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+  /instances:
+    get:
+      summary: List Ad Network Instances
+      operationId: list_instances
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Instance
+      operationId: create_instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceRequest'
+      responses:
+        '200':
+          description: OK
+  /instances/{id}:
+    get:
+      summary: Get Instance Details
+      operationId: get_instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Update Instance
+      operationId: update_instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstanceRequest'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete Instance
+      operationId: delete_instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+  /reporting/marketplace:
+    get:
+      summary: Marketplace Performance Report
+      operationId: get_marketplace_report
+      responses:
+        '200':
+          description: OK
+  /reporting/user-level:
+    get:
+      summary: User-Level Revenue Export
+      operationId: get_user_level_report
+      responses:
+        '200':
+          description: OK
+  /reporting/basic:
+    get:
+      summary: Basic Performance Report
+      operationId: get_basic_report
+      responses:
+        '200':
+          description: OK
+  /api/v2/management/auth:
+    post:
+      summary: Management API Authentication
+      operationId: auth_management_v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    SSRConfig:
+      type: object
+      properties:
+        currency:
+          type: string
+          description: Reward currency name
+          example: coins
+        amount:
+          type: integer
+          description: Reward amount
+          example: 100
+        enabled:
+          type: boolean
+          default: true
+
+    GeoConfig:
+      type: object
+      properties:
+        countries:
+          type: array
+          items:
+            type: string
+          description: ISO country codes
+          example: [US, GB, CA]
+        include:
+          type: boolean
+          description: True to include, false to exclude
+          example: true
+
+    FloorPrice:
+      type: object
+      required: [price, country]
+      properties:
+        price:
+          type: number
+          description: Floor price CPM
+          example: 2.50
+        country:
+          type: string
+          description: ISO country code
+          example: US
+
+    CappingConfig:
+      type: object
+      properties:
+        value:
+          type: integer
+          description: Max impressions
+          example: 5
+        unit:
+          type: string
+          enum: [minute, hour, day]
+          example: hour
+        enabled:
+          type: boolean
+          default: true
+
+    PacingConfig:
+      type: object
+      properties:
+        value:
+          type: integer
+          description: Time between impressions
+          example: 30
+        unit:
+          type: string
+          enum: [second, minute]
+          example: second
+        enabled:
+          type: boolean
+          default: true
+
+    CreateAppRequest:
+      type: object
+      required: [name, platform, storeId]
+      properties:
+        name:
+          type: string
+          example: My Game
+        platform:
+          type: string
+          enum: [android, ios]
+          example: android
+        storeId:
+          type: string
+          description: Package name or bundle ID
+          example: com.example.game
+        coppa:
+          type: boolean
+          default: false
+
+    UpdateAppRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        coppa:
+          type: boolean
+
+    CreatePlacementRequest:
+      type: object
+      required: [name, appId, placementType]
+      properties:
+        name:
+          type: string
+          example: Interstitial Placement
+        appId:
+          type: integer
+          description: App ID
+          example: 12345
+        placementType:
+          type: string
+          enum: [Interstitial, Rewarded, Banner]
+          example: Interstitial
+        coppa:
+          type: boolean
+          default: false
+        ssrConfig:
+          $ref: '#/components/schemas/SSRConfig'
+        targetingEnabled:
+          type: boolean
+          default: true
+        geo:
+          $ref: '#/components/schemas/GeoConfig'
+        connectivity:
+          type: array
+          items:
+            type: string
+            enum: [WIFI, CELLULAR]
+          example: [WIFI, CELLULAR]
+        floorPrices:
+          type: array
+          items:
+            $ref: '#/components/schemas/FloorPrice'
+        capping:
+          $ref: '#/components/schemas/CappingConfig'
+        pacing:
+          $ref: '#/components/schemas/PacingConfig'
+
+    UpdatePlacementRequest:
+      type: object
+      properties:
+        placementId:
+          type: integer
+          example: 67890
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        coppa:
+          type: boolean
+        ssrConfig:
+          $ref: '#/components/schemas/SSRConfig'
+        targetingEnabled:
+          type: boolean
+        geo:
+          $ref: '#/components/schemas/GeoConfig'
+        connectivity:
+          type: array
+          items:
+            type: string
+        floorPrices:
+          type: array
+          items:
+            $ref: '#/components/schemas/FloorPrice'
+        capping:
+          $ref: '#/components/schemas/CappingConfig'
+        pacing:
+          $ref: '#/components/schemas/PacingConfig'
+
+    CreateInstanceRequest:
+      type: object
+      required: [placementId, networkId]
+      properties:
+        placementId:
+          type: integer
+          example: 67890
+        networkId:
+          type: string
+          description: Ad network identifier
+          example: admob
+        instanceName:
+          type: string
+          example: AdMob Instance
+        appKey:
+          type: string
+          description: Network app ID
+        adUnitId:
+          type: string
+          description: Network ad unit ID
+        cpm:
+          type: number
+          description: Manual CPM
+          example: 2.50
+        isBidding:
+          type: boolean
+          default: false
+        status:
+          type: string
+          enum: [active, inactive]
+          default: active
+
+    UpdateInstanceRequest:
+      type: object
+      properties:
+        instanceName:
+          type: string
+        appKey:
+          type: string
+        adUnitId:
+          type: string
+        cpm:
+          type: number
+        status:
+          type: string
+          enum: [active, inactive]
+
+    AuthRequest:
+      type: object
+      required: [client_id, client_secret]
+      properties:
+        client_id:
+          type: string
+        client_secret:
+          type: string

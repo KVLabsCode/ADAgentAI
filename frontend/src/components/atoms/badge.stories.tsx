@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { Badge, RemovableBadge } from "./badge";
 import { Check, Clock, AlertCircle, Zap, User, Box } from "lucide-react";
 
@@ -23,9 +23,9 @@ const meta: Meta<typeof Badge> = {
       ],
       description: "Badge style variant",
     },
-    asChild: {
-      control: "boolean",
-      description: "Render as child element (slot pattern)",
+    render: {
+      control: false,
+      description: "Custom element to render as (render prop pattern)",
     },
   },
   parameters: {

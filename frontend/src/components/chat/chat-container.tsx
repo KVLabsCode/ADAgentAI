@@ -23,19 +23,21 @@ import { Zap } from "lucide-react"
 interface ChatContainerProps {
   initialMessages?: Message[]
   providers?: Provider[]
+  isLoadingProviders?: boolean
   sessionId?: string
 }
 
 export function ChatContainer({
   initialMessages = [],
   providers = [],
+  isLoadingProviders = false,
   sessionId: initialSessionId
 }: ChatContainerProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const newChatParam = searchParams.get('new')
-  const { user, getAccessToken } = useUser()
-  const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel } = useChatSettings()
+  const { user, getAccessToken, selectedOrganizationId } = useUser()
+  const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel, contextMode } = useChatSettings()
 
   // Core state
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
@@ -48,7 +50,7 @@ export function ChatContainer({
   const currentAssistantIdRef = React.useRef<string | null>(null)
 
   // Session management
-  const { createSession, saveMessage } = useChatSession({ getAccessToken })
+  const { createSession, saveMessage } = useChatSession({ getAccessToken, selectedOrganizationId })
 
   // Tool approvals
   const {
@@ -155,21 +157,78 @@ export function ChatContainer({
     }
   }, [])
 
-  const hasProviders = providers.some(p => p.status === "connected")
+  const activeProviders = React.useMemo(
+    () => providers.filter((p) => p.status === "connected" && p.isEnabled !== false),
+    [providers]
+  )
+  const hasProviders = activeProviders.length > 0
+  const activeProviderIds = React.useMemo(
+    () => new Set(activeProviders.map((p) => p.id)),
+    [activeProviders]
+  )
+  const effectiveEnabledProviderIds = React.useMemo(() => {
+    if (enabledProviderIds.length === 0) {
+      return activeProviders.map((p) => p.id)
+    }
+    return enabledProviderIds.filter((id) => activeProviderIds.has(id))
+  }, [activeProviderIds, activeProviders, enabledProviderIds])
   const hasMessages = messages.length > 0
   const userId = user?.id
 
   // Build context for API calls
   const chatContext: ChatContext = React.useMemo(() => ({
-    enabledProviderIds,
+    enabledProviderIds: effectiveEnabledProviderIds,
     enabledAppIds,
     responseStyle,
     autoIncludeContext,
     selectedModel,
-  }), [enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel])
+    contextMode,
+  }), [effectiveEnabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel, contextMode])
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isLoading || !hasProviders) return
+
+    // Cancel any pending tool approvals from previous messages
+    // When user sends a new message, pending approvals are no longer relevant
+    const pendingApprovalIds: string[] = []
+    pendingApprovals.forEach((state, approvalId) => {
+      if (state === null) {
+        pendingApprovalIds.push(approvalId)
+      }
+    })
+
+    if (pendingApprovalIds.length > 0) {
+      // Add tool_cancelled events to messages with pending approvals
+      setMessages(prev => prev.map(msg => {
+        if (!msg.events) return msg
+
+        // Find tool_approval_required events that are being cancelled
+        const cancelledEvents: StreamEventItem[] = []
+        for (const event of msg.events) {
+          if (event.type === "tool_approval_required" && pendingApprovalIds.includes(event.approval_id)) {
+            cancelledEvents.push({
+              type: "tool_cancelled",
+              tool_name: event.tool_name,
+              approval_id: event.approval_id
+            })
+          }
+        }
+
+        if (cancelledEvents.length > 0) {
+          return { ...msg, events: [...msg.events, ...cancelledEvents] }
+        }
+        return msg
+      }))
+
+      // Mark approvals as cancelled in the map (use false to indicate not approved)
+      setPendingApprovals(prev => {
+        const newMap = new Map(prev)
+        for (const approvalId of pendingApprovalIds) {
+          newMap.set(approvalId, false) // Mark as cancelled/denied
+        }
+        return newMap
+      })
+    }
 
     const accessToken = await getAccessToken()
     abortControllerRef.current?.abort()
@@ -230,8 +289,8 @@ export function ChatContainer({
         onStreamId: (streamId) => {
           currentStreamIdRef.current = streamId
         },
-        onRouting: (service, capability, thinking) => {
-          events.push({ type: "routing", service, capability, thinking })
+        onRouting: (service, capability, thinking, executionPath, modelSelected) => {
+          events.push({ type: "routing", service, capability, thinking, execution_path: executionPath, model_selected: modelSelected })
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
@@ -248,7 +307,15 @@ export function ChatContainer({
           )
         },
         onThinking: (thinkingContent) => {
-          events.push({ type: "thinking", content: thinkingContent })
+          // Append to existing thinking event or create new one
+          const lastEvent = events[events.length - 1]
+          if (lastEvent && lastEvent.type === "thinking") {
+            // Append to existing thinking event
+            lastEvent.content = (lastEvent.content || "") + thinkingContent
+          } else {
+            // Create new thinking event
+            events.push({ type: "thinking", content: thinkingContent })
+          }
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId ? { ...m, events: [...events] } : m
@@ -325,6 +392,21 @@ export function ChatContainer({
             )
           )
         },
+        onActionRequired: (actionType, message, deepLink, blocking, metadata) => {
+          events.push({
+            type: "action_required",
+            action_type: actionType as import("@/lib/types").ActionRequiredType,
+            message,
+            deep_link: deepLink,
+            blocking: blocking ?? true,
+            metadata
+          })
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId ? { ...m, events: [...events] } : m
+            )
+          )
+        },
         onContent: (chunk) => {
           // Accumulate content for live display AND for chain of thought
           // Content will be pushed as "content" event when a tool call arrives (see onToolCall)
@@ -378,7 +460,8 @@ export function ChatContainer({
       userId,
       history,
       chatContext,
-      accessToken
+      accessToken,
+      selectedOrganizationId
     )
 
     setIsLoading(false)
@@ -427,8 +510,9 @@ export function ChatContainer({
                 onStop={handleStop}
                 disabled={!hasProviders}
                 isLoading={isLoading}
+                isLoadingProviders={isLoadingProviders}
                 placeholder={hasProviders ? "Ask anything about your ads..." : "Connect a provider first"}
-                providers={providers}
+                providers={activeProviders}
                 isCentered
               >
                 {hasProviders && (
@@ -449,7 +533,7 @@ export function ChatContainer({
         </div>
       ) : (
         <>
-          <div className="flex-1 pb-20">
+          <div className="flex-1">
             <ChatMessages
               messages={messages}
               isLoading={isLoading}
@@ -458,16 +542,17 @@ export function ChatContainer({
             />
           </div>
 
-          <div className="sticky bottom-0 z-50 px-4 pt-16 pb-4">
-            {/* Gradient fade so text fades behind */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background from-40% via-background/80 via-70% to-transparent pointer-events-none" />
-            <div className="relative max-w-3xl mx-auto w-full">
+          <div className="sticky bottom-0 z-50 px-4 pt-12">
+            {/* Gradient fade so text fades behind - solid at bottom, fades up */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background from-55% via-background/80 via-75% to-transparent pointer-events-none" />
+            <div className="relative max-w-3xl mx-auto w-full pb-8">
               <ChatInput
                 onSend={handleSendMessage}
                 onStop={handleStop}
                 disabled={!hasProviders}
                 isLoading={isLoading}
-                providers={providers}
+                isLoadingProviders={isLoadingProviders}
+                providers={activeProviders}
               />
             </div>
           </div>

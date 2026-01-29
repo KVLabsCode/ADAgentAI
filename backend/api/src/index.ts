@@ -18,9 +18,10 @@ import agentRoutes from "./routes/agents";
 import accountRoutes from "./routes/account";
 import inviteLinksRoutes from "./routes/invite-links";
 import internalRoutes from "./routes/internal";
+import networksRoutes from "./routes/networks";
 import adminUsageRoutes from "./routes/admin/usage";
 import adminConversationsRoutes from "./routes/admin/conversations";
-import adminConfigRoutes from "./routes/admin/config";
+import adminStatsRoutes from "./routes/admin/stats";
 import testAuthRoutes from "./routes/test-auth";
 
 // Initialize observability (as early as possible)
@@ -119,6 +120,7 @@ api.get("/", (c) => {
 // Feature routes
 api.route("/chat", chatRoutes);
 api.route("/providers", providerRoutes);
+api.route("/networks", networksRoutes);
 api.route("/billing", billingRoutes);
 api.route("/blog", publicBlog);
 api.route("/admin/blog", adminBlog);
@@ -129,7 +131,7 @@ api.route("/invite-links", inviteLinksRoutes);
 api.route("/internal", internalRoutes);
 api.route("/admin/usage", adminUsageRoutes);
 api.route("/admin/conversations", adminConversationsRoutes);
-api.route("/admin/config", adminConfigRoutes);
+api.route("/admin/stats", adminStatsRoutes);
 
 // Test auth route (only enabled in CI/test environments)
 api.route("/test-auth", testAuthRoutes);

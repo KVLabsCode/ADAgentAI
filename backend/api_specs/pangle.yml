@@ -1,0 +1,318 @@
+openapi: 3.0.0
+info:
+  title: Pangle Global API 2.0
+  version: 2.0.0
+  description: The new Pangle 2.0 suite for App and Ad Slot management.
+servers:
+  - url: https://open-api.pangleglobal.com
+paths:
+  /union/media/open_api/site/query:
+    post:
+      summary: Query Applications
+      operationId: query_apps
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryAppsRequest'
+      responses:
+        '200':
+          description: OK
+  /union/media/open_api/site/create:
+    post:
+      summary: Create Application
+      operationId: create_app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /union/media/open_api/site/update:
+    post:
+      summary: Update Application
+      operationId: update_app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /union/media/open_api/code/query:
+    post:
+      summary: Query Ad Slots
+      operationId: query_ad_slots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryAdSlotsRequest'
+      responses:
+        '200':
+          description: OK
+  /union/media/open_api/code/create:
+    post:
+      summary: Create Ad Slot
+      operationId: create_ad_slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdSlotRequest'
+      responses:
+        '200':
+          description: OK
+  /union/media/open_api/code/update:
+    post:
+      summary: Update Ad Slot Settings
+      operationId: update_ad_slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdSlotRequest'
+      responses:
+        '200':
+          description: OK
+  /union/media/open/api/report/user:
+    get:
+      summary: User-Level Report (API v1)
+      operationId: report_user_v1
+      responses:
+        '200':
+          description: OK
+  /union/media/open/api/report/app:
+    get:
+      summary: App Report (API v1)
+      operationId: report_app_v1
+      responses:
+        '200':
+          description: OK
+  /union/media/open/api/report/slot:
+    get:
+      summary: Slot Report (API v1)
+      operationId: report_slot_v1
+      responses:
+        '200':
+          description: OK
+  /union_pangle/open/api/code/cpm:
+    post:
+      summary: Update Expected CPM
+      operationId: update_expected_cpm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCPMRequest'
+      responses:
+        '200':
+          description: OK
+  /union_pangle/open/api/rt/income:
+    get:
+      summary: Income Report (API 2.0)
+      operationId: get_income_report
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    QueryAppsRequest:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        app_ids:
+          type: array
+          items:
+            type: string
+          description: Filter by app IDs
+        status:
+          type: string
+          enum: [active, inactive, pending]
+
+    CreateAppRequest:
+      type: object
+      required: [app_name, platform, package_name]
+      properties:
+        app_name:
+          type: string
+          description: Application name
+          example: My Mobile Game
+        platform:
+          type: string
+          enum: [android, ios]
+          example: android
+        package_name:
+          type: string
+          description: Bundle ID or package name
+          example: com.example.game
+        store_url:
+          type: string
+          description: App store URL
+          example: https://play.google.com/store/apps/details?id=com.example.game
+        category:
+          type: string
+          description: App category
+          example: game
+        coppa:
+          type: boolean
+          description: COPPA compliance
+          default: false
+        download_url:
+          type: string
+          description: Direct download URL (if not in store)
+
+    UpdateAppRequest:
+      type: object
+      required: [app_id]
+      properties:
+        app_id:
+          type: string
+          description: App ID to update
+          example: "123456789"
+        app_name:
+          type: string
+        store_url:
+          type: string
+        category:
+          type: string
+        coppa:
+          type: boolean
+        status:
+          type: string
+          enum: [active, inactive]
+
+    QueryAdSlotsRequest:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        app_id:
+          type: string
+          description: Filter by app ID
+        slot_ids:
+          type: array
+          items:
+            type: string
+        ad_type:
+          type: string
+          enum: [rewarded_video, interstitial, banner, native, splash]
+
+    CreateAdSlotRequest:
+      type: object
+      required: [app_id, slot_name, ad_type]
+      properties:
+        app_id:
+          type: string
+          description: Parent app ID
+          example: "123456789"
+        slot_name:
+          type: string
+          description: Ad slot name
+          example: Main Rewarded
+        ad_type:
+          type: string
+          enum: [rewarded_video, interstitial, banner, native, splash]
+          example: rewarded_video
+        orientation:
+          type: string
+          enum: [portrait, landscape, both]
+          example: both
+        reward_name:
+          type: string
+          description: Reward currency name (for rewarded)
+          example: coins
+        reward_amount:
+          type: integer
+          description: Reward amount (for rewarded)
+          example: 100
+        video_muted:
+          type: boolean
+          description: Mute video by default
+          default: false
+        allow_skip:
+          type: boolean
+          description: Allow skipping ads
+          default: false
+        skip_time:
+          type: integer
+          description: Seconds before skip allowed
+          example: 5
+        expected_cpm:
+          type: object
+          additionalProperties:
+            type: number
+          description: CPM by country
+          example:
+            US: 5.00
+            GB: 3.00
+            ALL: 1.00
+
+    UpdateAdSlotRequest:
+      type: object
+      required: [slot_id]
+      properties:
+        slot_id:
+          type: string
+          description: Ad slot ID to update
+          example: "987654321"
+        slot_name:
+          type: string
+        orientation:
+          type: string
+          enum: [portrait, landscape, both]
+        reward_name:
+          type: string
+        reward_amount:
+          type: integer
+        video_muted:
+          type: boolean
+        allow_skip:
+          type: boolean
+        skip_time:
+          type: integer
+        expected_cpm:
+          type: object
+          additionalProperties:
+            type: number
+        status:
+          type: string
+          enum: [active, inactive]
+
+    UpdateCPMRequest:
+      type: object
+      required: [slot_id, expected_cpm]
+      properties:
+        slot_id:
+          type: string
+          description: Ad slot ID
+          example: "987654321"
+        expected_cpm:
+          type: object
+          additionalProperties:
+            type: number
+          description: CPM by country code (use ALL for default)
+          example:
+            US: 6.00
+            GB: 4.00
+            ALL: 2.00

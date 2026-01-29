@@ -10,15 +10,18 @@ function ScrollArea({
   children,
   style,
   viewportClassName,
-  type = "hover",
+  type = "auto",
   scrollHideDelay = 400,
+  maxHeight: maxHeightProp,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   style?: React.CSSProperties
   viewportClassName?: string
+  maxHeight?: string | number
 }) {
   // Extract maxHeight to apply to viewport for proper scroll behavior
-  const { maxHeight, ...restStyle } = style || {}
+  const { maxHeight: styleMaxHeight, ...restStyle } = style || {}
+  const maxHeight = maxHeightProp || styleMaxHeight
 
   return (
     <ScrollAreaPrimitive.Root
@@ -31,7 +34,7 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className={cn("!block w-full h-full rounded-[inherit]", viewportClassName)}
+        className={cn("!block w-full h-full rounded-[inherit] pr-3", viewportClassName)}
         style={maxHeight ? { maxHeight, overflowY: 'scroll' } : { overflowY: 'scroll' }}
       >
         {children}

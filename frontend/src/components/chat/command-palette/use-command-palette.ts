@@ -116,7 +116,7 @@ export function useCommandPalette({ providers, providerApps, onInsertMention }: 
 
   // Handle @ key press to open palette (inline mode)
   const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>, currentValue: string) => {
+    (e: React.KeyboardEvent<HTMLTextAreaElement>, _currentValue: string) => {
       // Open command palette when @ is pressed (anywhere in text)
       if (e.key === "@") {
         e.preventDefault()

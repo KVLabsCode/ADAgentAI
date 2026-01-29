@@ -1,4 +1,4 @@
-import { authApiHandler } from "@neondatabase/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next/server"
 
 // This creates all Neon Auth API endpoints:
 // - /api/auth/sign-in

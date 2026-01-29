@@ -15,7 +15,7 @@ cd frontend && bun run dev
 This runs concurrently:
 - Next.js frontend on http://localhost:3000
 - Hono API server on http://localhost:3001
-- Chat agent service on http://localhost:5000
+- Chat agent service on http://localhost:5001
 
 ### Individual Services
 ```bash
@@ -101,8 +101,8 @@ Frontend (SSE) → Chat Agent → LangGraph StateGraph → MCP Tools
   - `streaming/` - SSE events, stream state, main processor
   - `approval/` - Tool approval system (dangerous tools, human-in-loop)
   - `utils/` - Helpers (providers, text parsing)
-- `backend/admob_mcp/` - AdMob MCP server (FastMCP)
-- `backend/admanager_mcp/` - Google Ad Manager MCP server
+- **MCP Tools**: Unified server `backend/mcp_servers/server.py` (FastMCP) with 252 tools across 9 networks.
+- **Specs**: `backend/api_specs/` (OpenAPI 3.0 & Google Discovery).
 
 ### Authentication Flow
 - Google OAuth via Better Auth

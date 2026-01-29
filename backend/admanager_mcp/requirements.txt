@@ -1,8 +1,0 @@
-# Auto-generated with pipreqs, versions removed for latest
-httpx
-mcp
-pydantic
-python-dotenv
-
-# Optional: for service account auth
-google-auth

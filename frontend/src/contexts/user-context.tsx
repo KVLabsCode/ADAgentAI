@@ -197,6 +197,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       const response = await fetch(`${apiUrl}/api/waitlist/access/${encodeURIComponent(neonUser.email)}`)
+
+      if (!response.ok) {
+        // On error, allow access to prevent lockout
+        setHasWaitlistAccess(true)
+        setWaitlistAccessReason(null)
+        return
+      }
+
       const data = await response.json()
 
       if (data.hasAccess) {
@@ -254,6 +262,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch(`${apiUrl}/api/account/tos-status`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         })
+
+        if (!response.ok) {
+          // On error, assume accepted to prevent blocking
+          setHasAcceptedTos(true)
+          return
+        }
+
         const data = await response.json()
 
         setHasAcceptedTos(data.accepted === true)

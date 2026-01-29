@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { Polar } from "@polar-sh/sdk";
-import { eq, and, gte, sql, inArray } from "drizzle-orm";
+import { eq, and, gte, sql } from "drizzle-orm";
 
 import { requireAuth } from "../middleware/auth";
 import { trackSubscription } from "../lib/analytics";
 import { db } from "../db";
-import { chatSessions, messages } from "../db/schema";
+import { runSummaries } from "../db/schema";
 
 const billing = new Hono();
 
@@ -95,29 +95,23 @@ billing.get("/usage", async (c) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    // Count user messages this billing period
-    // First get all session IDs for this user
-    const userSessions = await db
-      .select({ id: chatSessions.id })
-      .from(chatSessions)
-      .where(eq(chatSessions.userId, user.id));
+    // Get token usage from run_summaries for this user this month
+    const tokenUsageResult = await db
+      .select({
+        queries: sql<number>`count(*)::int`,
+        toolCalls: sql<number>`COALESCE(SUM(tool_calls), 0)::int`,
+        totalTokens: sql<number>`COALESCE(SUM(total_tokens), 0)::int`,
+        totalCost: sql<number>`COALESCE(SUM(total_cost), 0)`,
+      })
+      .from(runSummaries)
+      .where(
+        and(
+          eq(runSummaries.userId, user.id),
+          gte(runSummaries.createdAt, startOfMonth)
+        )
+      );
 
-    let messageCount = 0;
-    if (userSessions.length > 0) {
-      const sessionIds = userSessions.map((s) => s.id);
-      // Count user role messages in these sessions created this month
-      const result = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(messages)
-        .where(
-          and(
-            inArray(messages.sessionId, sessionIds),
-            eq(messages.role, "user"),
-            gte(messages.createdAt, startOfMonth)
-          )
-        );
-      messageCount = result[0]?.count || 0;
-    }
+    const tokenUsage = tokenUsageResult[0] || { queries: 0, toolCalls: 0, totalTokens: 0, totalCost: 0 };
 
     // Check if user is admin (unlimited usage)
     const isAdmin = user.role === "admin";
@@ -140,19 +134,28 @@ billing.get("/usage", async (c) => {
       hasActiveSubscription = subscriptions.result.items.length > 0;
     }
 
-    // Determine limits: admin = unlimited, paid = unlimited, trial = 25
-    const chatLimit = isAdmin || hasActiveSubscription ? -1 : 25;
-    const providerLimit = isAdmin || hasActiveSubscription ? -1 : 10;
+    // Determine limits: admin = unlimited, paid = unlimited, trial = limited
+    const isPro = isAdmin || hasActiveSubscription;
+    const queryLimit = isPro ? -1 : 100;        // Free tier: 100 queries/month
+    const tokenLimit = isPro ? -1 : 500000;     // Free tier: 500K tokens/month
 
     return c.json({
-      chatMessages: messageCount,
-      providerQueries: 0, // TODO: Track provider queries separately
-      limit: {
-        chatMessages: chatLimit,
-        providerQueries: providerLimit,
+      // Current usage
+      queries: tokenUsage.queries,              // Number of user messages
+      toolCalls: tokenUsage.toolCalls,          // Number of MCP tools executed
+      tokens: tokenUsage.totalTokens,           // Total tokens used
+      cost: Number(tokenUsage.totalCost) || 0,  // Estimated cost in USD
+      // Limits (-1 = unlimited)
+      limits: {
+        queries: queryLimit,
+        tokens: tokenLimit,
       },
+      // Plan info
+      isPro,
       isAdmin,
-      resetDate: endOfMonth.toISOString(),
+      // Billing period
+      periodStart: startOfMonth.toISOString(),
+      periodEnd: endOfMonth.toISOString(),
     });
   } catch (error) {
     console.error("Error fetching usage:", error);
@@ -264,7 +267,7 @@ billing.get("/invoices", async (c) => {
     return c.json({
       invoices: orders.result.items.map((order) => ({
         id: order.id,
-        amount: order.amount,
+        amount: order.totalAmount,
         currency: order.currency,
         status: order.billingReason,
         createdAt: order.createdAt,

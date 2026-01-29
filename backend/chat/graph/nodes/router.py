@@ -2,6 +2,17 @@
 
 Uses a lightweight LLM call to classify user queries into service/capability pairs.
 This determines which specialist agent will handle the request.
+
+Supports 9 ad networks:
+- admob: Google AdMob (mediation, apps, ad units, reporting)
+- admanager: Google Ad Manager (orders, line items, inventory, reporting)
+- applovin: AppLovin MAX (mediation, reporting)
+- unity: Unity LevelPlay (mediation, ad units, reporting)
+- mintegral: Mintegral (campaigns, reporting)
+- liftoff: Liftoff (campaigns, ads, reporting)
+- inmobi: InMobi (placements, reporting)
+- pangle: Pangle (ads, reporting)
+- dtexchange: DT Exchange (placements, reporting)
 """
 
 from typing import Literal
@@ -12,19 +23,66 @@ from langsmith import traceable
 from ..state import GraphState
 from ...utils.prompts import get_router_prompt
 
-# Route map: category -> (service, capability)
-ROUTE_MAP = {
-    "general": ("general", "assistant"),
-    "admob_inventory": ("admob", "inventory"),
-    "admob_reporting": ("admob", "reporting"),
-    "admob_mediation": ("admob", "mediation"),
-    "admob_experimentation": ("admob", "experimentation"),
-    "admanager_inventory": ("admanager", "inventory"),
-    "admanager_reporting": ("admanager", "reporting"),
-    "admanager_orders": ("admanager", "orders"),
-    "admanager_deals": ("admanager", "deals"),
-    "admanager_targeting": ("admanager", "targeting"),
+# ============================================================================
+# Network and Capability Definitions
+# ============================================================================
+
+# All 9 supported ad networks
+SUPPORTED_NETWORKS = [
+    "admob",
+    "admanager",
+    "applovin",
+    "unity",
+    "mintegral",
+    "liftoff",
+    "inmobi",
+    "pangle",
+    "dtexchange",
+]
+
+# Capabilities vary by network based on their actual API capabilities
+NETWORK_CAPABILITIES: dict[str, list[str]] = {
+    "admob": ["inventory", "reporting", "mediation", "experimentation"],
+    "admanager": ["inventory", "reporting", "orders", "deals", "targeting"],
+    "applovin": ["inventory", "reporting", "mediation"],
+    "unity": ["inventory", "reporting", "mediation"],
+    "mintegral": ["inventory", "reporting"],
+    "liftoff": ["inventory", "reporting"],
+    "inmobi": ["inventory", "reporting"],
+    "pangle": ["inventory", "reporting"],
+    "dtexchange": ["inventory", "reporting"],
 }
+
+# ============================================================================
+# Dynamic Route Map Generation
+# ============================================================================
+
+
+def _build_route_map() -> dict[str, tuple[str, str]]:
+    """Build the route map dynamically from network/capability definitions.
+
+    Returns:
+        Dict mapping route keys to (network, capability) tuples
+    """
+    route_map: dict[str, tuple[str, str]] = {
+        "general": ("general", "assistant"),
+    }
+
+    # Generate routes for each network × capability combination
+    for network, capabilities in NETWORK_CAPABILITIES.items():
+        for capability in capabilities:
+            route_key = f"{network}_{capability}"
+            route_map[route_key] = (network, capability)
+
+    # Cross-network orchestration routes
+    route_map["orchestration_mediation"] = ("orchestration", "mediation")
+    route_map["orchestration_reporting"] = ("orchestration", "reporting")
+
+    return route_map
+
+
+# Build the route map at module load time
+ROUTE_MAP = _build_route_map()
 
 
 def _build_context_string(conversation_history: list[dict] | None) -> str:
@@ -43,13 +101,14 @@ def _build_context_string(conversation_history: list[dict] | None) -> str:
     return "\n".join(context_parts)
 
 
-def _parse_router_response(response_text: str) -> tuple[str, str, str]:
-    """Parse router LLM response to extract thinking and route.
+def _parse_router_response(response_text: str) -> tuple[str, str, str, str]:
+    """Parse router LLM response to extract thinking, route, and execution path.
 
-    Returns: (service, capability, thinking)
+    Returns: (service, capability, thinking, execution_path)
     """
     thinking = ""
     route = "general"
+    path = "workflow"  # Default to workflow (safer, uses more capable model)
 
     lines = response_text.strip().split("\n")
     for line in lines:
@@ -58,18 +117,25 @@ def _parse_router_response(response_text: str) -> tuple[str, str, str]:
             thinking = line[9:].strip()
         elif line.startswith("ROUTE:"):
             route = line[6:].strip().lower().replace('"', '').replace("'", "")
+        elif line.startswith("PATH:"):
+            path = line[5:].strip().lower()
+            if path not in ("reactive", "workflow"):
+                path = "workflow"  # Default to workflow for invalid values
 
     # Map route to service/capability
     if route in ROUTE_MAP:
         service, capability = ROUTE_MAP[route]
-        return service, capability, thinking
+        return service, capability, thinking, path
 
-    return "general", "assistant", thinking
+    return "general", "assistant", thinking, path
 
 
 @traceable(name="router_node", run_type="chain")
 async def router_node(state: GraphState) -> dict:
     """Classify the user query to determine routing.
+
+    Supports backflow: if specialist set needs_reroute, use that query instead.
+    This enables topic changes mid-conversation (e.g., "now show my GAM orders").
 
     Args:
         state: Current graph state with user_query
@@ -77,8 +143,16 @@ async def router_node(state: GraphState) -> dict:
     Returns:
         Updated state with routing result
     """
-    user_query = state.get("user_query", "")
+    # Check for backflow reroute (specialist sent us back with a new query)
+    reroute_query = state.get("needs_reroute")
+    is_backflow = reroute_query is not None
+
+    # Use reroute query if present, otherwise use original query
+    user_query = reroute_query if reroute_query else state.get("user_query", "")
     conversation_history = state.get("conversation_history")
+
+    if is_backflow:
+        print(f"[router] Backflow reroute with query: {user_query[:50]}...")
 
     # Build context string
     context_str = _build_context_string(conversation_history)
@@ -103,25 +177,55 @@ async def router_node(state: GraphState) -> dict:
         response = await router_llm.ainvoke(messages)
         response_text = response.content if hasattr(response, "content") else str(response)
 
-        service, capability, thinking = _parse_router_response(response_text)
+        service, capability, thinking, execution_path = _parse_router_response(response_text)
 
-        return {
+        # Extract token usage from router response
+        token_usage = {}
+        if hasattr(response, "response_metadata") and response.response_metadata:
+            usage = response.response_metadata.get("usage", {})
+            token_usage = {
+                "input_tokens": usage.get("input_tokens", 0),
+                "output_tokens": usage.get("output_tokens", 0),
+            }
+            print(f"[router] Token usage: {token_usage}")
+
+        print(f"[router] Classified: service={service}, capability={capability}, path={execution_path}")
+
+        result = {
             "routing": {
                 "service": service,
                 "capability": capability,
                 "thinking": thinking,
-            }
+                "execution_path": execution_path,
+            },
+            "router_token_usage": token_usage,
+            "router_model": "claude-3-5-haiku-20241022",
         }
+
+        # Clear backflow flags to prevent infinite loops
+        if is_backflow:
+            result["needs_reroute"] = None
+            result["backflow_reason"] = None
+            # Update user_query to the new query for downstream nodes
+            result["user_query"] = user_query
+
+        return result
 
     except Exception as e:
         print(f"[router] Error classifying query: {e}", flush=True)
-        return {
+        result = {
             "routing": {
                 "service": "general",
                 "capability": "assistant",
                 "thinking": f"Routing error: {str(e)}",
+                "execution_path": "workflow",  # Default to workflow on error
             }
         }
+        # Clear backflow flags even on error
+        if is_backflow:
+            result["needs_reroute"] = None
+            result["backflow_reason"] = None
+        return result
 
 
 def should_use_specialist(state: GraphState) -> Literal["specialist", "general"]:

@@ -75,11 +75,9 @@ export function ProviderListItem({
 
           {canManage && (
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="sr-only">Disconnect provider</span>
-                </Button>
+              <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" />}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="sr-only">Disconnect provider</span>
               </AlertDialogTrigger>
               <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
                 <AlertDialogHeader>

@@ -1,0 +1,244 @@
+openapi: 3.0.0
+info:
+  title: Liftoff Monetize (Vungle) API
+  version: 1.0.0
+  description: API for Liftoff Monetize Publisher Management and Performance Reporting.
+servers:
+  - url: https://publisher-api.vungle.com/api/v1
+  - url: https://auth-api.vungle.com
+paths:
+  /applications:
+    get:
+      summary: List Applications
+      operationId: list_applications
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Application
+      operationId: create_application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApplicationRequest'
+      responses:
+        '200':
+          description: OK
+  /applications/{id}:
+    get:
+      summary: Get Application
+      operationId: get_application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update Application
+      operationId: update_application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApplicationRequest'
+      responses:
+        '200':
+          description: OK
+  /placements:
+    get:
+      summary: List Placements
+      operationId: list_placements
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Placement
+      operationId: create_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /placements/{id}:
+    get:
+      summary: Get Placement
+      operationId: get_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Update Placement
+      operationId: update_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /reports/performance:
+    get:
+      summary: Publisher Performance Report
+      operationId: get_performance_report
+      responses:
+        '200':
+          description: OK
+  /auth:
+    post:
+      summary: Authenticate (Publisher API)
+      operationId: auth_publisher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    TargetingConfig:
+      type: object
+      properties:
+        countries:
+          type: array
+          items:
+            type: string
+          description: ISO country codes
+          example: [US, GB, CA]
+        includeCountries:
+          type: boolean
+          description: True to include, false to exclude
+          default: true
+
+    CreateApplicationRequest:
+      type: object
+      required: [name, platform, storeId]
+      properties:
+        name:
+          type: string
+          description: Application name
+          example: My Mobile Game
+        platform:
+          type: string
+          enum: [android, ios]
+          example: android
+        storeId:
+          type: string
+          description: Package name or bundle ID
+          example: com.example.game
+        isLive:
+          type: boolean
+          description: Is the app live in store
+          default: true
+        coppa:
+          type: boolean
+          description: COPPA compliance
+          default: false
+
+    UpdateApplicationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        isLive:
+          type: boolean
+        coppa:
+          type: boolean
+
+    CreatePlacementRequest:
+      type: object
+      required: [name, vungleAppId, placementType]
+      properties:
+        name:
+          type: string
+          description: Placement name
+          example: Rewarded Placement
+        vungleAppId:
+          type: string
+          description: Liftoff app ID
+          example: app123456
+        placementType:
+          type: string
+          enum: [rewarded, interstitial, banner, mrec, native]
+          example: rewarded
+        isHeaderBidding:
+          type: boolean
+          description: Enable in-app bidding
+          default: false
+        isFlatCpm:
+          type: boolean
+          description: Enable flat CPM pricing
+          default: false
+        flatCpmValue:
+          type: number
+          description: Flat CPM value (if enabled)
+          example: 5.00
+        adRefreshDuration:
+          type: integer
+          description: Banner refresh duration (0 for non-banner)
+          default: 0
+        isActive:
+          type: boolean
+          description: Placement status
+          default: true
+        targeting:
+          $ref: '#/components/schemas/TargetingConfig'
+
+    UpdatePlacementRequest:
+      type: object
+      properties:
+        placementId:
+          type: string
+          example: placement789
+        name:
+          type: string
+        isHeaderBidding:
+          type: boolean
+        isFlatCpm:
+          type: boolean
+        flatCpmValue:
+          type: number
+        adRefreshDuration:
+          type: integer
+        isActive:
+          type: boolean
+        targeting:
+          $ref: '#/components/schemas/TargetingConfig'
+
+    AuthRequest:
+      type: object
+      required: [api_key]
+      properties:
+        api_key:
+          type: string
+          description: Publisher API key

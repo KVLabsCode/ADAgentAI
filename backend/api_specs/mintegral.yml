@@ -1,0 +1,474 @@
+openapi: 3.0.0
+info:
+  title: Mintegral Publisher API
+  version: 2.0.0
+  description: API for Mintegral App management and Async Reporting V2.
+servers:
+  - url: https://dev.mintegral.com
+  - url: https://api.mintegral.com
+paths:
+  /app/open_api_create:
+    post:
+      summary: Create Application (Media)
+      operationId: create_app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /app/open_api_edit:
+    post:
+      summary: Edit Application (Media)
+      operationId: update_app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /v2/app/open_api_list:
+    get:
+      summary: List Applications (Media)
+      operationId: list_apps
+      responses:
+        '200':
+          description: OK
+  /v2/placement/open_api_create:
+    post:
+      summary: Create Ad Placement
+      operationId: create_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /v2/placement/open_api_edit:
+    post:
+      summary: Edit Ad Placement
+      operationId: update_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /v2/placement/open_api_delete:
+    post:
+      summary: Delete Ad Placement
+      operationId: delete_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeletePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /v2/placement/open_api_list:
+    get:
+      summary: List Ad Placements
+      operationId: list_placements
+      responses:
+        '200':
+          description: OK
+  /v2/unit/open_api_create:
+    post:
+      summary: Create Ad Unit
+      operationId: create_ad_unit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdUnitRequest'
+      responses:
+        '200':
+          description: OK
+  /v2/unit/open_api_edit:
+    post:
+      summary: Edit Ad Unit
+      operationId: update_ad_unit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdUnitRequest'
+      responses:
+        '200':
+          description: OK
+  /unit/open_api_delete:
+    post:
+      summary: Delete Ad Unit
+      operationId: delete_ad_unit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAdUnitRequest'
+      responses:
+        '200':
+          description: OK
+  /v2/unit/open_api_list:
+    get:
+      summary: List Ad Units
+      operationId: list_ad_units
+      responses:
+        '200':
+          description: OK
+  /reporting/v2/data:
+    post:
+      summary: Performance Reporting API (v2)
+      operationId: get_performance_report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    AuthFields:
+      type: object
+      required: [skey, time, sign]
+      properties:
+        skey:
+          type: string
+          description: Secret key from API Tools
+          example: your_skey_here
+        time:
+          type: string
+          description: Unix timestamp
+          example: "1706180400"
+        sign:
+          type: string
+          description: MD5 signature (md5(SECRET + md5(time)))
+          example: md5_signature_here
+
+    CreateAppRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [app_name, os, package, is_live_in_store, coppa]
+          properties:
+            app_name:
+              type: string
+              description: Application name
+              example: My Mobile Game
+            os:
+              type: string
+              enum: [ANDROID, IOS]
+              example: ANDROID
+            package:
+              type: string
+              description: Package name or bundle ID
+              example: com.example.game
+            is_live_in_store:
+              type: integer
+              enum: [0, 1]
+              description: 1 if live in store
+              example: 1
+            store_url:
+              type: string
+              description: Required if is_live_in_store=1
+              example: https://play.google.com/store/apps/details?id=com.example.game
+            coppa:
+              type: integer
+              enum: [0, 1]
+              description: COPPA compliance
+              example: 0
+            campaign_black_rule:
+              type: integer
+              description: Blacklist rule (default 2)
+              default: 2
+            black_category:
+              type: string
+              description: Comma-separated blocked category IDs
+            black_packagename:
+              type: string
+              description: Comma-separated blocked package names
+            auto_storekit:
+              type: integer
+              enum: [0, 1]
+              description: Auto StoreKit rendering
+              default: 1
+            mediation_platform:
+              type: integer
+              description: Mediation platform ID (0 for direct)
+              default: 0
+            video_orientation:
+              type: string
+              enum: [portrait, landscape, both]
+              example: both
+            store:
+              type: string
+              enum: [google_play, app_store, amazon, other]
+              example: google_play
+
+    UpdateAppRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [app_id]
+          properties:
+            app_id:
+              type: integer
+              description: App ID to update
+              example: 12345
+            app_name:
+              type: string
+            package:
+              type: string
+            is_live_in_store:
+              type: integer
+              enum: [0, 1]
+            store_url:
+              type: string
+            coppa:
+              type: integer
+              enum: [0, 1]
+            campaign_black_rule:
+              type: integer
+            black_category:
+              type: string
+            black_packagename:
+              type: string
+            auto_storekit:
+              type: integer
+            mediation_platform:
+              type: integer
+            video_orientation:
+              type: string
+            store:
+              type: string
+
+    CreatePlacementRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [app_id, placement_name, ad_type, integrate_type]
+          properties:
+            app_id:
+              type: integer
+              description: Parent app ID
+              example: 12345
+            placement_name:
+              type: string
+              description: Placement name
+              example: Rewarded Video
+            ad_type:
+              type: string
+              enum: [rewarded_video, new_interstitial, native, static_interstitial, banner, automatic_rendering_native, splash_ad]
+              example: rewarded_video
+            integrate_type:
+              type: string
+              enum: [sdk]
+              default: sdk
+            content_type:
+              type: string
+              enum: [image, video, both]
+              example: video
+            video_orientation:
+              type: string
+              enum: [portrait, landscape, both]
+              example: both
+            show_close_button:
+              type: integer
+              enum: [0, 1]
+              description: Show close button
+              example: 1
+            auto_fresh:
+              type: integer
+              enum: [0, 1]
+              description: Auto refresh for banner
+              default: 0
+            ad_space_type:
+              type: integer
+              enum: [1, 2]
+              description: Ad space type
+            unit_names:
+              type: string
+              description: Comma-separated unit names (one of unit_names or hb_unit_name required)
+              example: rv_unit_1,rv_unit_2
+            hb_unit_name:
+              type: string
+              description: Header bidding unit name (one of unit_names or hb_unit_name required)
+            skip_time:
+              type: integer
+              description: Skip time in seconds (-1 for no skip, 0-30)
+              example: 5
+
+    UpdatePlacementRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [app_id, placement_id]
+          properties:
+            app_id:
+              type: integer
+              example: 12345
+            placement_id:
+              type: integer
+              description: Placement ID to update
+              example: 67890
+            placement_name:
+              type: string
+            content_type:
+              type: string
+              enum: [image, video, both]
+            video_orientation:
+              type: string
+              enum: [portrait, landscape, both]
+            show_close_button:
+              type: integer
+              enum: [0, 1]
+            auto_fresh:
+              type: integer
+              enum: [0, 1]
+            ad_space_type:
+              type: integer
+              enum: [1, 2]
+            skip_time:
+              type: integer
+
+    DeletePlacementRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [placement_ids]
+          properties:
+            placement_ids:
+              type: string
+              description: Comma-separated placement IDs to delete
+              example: "67890,67891"
+
+    TargetECPM:
+      type: object
+      additionalProperties:
+        type: number
+      description: Target eCPM by country code (use ALL for default)
+      example:
+        US: 5.00
+        GB: 3.00
+        ALL: 1.00
+
+    CreateAdUnitRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [app_id, placement_id, unit_name]
+          properties:
+            app_id:
+              type: integer
+              example: 12345
+            placement_id:
+              type: integer
+              description: Parent placement ID
+              example: 67890
+            bidding_type:
+              type: integer
+              enum: [0, 1]
+              description: 0 for waterfall, 1 for bidding
+              default: 0
+            unit_name:
+              type: string
+              description: Ad unit name
+              example: Bidding Unit
+            target_ecpm:
+              $ref: '#/components/schemas/TargetECPM'
+
+    UpdateAdUnitRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [app_id, placement_id, unit_id]
+          properties:
+            app_id:
+              type: integer
+              example: 12345
+            placement_id:
+              type: integer
+              example: 67890
+            unit_id:
+              type: integer
+              description: Ad unit ID to update
+              example: 11111
+            unit_name:
+              type: string
+            target_ecpm:
+              $ref: '#/components/schemas/TargetECPM'
+            clear_target_ecpm:
+              type: integer
+              enum: [0, 1]
+              description: Set to 1 to clear target eCPM
+
+    DeleteAdUnitRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [unit_ids]
+          properties:
+            unit_ids:
+              type: string
+              description: Comma-separated unit IDs to delete
+              example: "11111,22222"
+
+    ReportRequest:
+      allOf:
+        - $ref: '#/components/schemas/AuthFields'
+        - type: object
+          required: [start_date, end_date]
+          properties:
+            start_date:
+              type: string
+              format: date
+              example: "2026-01-01"
+            end_date:
+              type: string
+              format: date
+              example: "2026-01-31"
+            app_ids:
+              type: array
+              items:
+                type: integer
+              description: Filter by app IDs
+            placement_ids:
+              type: array
+              items:
+                type: integer
+              description: Filter by placement IDs
+            unit_ids:
+              type: array
+              items:
+                type: integer
+              description: Filter by unit IDs
+            group_by:
+              type: array
+              items:
+                type: string
+                enum: [date, app, placement, unit, country]
+              example: [date, app]
+            timezone:
+              type: string
+              description: Timezone for reporting
+              example: UTC

@@ -48,7 +48,7 @@ export const useChatSettings = create<ChatSettingsState>()(
   persist(
     (set, get) => ({
       displayMode: "compact",
-      selectedModel: "deepseek/deepseek-v3.2",
+      selectedModel: "auto",  // Auto-select model based on query complexity
       responseStyle: "concise",
       contextMode: "soft", // Default to soft mode (more flexible)
       jsonViewMode: "tree", // Default to tree view for better readability
@@ -104,31 +104,7 @@ export const useChatSettings = create<ChatSettingsState>()(
   )
 )
 
-// Available models grouped by provider
-export const AVAILABLE_MODELS = [
-  {
-    provider: "Anthropic",
-    models: [
-      { id: "anthropic/claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Fast and capable" },
-    ],
-  },
-  {
-    provider: "Google",
-    models: [
-      { id: "openrouter/google/gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Fast and cost-effective" },
-      { id: "openrouter/google/gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Latest free Gemini model" },
-    ],
-  },
-  {
-    provider: "OpenAI",
-    models: [
-      { id: "openrouter/openai/gpt-5-mini", name: "GPT-5 Mini", description: "Compact and efficient" },
-    ],
-  },
-  {
-    provider: "DeepSeek",
-    models: [
-      { id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2", description: "DeepSeek's latest model" },
-    ],
-  },
-]
+// Model selection is now automatic based on query complexity:
+// - Reactive (simple queries) → Claude Haiku (fast, cost-effective)
+// - Workflow (complex queries) → Claude Sonnet (capable, with extended thinking)
+// The backend handles model selection via execution_path from the router.

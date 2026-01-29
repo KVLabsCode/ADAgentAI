@@ -129,7 +129,7 @@ export function CurrencyWidget(props: WidgetProps) {
           className={cn(
             "flex h-7 w-full rounded border px-2 py-1 text-xs",
             "pl-9", // Space for dollar symbol
-            "bg-transparent dark:bg-input/30 border-input",
+            "bg-[var(--input-bg)] border-[var(--input-border)]",
             "text-foreground placeholder:text-muted-foreground",
             "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
             "disabled:cursor-not-allowed disabled:opacity-50",
@@ -147,7 +147,7 @@ export function CurrencyWidget(props: WidgetProps) {
           disabled={isDisabled}
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-l border border-r-0",
-            "bg-muted/30 hover:bg-muted/50 border-input transition-colors",
+            "bg-muted/30 hover:bg-[var(--input-bg)] border-[var(--input-border)] transition-colors",
             "text-muted-foreground hover:text-foreground",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
@@ -161,7 +161,7 @@ export function CurrencyWidget(props: WidgetProps) {
           disabled={isDisabled}
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-r border",
-            "bg-muted/30 hover:bg-muted/50 border-input transition-colors",
+            "bg-muted/30 hover:bg-[var(--input-bg)] border-[var(--input-border)] transition-colors",
             "text-muted-foreground hover:text-foreground",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}

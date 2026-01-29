@@ -1,3 +1,47 @@
+// Network types for API-key based ad networks
+export type NetworkName =
+  | "applovin"
+  | "unity"
+  | "liftoff"
+  | "inmobi"
+  | "mintegral"
+  | "pangle"
+  | "dtexchange"
+
+export interface NetworkConfigField {
+  key: string
+  label: string
+  type: "text" | "password"
+  required: boolean
+  placeholder?: string
+  helpText?: string
+  helpUrl?: string
+}
+
+export interface NetworkConfig {
+  name: NetworkName
+  displayName: string
+  description?: string
+  docsUrl?: string
+  fields: NetworkConfigField[]
+}
+
+export interface NetworkCredential {
+  id: string
+  networkName: NetworkName
+  displayName: string
+  isEnabled: boolean
+  connectedAt: string
+}
+
+// Action required types (for prompting user to connect provider, etc.)
+export type ActionRequiredType =
+  | "connect_provider"
+  | "upgrade_plan"
+  | "verify_email"
+  | "grant_permissions"
+  | "reauthenticate"
+
 // JSON Schema types for parameter editing
 export interface SchemaProperty {
   type: "string" | "number" | "integer" | "boolean" | "array"
@@ -42,15 +86,18 @@ export interface RJSFSchema {
 
 // Sequential event types for streaming
 export type StreamEventItem =
-  | { type: "routing"; service: string; capability: string; thinking?: string }
+  | { type: "routing"; service: string; capability: string; thinking?: string; execution_path?: string; model_selected?: string }
   | { type: "thinking"; content: string }
   | { type: "content"; content: string }  // Intermediate content (before/between tools)
   | { type: "result"; content: string }    // Final answer (after all tools complete)
   | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean }
-  | { type: "tool_executing"; tool_name: string; message: string }  // Tool execution started (progress UI)
+  | { type: "tool_executing"; tool_name: string; message: string }  // Tool execution started (shows spinner)
   | { type: "tool_result"; name: string; result: unknown }
   | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: RJSFSchema }
   | { type: "tool_denied"; tool_name: string; reason: string }
+  | { type: "tool_cancelled"; tool_name: string; approval_id: string }
+  | { type: "action_required"; action_type: ActionRequiredType; message: string; deep_link?: string; blocking: boolean; metadata?: Record<string, unknown> }
+  | { type: "finished"; message?: string }
 
 export interface Message {
   id: string
@@ -90,6 +137,7 @@ export interface Provider {
     networkCode?: string // GAM
     accountName?: string // GAM
   }
+  isEnabled?: boolean // Whether provider is enabled for context
 }
 
 export interface ProviderApp {

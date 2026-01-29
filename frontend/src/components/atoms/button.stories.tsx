@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { Button } from "./button";
 import { Spinner } from "./spinner";
 import { Mail, ChevronRight } from "lucide-react";
@@ -22,9 +22,9 @@ const meta: Meta<typeof Button> = {
       control: "boolean",
       description: "Disable the button",
     },
-    asChild: {
-      control: "boolean",
-      description: "Render as child element (slot pattern)",
+    render: {
+      control: false,
+      description: "Custom element to render as (render prop pattern)",
     },
   },
   parameters: {

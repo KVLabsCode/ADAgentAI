@@ -151,13 +151,16 @@ export function ContactAutocomplete({
   return (
     <div className={cn("space-y-1", className)}>
       <Popover open={open && contacts.length > 0} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <div
-            className={cn(
-              "flex items-center h-9 rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 overflow-hidden",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-          >
+        <PopoverTrigger
+          render={
+            <div
+              className={cn(
+                "flex items-center h-9 rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 overflow-hidden",
+                disabled && "opacity-50 cursor-not-allowed"
+              )}
+            />
+          }
+        >
             {/* Google icon or selected contact avatar */}
             <div className="flex items-center justify-center h-full px-2.5 border-r border-input bg-muted/30 shrink-0">
               {selectedContact?.photo ? (
@@ -205,12 +208,10 @@ export function ContactAutocomplete({
             <div className="flex items-center h-full px-3 text-sm text-muted-foreground shrink-0 min-w-[100px]">
               gmail.com
             </div>
-          </div>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] p-0"
+          className="w-[var(--anchor-width)] p-0"
           align="start"
-          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Command shouldFilter={false}>
             <CommandList>

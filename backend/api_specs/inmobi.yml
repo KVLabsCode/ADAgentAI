@@ -1,0 +1,280 @@
+openapi: 3.0.0
+info:
+  title: InMobi Unified API
+  version: 3.0.0
+  description: Professional suite for InMobi Inventory and Reporting.
+servers:
+  - url: https://publisher.inmobi.com
+  - url: https://api.inmobi.com
+paths:
+  /rest/api/v2/apps:
+    get:
+      summary: List Apps
+      operationId: list_apps
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create App
+      operationId: create_app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /rest/api/v2/apps/{id}:
+    get:
+      summary: Get App Details
+      operationId: get_app
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Update App
+      operationId: update_app
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAppRequest'
+      responses:
+        '200':
+          description: OK
+  /rest/api/v1/placements:
+    get:
+      summary: List Placements
+      operationId: list_placements
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create Placement
+      operationId: create_placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /rest/api/v1/placements/{id}:
+    get:
+      summary: Get Placement Details
+      operationId: get_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Update Placement
+      operationId: update_placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlacementRequest'
+      responses:
+        '200':
+          description: OK
+  /v3/reporting/publisher:
+    post:
+      summary: Generate Advanced Publisher Report
+      operationId: generate_report_v3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '200':
+          description: OK
+  /v3.0/reporting/publisher:
+    post:
+      summary: Generate Advanced Publisher Report (v3.0)
+      operationId: generate_report_v3_0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '200':
+          description: OK
+  /v1.0/generatesession/generate:
+    get:
+      summary: Generate Session
+      operationId: generate_session_v1
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    CreateAppRequest:
+      type: object
+      required: [name, platform, storeUrl]
+      properties:
+        name:
+          type: string
+          description: Application name
+          example: My Mobile Game
+        platform:
+          type: string
+          enum: [android, ios]
+          example: android
+        storeUrl:
+          type: string
+          description: App store URL
+          example: https://play.google.com/store/apps/details?id=com.example.game
+        bundleId:
+          type: string
+          description: Package name or bundle ID
+          example: com.example.game
+        category:
+          type: string
+          description: App category
+          example: Games
+        coppa:
+          type: boolean
+          description: COPPA compliance
+          default: false
+
+    UpdateAppRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        storeUrl:
+          type: string
+        category:
+          type: string
+        coppa:
+          type: boolean
+        status:
+          type: string
+          enum: [active, inactive]
+
+    CreatePlacementRequest:
+      type: object
+      required: [appId, name, adType]
+      properties:
+        appId:
+          type: string
+          description: Parent app ID
+          example: "123456789"
+        name:
+          type: string
+          description: Placement name
+          example: Interstitial Main
+        adType:
+          type: string
+          enum: [banner, interstitial, rewarded, native]
+          example: interstitial
+        bannerSize:
+          type: string
+          enum: [320x50, 300x250, 728x90]
+          description: Banner size (required for banner type)
+        rewardName:
+          type: string
+          description: Reward currency name (for rewarded)
+          example: coins
+        rewardAmount:
+          type: integer
+          description: Reward amount (for rewarded)
+          example: 100
+        bidFloor:
+          type: number
+          description: Minimum CPM floor
+          example: 0.5
+
+    UpdatePlacementRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        bidFloor:
+          type: number
+        rewardName:
+          type: string
+        rewardAmount:
+          type: integer
+        status:
+          type: string
+          enum: [active, inactive]
+
+    ReportRequest:
+      type: object
+      required: [startDate, endDate, metrics]
+      properties:
+        startDate:
+          type: string
+          format: date
+          description: Report start date
+          example: "2026-01-01"
+        endDate:
+          type: string
+          format: date
+          description: Report end date
+          example: "2026-01-31"
+        metrics:
+          type: array
+          items:
+            type: string
+            enum: [impressions, clicks, revenue, ecpm, fillRate]
+          description: Metrics to include
+          example: [impressions, revenue, ecpm]
+        dimensions:
+          type: array
+          items:
+            type: string
+            enum: [date, app, placement, country, adType]
+          description: Grouping dimensions
+          example: [date, app]
+        filters:
+          type: object
+          properties:
+            appIds:
+              type: array
+              items:
+                type: string
+            placementIds:
+              type: array
+              items:
+                type: string
+            countries:
+              type: array
+              items:
+                type: string
+        timeGranularity:
+          type: string
+          enum: [hourly, daily, weekly, monthly]
+          default: daily

@@ -17,6 +17,8 @@ import { StatCard, type StatCardProps } from "@/molecules/stat-card"
 // - Description: 12px, weight 450, color muted
 // - Item: padding 12px 16px, min-height 60px, gap 12px
 // - Card: background lch(8.3), border 0.8px solid lch(19.66), border-radius 7px
+// Design tokens mapped to CSS variables
+// Responsive values (--item-padding-x etc.) change at 640px breakpoint via media query
 const TOKENS = {
   // Cards - Linear-style section card wrapper (wraps the ul)
   // VERIFIED: background lch(8.3), border 0.8px solid lch(19.66), border-radius 7px
@@ -25,13 +27,14 @@ const TOKENS = {
   cardHeaderBorder: "border-b border-[color:var(--card-header-border)]",
   // Inset dividers - Linear uses ::after pseudo with left/right: 16px for the "cut" effect
   itemDivider: "divide-inset",
-  // Page layout - VERIFIED: 32px title-to-section, 48px section gap
+  // Page layout - now handled by PageContainer and SettingsSection
   pagePadding: "px-[var(--page-padding)]",
   pageTopGap: "pt-[var(--page-top-gap)]",
   sectionGap: "gap-[var(--section-gap)]",
   titleToSection: "mb-[var(--title-to-section)]",
   sectionHeaderMb: "mb-[var(--section-header-mb)]",
-  // Item/Row - VERIFIED: padding 12px 16px, min-height 60px, gap 12px, border-radius 6px
+  // Item/Row - VERIFIED: padding responsive (16px desktop → 10.67px mobile)
+  // Uses CSS variable that changes at 640px breakpoint
   itemPadding: "px-[var(--item-padding-x)] py-[var(--item-padding-y)]",
   itemMinHeight: "min-h-[var(--item-min-height)]",
   itemGap: "gap-[var(--item-gap)]",
@@ -58,19 +61,42 @@ const PAGE_SIZES = {
   full: "max-w-full",
 } as const
 
+/**
+ * PageContainer - Linear-style page layout with centered content
+ *
+ * Structure (matches Linear):
+ * - Outer wrapper: full width, horizontal padding for safe edges
+ * - Inner wrapper: flex column, align-items center
+ * - Content: max-width constrained
+ *
+ * Responsive behavior (from Linear extraction 2026-01-28):
+ * - Desktop: padding 0 40px, bottom margin 64px
+ * - Mobile (≤640px): padding 0 22px, bottom margin 32px
+ */
 function PageContainer({ children, size = "default", className }: PageContainerProps) {
   return (
+    // Outer wrapper - padding creates safe edges, won't cut off content
     <div
       className={cn(
-        "flex flex-col w-full mx-auto pb-16",
-        TOKENS.pagePadding,
-        TOKENS.pageTopGap,
-        TOKENS.sectionGap,
-        PAGE_SIZES[size],
+        "w-full",
+        "px-[var(--page-padding)]",
+        "pt-16", // Top spacing (was --page-top-gap)
+        "pb-[var(--page-bottom-gap)]",
         className
       )}
     >
-      {children}
+      {/* Centering wrapper - centers the max-width content */}
+      <div className="flex flex-col items-center w-full">
+        {/* Content container - max-width constrained */}
+        <div
+          className={cn(
+            "flex flex-col w-full",
+            PAGE_SIZES[size]
+          )}
+        >
+          {children}
+        </div>
+      </div>
     </div>
   )
 }
@@ -85,9 +111,19 @@ interface PageHeaderProps {
   className?: string
 }
 
+/**
+ * PageHeader - Linear-style page title and description
+ *
+ * Spacing (from Linear extraction 2026-01-28):
+ * - margin-bottom: 32px (title to first section)
+ */
 function PageHeader({ title, description, children, className }: PageHeaderProps) {
   return (
-    <div className={cn("flex items-center justify-between", className)}>
+    <div className={cn(
+      "flex items-center justify-between",
+      "mb-[var(--title-to-section)]", // 32px gap to first section
+      className
+    )}>
       <div className="space-y-1">
         {/* VERIFIED: Linear page title = 24px, weight 500, line-height 32px */}
         <h1 className="text-[length:var(--text-page-title)] leading-[var(--line-height-title)] font-[var(--font-weight-medium)] tracking-tight">{title}</h1>
@@ -112,9 +148,17 @@ interface SettingsSectionProps {
   bare?: boolean
 }
 
+/**
+ * SettingsSection - Linear-style section with header and card
+ *
+ * Responsive behavior (from Linear extraction 2026-01-28):
+ * - Desktop: margin-bottom 64px between sections
+ * - Mobile (≤640px): margin-bottom 32px between sections
+ */
 function SettingsSection({ title, children, className, bare = false }: SettingsSectionProps) {
   return (
-    <div className={className}>
+    // margin-bottom creates section gaps (Linear uses margin, not flex gap)
+    <div className={cn("mb-[var(--section-gap)]", className)}>
       {/* Linear h3 = 15px, weight 450 - using 500 for Geist to match Inter's visual weight */}
       <h3 className={cn(
         "text-[length:var(--text-section-title)] leading-[var(--line-height-section)] font-[var(--font-weight-section)] text-foreground",

@@ -135,8 +135,10 @@ export function useBilling() {
     fetchBillingData()
   }, [fetchBillingData])
 
-  const isPro = !!(subscription?.hasSubscription && subscription.status === 'active')
-  const usagePercent = usage ? Math.min((usage.chatMessages / (usage.limit.chatMessages || 1)) * 100, 100) : 0
+  const isPro = !!(subscription?.hasSubscription && subscription.status === 'active') || usage?.isPro || false
+  const usagePercent = usage && usage.limits.queries > 0
+    ? Math.min((usage.queries / usage.limits.queries) * 100, 100)
+    : 0
 
   return {
     // Data

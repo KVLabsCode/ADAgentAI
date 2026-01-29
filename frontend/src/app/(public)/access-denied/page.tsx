@@ -24,9 +24,7 @@ export default function AccessDeniedPage() {
                   onSuccess={recheckWaitlistAccess}
                 />
               ) : (
-                <Button asChild>
-                  <Link href="/">Join Waitlist</Link>
-                </Button>
+                <Button render={<Link href="/" />}>Join Waitlist</Button>
               )}
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign out
@@ -37,15 +35,13 @@ export default function AccessDeniedPage() {
       case "pending_approval":
         return {
           icon: <Clock className="h-12 w-12 text-amber-500" />,
-          title: "You’re on the waitlist",
+          title: "You're on the waitlist",
           description: "Thank you for your interest in our product. We will get in touch with you as soon as possible.",
           action: (
             <div className="flex flex-col gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Home
-                </Link>
+              <Button variant="outline" render={<Link href="/" />}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Home
               </Button>
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign out
@@ -60,11 +56,9 @@ export default function AccessDeniedPage() {
           description: "Unfortunately, your access request was not approved. If you think this is a mistake, please contact support.",
           action: (
             <div className="flex flex-col gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Home
-                </Link>
+              <Button variant="outline" render={<Link href="/" />}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Home
               </Button>
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign out
@@ -85,9 +79,7 @@ export default function AccessDeniedPage() {
                   onSuccess={recheckWaitlistAccess}
                 />
               ) : (
-                <Button asChild>
-                  <Link href="/">Join Waitlist</Link>
-                </Button>
+                <Button render={<Link href="/" />}>Join Waitlist</Button>
               )}
               <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign out

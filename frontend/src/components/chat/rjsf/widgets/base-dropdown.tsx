@@ -168,7 +168,7 @@ export function BaseDropdown({
         disabled={isDisabled}
         className={cn(
           "flex h-7 w-full items-center justify-between rounded border px-2 py-1 text-xs",
-          "bg-transparent dark:bg-input/30 border-input",
+          "bg-[var(--input-bg)] border-[var(--input-border)]",
           "text-foreground",
           "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
           "disabled:cursor-not-allowed disabled:opacity-50",
@@ -217,7 +217,7 @@ export function FallbackInput({
       placeholder={placeholder}
       className={cn(
         "flex h-7 w-full rounded border px-2 py-1 text-xs",
-        "bg-transparent dark:bg-input/30 border-input",
+        "bg-[var(--input-bg)] border-[var(--input-border)]",
         "text-foreground placeholder:text-muted-foreground",
         "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
       )}
@@ -232,7 +232,7 @@ export function DependencyMessage({ parentLabel }: { parentLabel: string }) {
   return (
     <div className={cn(
       "flex h-7 w-full items-center rounded border px-2 text-xs",
-      "bg-transparent dark:bg-input/30 border-input text-muted-foreground"
+      "bg-[var(--input-bg)] border-[var(--input-border)] text-muted-foreground"
     )}>
       Select {parentLabel} first
     </div>

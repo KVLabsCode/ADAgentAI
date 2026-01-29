@@ -10,8 +10,8 @@
   --color-background: var(--background);
   --color-background-marketing: var(--background-marketing, var(--background));
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-mono);
 
   /* Design system tokens as Tailwind utilities */
   --color-card-section: var(--card-bg);
@@ -96,23 +96,26 @@
      Source: linear_reverse/tokens.json, linear_reverse/authenticated/PATTERNS.md
      ========================================================================== */
 
-  /* Page Layout - Visual match to Linear */
-  --page-padding: 56px;            /* Linear: ~53-58px content offset from main edge */
-  --page-padding-md: 56px;         /* Linear: same horizontal padding on all sizes */
-  --page-top-gap: 64px;            /* VERIFIED: Linear uses 64px from content area top to title */
-  /* Page max-widths include padding (56px each side) so content matches Linear */
-  /* Content width = max-width - (2 * page-padding) */
-  --page-max-width-sm: 592px;      /* 480px content + 112px padding */
-  --page-max-width-default: 752px; /* 640px content + 112px padding (Linear: contentMax 640px) */
-  --page-max-width-lg: 912px;      /* 800px content + 112px padding */
-  --page-max-width-xl: 1136px;     /* 1024px content + 112px padding */
+  /* Page Layout - VERIFIED from Linear browser extraction 2026-01-28 */
+  /* Linear uses centered flex container with margin, not padding */
+  --page-padding: 40px;            /* Linear: margin 0 40px 64px on desktop */
+  --page-padding-mobile: 22px;     /* Linear: margin 0 22px 32px on mobile */
+  --page-top-gap: 0px;             /* Linear: no top padding, scroll container handles it */
+  --page-bottom-gap: 72px;         /* Linear shows ~86px after last content */
+  --page-bottom-gap-mobile: 32px;  /* Linear: 32px bottom margin mobile */
+  /* Page max-widths - Linear uses 640px content max-width */
+  --page-max-width-sm: 592px;      /* 480px content + margins */
+  --page-max-width-default: 640px; /* Linear: exact 640px content max-width */
+  --page-max-width-lg: 912px;      /* 800px content + margins */
+  --page-max-width-xl: 1136px;     /* 1024px content + margins */
   /* Explicit content max-width for cards - VERIFIED: Linear cards are exactly 640px */
   --content-max-width: 640px;
 
-  /* Section Spacing - VERIFIED from Linear browser extraction 2026-01-21 */
-  --title-to-section: 32px;        /* Ground truth: 32px from title bottom to first section */
-  --section-gap: 32px;             /* Gap between sections - reduced from 48px for tighter layout */
-  --section-header-mb: 17px;       /* Ground truth: ~17px from h3 to ul */
+  /* Section Spacing - VERIFIED from Linear browser extraction 2026-01-28 */
+  --title-to-section: 32px;        /* Ground truth: 32px from title to first section */
+  --section-gap: 64px;             /* Linear: margin-bottom 64px on sections (desktop) */
+  --section-gap-mobile: 32px;      /* Linear: margin-bottom 32px on sections (mobile) */
+  --section-header-mb: 17px;       /* Ground truth: ~17px from h3 to content */
 
   /* Card Tokens - Linear-style */
   --card-radius: 8px;
@@ -120,8 +123,9 @@
   --card-bg: oklch(1 0 0 / 50%);
   --card-header-border: oklch(0.92 0.004 286.32 / 30%);
 
-  /* Item/Field Tokens - VERIFIED from Linear browser extraction */
-  --item-padding-x: 16px;          /* Ground truth: padding 12px 16px */
+  /* Item/Field Tokens - VERIFIED from Linear browser extraction 2026-01-28 */
+  --item-padding-x: 16px;          /* Ground truth: padding 12px 16px (desktop) */
+  --item-padding-x-mobile: 10.67px; /* Linear: reduced padding on mobile */
   --item-padding-y: 12px;          /* Ground truth: padding 12px 16px */
   --item-min-height: 60px;         /* Ground truth: min-height 60px */
   --item-gap: 12px;                /* Ground truth: gap 12px */
@@ -172,7 +176,7 @@
 
   /* List tokens - light mode */
   --list-section-bg: oklch(0.96 0.002 286);     /* Light: subtle gray for section headers */
-  --input-bg: oklch(1 0 0);                     /* Light: white input background */
+  --input-bg: oklch(0.98 0.002 286);            /* Light: slightly elevated from white */
   --input-border: oklch(0.9 0.004 286);         /* Light: subtle border */
 
   /* Badge tokens - status badges (light mode) */
@@ -228,19 +232,40 @@
 }
 
 .dark {
-  /* Card tokens - VERIFIED from Linear browser extraction 2026-01-21 */
-  /* Linear section wrapper: background lch(8.3 1.867 272), border 0.8px solid lch(19.66 4.707 272) */
+  /* ==========================================================================
+     LINEAR SURFACE TIERS - VERIFIED from Linear browser extraction 2026-01-28
+     All colors use LCH with hue 272 (purple-tinted gray)
+     ========================================================================== */
+
+  /* Background tiers (layered surfaces) */
+  --color-bg-primary: lch(4.8 0.7 272);      /* Page background */
+  --color-bg-quaternary: lch(7.133 1.867 272); /* Subtle surfaces */
+  --color-bg-secondary: lch(10.633 3.033 272); /* Section headers */
+  --color-bg-tertiary: lch(14.133 4.2 272);   /* Elevated (inputs, controls) */
+
+  /* Border tiers */
+  --color-border-primary: lch(9.77 3.54 272);   /* Subtle border */
+  --color-border-secondary: lch(14.74 3.54 272); /* Medium border */
+  --color-border-tertiary: lch(19 3.54 272);    /* Prominent border */
+
+  /* Text tiers */
+  --color-text-primary: lch(100 0 272);        /* White text */
+  --color-text-secondary: lch(90.65 1.35 272); /* Slightly muted */
+  --color-text-tertiary: lch(62.6 1.35 272);   /* Muted text */
+  --color-text-quaternary: lch(38.29 1.35 272); /* Very muted */
+
+  /* Card tokens - VERIFIED from Linear browser extraction 2026-01-28 */
   --card-bg: lch(8.3 1.867 272);
   --card-border: lch(19.66 4.707 272);
-  --card-border-width: 0.8px;
-  --card-radius: 7px;                  /* Linear uses 7px, not 8px */
+  --card-border-width: 0.57px;           /* Linear uses 0.571429px */
+  --card-radius: 7px;                    /* Linear uses 7px, not 8px */
   --card-header-border: lch(19.66 4.707 272);
-  --item-divider: lch(35 4 272);        /* Divider - visible on dark background */
+  --item-divider: lch(19.66 4.707 272);  /* Same as card border - Linear style */
 
-  /* List tokens - VERIFIED from Linear browser extraction */
+  /* List tokens - VERIFIED from Linear browser extraction 2026-01-28 */
   --list-section-bg: lch(10.633 3.033 272);  /* Linear: grouped list section headers */
-  --input-bg: lch(4.8 0.7 272);              /* Linear: input background (same as page) */
-  --input-border: lch(19 3.54 272);          /* Linear: input border color */
+  --input-bg: lch(8.3 1.867 272);             /* Linear: SAME as card background */
+  --input-border: lch(22.5 4.707 272);       /* Linear: input border color */
 
   /* Badge tokens - status badges */
   --badge-draft-bg: lch(48 59.31 288.43 / 0.2);  /* Purple tint for draft status */
@@ -400,6 +425,137 @@
 }
 
 /* ==========================================================================
+   SPINNER FADE ANIMATION - Loader component rotating bars
+   8 bars with staggered opacity for smooth loading indication
+   ========================================================================== */
+@keyframes spinner-fade {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+}
+
+@keyframes bounce-dots {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+@keyframes typing {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes wave-bars {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes thin-pulse {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes text-blink {
+  0%,
+  100% {
+    color: var(--muted-foreground);
+  }
+  50% {
+    color: var(--foreground);
+  }
+}
+
+@keyframes loading-dots {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .animate-spinner-fade {
+    animation: spinner-fade 1s ease-in-out infinite;
+  }
+}
+
+/* ==========================================================================
+   CIRCULAR PULSE ANIMATION - Pulsing rings that scale big and small
+   Used for active step indicators with icons
+   ========================================================================== */
+@keyframes circular-pulse {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
    INSET DIVIDERS - Linear-style dividers with 16px inset on both sides
    Uses ::before pseudo-element instead of border for inset effect
    VERIFIED from Linear browser extraction 2026-01-21
@@ -523,6 +679,25 @@
 }
 
 /* ==========================================================================
+   RESPONSIVE BREAKPOINTS - VERIFIED from Linear browser extraction 2026-01-28
+   Linear uses max-width: 640px as main mobile breakpoint
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  :root {
+    /* Reduced margins on mobile */
+    --page-padding: var(--page-padding-mobile);
+    --page-bottom-gap: var(--page-bottom-gap-mobile);
+
+    /* Reduced section spacing on mobile */
+    --section-gap: var(--section-gap-mobile);
+
+    /* Reduced item padding on mobile */
+    --item-padding-x: var(--item-padding-x-mobile);
+  }
+}
+
+/* ==========================================================================
    ACCESSIBILITY MODES
    ========================================================================== */
 
@@ -616,3 +791,4 @@
   --brand-font-heading: "Space Grotesk", system-ui, sans-serif;
   --brand-radius: 0;
 }
+

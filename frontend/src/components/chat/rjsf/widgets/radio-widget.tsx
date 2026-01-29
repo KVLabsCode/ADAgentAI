@@ -92,8 +92,8 @@ export function RadioWidget(props: WidgetProps) {
                 "transition-colors duration-150",
                 isSelected
                   ? "border-emerald-500 dark:border-emerald-400"
-                  : "border-zinc-400 dark:border-zinc-600",
-                !disabled && !readonly && !isSelected && "hover:border-zinc-500 dark:hover:border-zinc-500"
+                  : "border-[var(--input-border)]",
+                !disabled && !readonly && !isSelected && "hover:border-muted-foreground"
               )}
             >
               {isSelected && (

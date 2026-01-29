@@ -28,12 +28,23 @@ from .nodes.tool_executor import tool_executor_node
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
-def _should_continue_after_specialist(state: GraphState) -> Literal["tool_executor", "end"]:
+def _should_continue_after_specialist(state: GraphState) -> Literal["tool_executor", "entity_loader", "router", "end"]:
     """Determine next step after specialist node.
 
-    If there are pending tool calls, route to tool_executor.
-    If we have a response (no tool calls), we're done.
+    Routes based on:
+    1. needs_reroute → router (user changed topic, e.g., "now show my GAM")
+    2. needs_entity_refresh → entity_loader (after creating app/ad unit, refresh entities)
+    3. pending tool calls → tool_executor
+    4. otherwise → end
     """
+    # Check for backflow signals first
+    if state.get("needs_reroute"):
+        return "router"
+
+    if state.get("needs_entity_refresh"):
+        return "entity_loader"
+
+    # Normal flow: check for pending tools
     tool_calls = state.get("tool_calls", [])
     pending_tools = [tc for tc in tool_calls if tc.get("result") is None]
 
@@ -83,25 +94,54 @@ def _handle_routing_result(state: GraphState) -> Literal["entity_loader", "end"]
     return "entity_loader"
 
 
+def _should_continue_after_entity_loader(state: GraphState) -> Literal["specialist", "end"]:
+    """Determine next step after entity_loader.
+
+    If action_required is blocking (e.g., network not connected), go to END.
+    This avoids wasting LLM tokens when we can't proceed anyway.
+    Otherwise, continue to specialist.
+    """
+    action_required = state.get("action_required")
+
+    if action_required and action_required.get("blocking"):
+        # Network not connected or no providers - skip specialist
+        return "end"
+
+    return "specialist"
+
+
 def build_graph() -> StateGraph:
     """Build the ad platform chat StateGraph.
 
-    Graph structure:
+    Graph structure with backflow support:
+
         START
           │
           ▼
-        router ──────────────────┐
-          │                      │ (error)
-          ▼                      ▼
-    entity_loader               END
-          │
-          ▼
-      specialist ◄───────────────┐
-          │                      │
-          ├──► tool_executor ────┘
+        router ◄─────────────────────────────┐
+          │                                  │ (topic change)
+          ├────────────────────┐             │
+          ▼                    │ (error)     │
+    entity_loader ◄────────────┼─────────────┤
+          │                    ▼             │ (refresh entities)
+          ├───────────────► END ◄────────────┤
+          │  (blocking)                      │
+          ▼                                  │
+      specialist ────────────────────────────┤
+          │                                  │
+          ├──► tool_executor ───► specialist ┘
           │
           ▼
          END
+
+    Conditional edges:
+    - router → end: Error or no service classified
+    - entity_loader → end: Blocking action (network not connected)
+    - specialist → end: Response ready (no pending tools)
+
+    Backflow scenarios:
+    - specialist → router: User changed topic ("now show my GAM orders")
+    - specialist → entity_loader: Need fresh entities (after creating app/ad unit)
 
     Returns:
         Uncompiled StateGraph ready for compilation with checkpointer
@@ -129,15 +169,28 @@ def build_graph() -> StateGraph:
         }
     )
 
-    # entity_loader -> specialist
-    graph.add_edge("entity_loader", "specialist")
+    # entity_loader -> specialist OR end (conditional)
+    # If action_required is blocking (network not connected), skip specialist
+    graph.add_conditional_edges(
+        "entity_loader",
+        _should_continue_after_entity_loader,
+        {
+            "specialist": "specialist",
+            "end": END,
+        }
+    )
 
-    # specialist -> tool_executor OR end (conditional)
+    # specialist -> tool_executor OR entity_loader OR router OR end (conditional)
+    # Backflow enables:
+    # - specialist -> router: User changed topic ("now show my GAM orders")
+    # - specialist -> entity_loader: Need fresh entities (after creating app/ad unit)
     graph.add_conditional_edges(
         "specialist",
         _should_continue_after_specialist,
         {
             "tool_executor": "tool_executor",
+            "entity_loader": "entity_loader",
+            "router": "router",
             "end": END,
         }
     )
@@ -266,16 +319,33 @@ async def run_graph(
         compiled_graph = graph.compile(checkpointer=checkpointer)
         print(f"[run_graph] Graph compiled, starting astream...", flush=True)
 
-        # Stream graph execution
+        # Stream graph execution with both updates and custom events
+        # - "updates": State updates per node (routing, tool calls, results)
+        # - "custom": Custom progress events emitted via get_stream_writer()
         event_count = 0
         async for event in compiled_graph.astream(
             initial_state,
             config=config,
-            stream_mode="updates",  # Get state updates per node
+            stream_mode=["updates", "custom"],
         ):
             event_count += 1
-            print(f"[run_graph] Got event #{event_count}: keys={list(event.keys())}", flush=True)
-            yield event
+            # With stream_mode=["updates", "custom"], all events come as tuples: (namespace, data)
+            # - ("updates", {...state update...}) - regular state updates from nodes
+            # - ("custom", {...custom data...}) - custom events emitted via get_stream_writer()
+            if isinstance(event, tuple) and len(event) == 2:
+                namespace, data = event
+                if namespace == "custom":
+                    # Wrap custom events emitted via get_stream_writer()
+                    print(f"[run_graph] Got custom event #{event_count}", flush=True)
+                    yield {"__custom__": {"namespace": namespace, "data": data}}
+                else:
+                    # "updates" namespace - regular state updates, yield as-is
+                    print(f"[run_graph] Got update event #{event_count}: keys={list(data.keys()) if isinstance(data, dict) else type(data)}", flush=True)
+                    yield data
+            else:
+                # Fallback for unexpected event format
+                print(f"[run_graph] Got event #{event_count}: keys={list(event.keys())}", flush=True)
+                yield event
 
         print(f"[run_graph] Finished streaming, total events: {event_count}", flush=True)
 

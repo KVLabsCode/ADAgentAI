@@ -39,7 +39,7 @@ interface ChatSessionClientProps {
 }
 
 export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
-  const { getAccessToken, isLoading: isUserLoading } = useUser()
+  const { user, getAccessToken, isLoading: isUserLoading } = useUser()
   const [providers, setProviders] = React.useState<Provider[]>([])
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -48,11 +48,24 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     async function fetchData() {
       try {
         const accessToken = await getAccessToken()
+
+        // If no token available, wait for user to be ready
+        if (!accessToken) {
+          console.warn('No access token available, will retry when user is ready')
+          return
+        }
+
         // Fetch providers and session messages in parallel
         const [providersRes, sessionRes] = await Promise.all([
           authFetch(`${API_URL}/api/providers`, accessToken),
           authFetch(`${API_URL}/api/chat/session/${sessionId}`, accessToken),
         ])
+
+        // Check for auth errors
+        if (providersRes.status === 401 || sessionRes.status === 401) {
+          console.warn('Auth error fetching chat session, will retry')
+          return
+        }
 
         if (providersRes.ok) {
           const data = await providersRes.json() as { providers: ApiProvider[] }
@@ -61,6 +74,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
             type: p.type,
             status: "connected" as const,
             displayName: p.name,
+            isEnabled: p.isEnabled,
             identifiers: p.type === "admob"
               ? { publisherId: p.identifier }
               : { networkCode: p.identifier, accountName: p.name },
@@ -94,12 +108,14 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
       }
     }
 
-    if (!isUserLoading) {
+    // Only fetch when user is loaded AND we have a user
+    if (!isUserLoading && user) {
       fetchData()
     }
-  }, [sessionId, getAccessToken, isUserLoading])
+  }, [sessionId, getAccessToken, isUserLoading, user])
 
-  if (isLoading) {
+  // Show loading while user or data is loading
+  if (isUserLoading || isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
         <Spinner size="sm" className="text-muted-foreground" />

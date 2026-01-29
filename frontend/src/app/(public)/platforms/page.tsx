@@ -119,14 +119,12 @@ export default function PlatformsPage() {
             Need a platform that&apos;s not listed? Let us know!
           </p>
           <div className="flex gap-4 justify-center">
-            <Button asChild>
-              <Link href="/dashboard">
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+            <Button render={<Link href="/dashboard" />}>
+              Get Started
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/support">Request a Platform</Link>
+            <Button variant="outline" render={<Link href="/support" />}>
+              Request a Platform
             </Button>
           </div>
         </div>

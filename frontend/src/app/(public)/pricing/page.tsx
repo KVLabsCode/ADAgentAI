@@ -125,12 +125,12 @@ export default function PricingPage() {
                   </ul>
 
                   <Button
-                    asChild
+                    render={<Link href={tier.href} />}
                     variant={tier.highlighted ? "default" : "outline"}
                     size="sm"
                     className="w-full h-8 text-xs"
                   >
-                    <Link href={tier.href}>{tier.cta}</Link>
+                    {tier.cta}
                   </Button>
                 </div>
               ))}
@@ -167,8 +167,8 @@ export default function PricingPage() {
           <p className="text-sm text-muted-foreground mb-3">
             Questions about pricing?
           </p>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-            <Link href="mailto:support@kovio.dev">Contact us</Link>
+          <Button render={<Link href="mailto:support@kovio.dev" />} variant="outline" size="sm" className="h-8 text-xs">
+            Contact us
           </Button>
         </div>
       </section>

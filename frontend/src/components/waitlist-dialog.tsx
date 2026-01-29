@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/molecules/dialog"
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
+import { VisuallyHidden } from "@/atoms/visually-hidden"
 import {
   Select,
   SelectContent,
@@ -67,8 +67,8 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
       setOpen(isOpen)
       if (!isOpen && step !== "success") resetForm()
     }}>
-      <DialogTrigger asChild>
-        {trigger || (
+      <DialogTrigger
+        render={React.isValidElement(trigger) ? trigger : (
           <button className={cn(
             "h-9 px-4 flex items-center justify-center gap-2 rounded-lg text-[13px] font-medium",
             "bg-[#f7f8f8] text-[#08090a] hover:bg-white transition-colors duration-100",
@@ -78,15 +78,15 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         )}
-      </DialogTrigger>
+      />
       {/* Linear-style dialog content */}
       <DialogContent className="sm:max-w-[450px] p-0 gap-0 bg-[#08090a] border-[0.8px] border-white/[0.05] rounded-lg overflow-hidden">
         {/* Success Step - Linear style */}
         {step === "success" && (
           <div className="py-12 px-6 text-center space-y-4">
-            <VisuallyHidden.Root>
+            <VisuallyHidden>
               <DialogTitle>Waitlist Confirmation</DialogTitle>
-            </VisuallyHidden.Root>
+            </VisuallyHidden>
             {/* Muted gray checkmark - Linear style */}
             <div className="mx-auto w-8 h-8 flex items-center justify-center">
               <Check className="h-8 w-8 text-white/40" strokeWidth={1.5} />
@@ -145,9 +145,9 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
             <div className="px-5 py-4 border-b-[0.8px] border-white/[0.05]">
               <DialogHeader className="space-y-0">
                 <DialogTitle className="text-[16px] font-normal text-[#f7f8f8]">Join the Waitlist</DialogTitle>
-                <VisuallyHidden.Root>
+                <VisuallyHidden>
                   <DialogDescription>Get early access to ADAgent</DialogDescription>
-                </VisuallyHidden.Root>
+                </VisuallyHidden>
               </DialogHeader>
             </div>
 
@@ -207,9 +207,9 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
             <div className="px-5 py-4 border-b-[0.8px] border-white/[0.05]">
               <DialogHeader className="space-y-0">
                 <DialogTitle className="text-[16px] font-normal text-[#f7f8f8]">Almost there!</DialogTitle>
-                <VisuallyHidden.Root>
+                <VisuallyHidden>
                   <DialogDescription>Tell us about yourself</DialogDescription>
-                </VisuallyHidden.Root>
+                </VisuallyHidden>
               </DialogHeader>
             </div>
 

@@ -7,8 +7,6 @@ import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import type { Provider } from "@/lib/types"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
-
 interface ApiProvider {
   id: string
   type: "admob" | "gam"
@@ -20,15 +18,23 @@ interface ApiProvider {
 }
 
 export default function ChatPage() {
-  const { getAccessToken, isLoading: isUserLoading } = useUser()
+  const { user, getAccessToken, isLoading: isUserLoading } = useUser()
   const [providers, setProviders] = React.useState<Provider[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
+  const [_fetchAttempted, setFetchAttempted] = React.useState(false)
 
   React.useEffect(() => {
     async function fetchProviders() {
       try {
         const accessToken = await getAccessToken()
-        const response = await authFetch(`${API_URL}/api/providers`, accessToken)
+
+        // If no token available, wait for user to be ready
+        if (!accessToken) {
+          console.warn('No access token available, will retry when user is ready')
+          return
+        }
+
+        const response = await authFetch(`/api/providers`, accessToken)
 
         if (response.ok) {
           const data = await response.json() as { providers: ApiProvider[] }
@@ -38,26 +44,36 @@ export default function ChatPage() {
             type: p.type,
             status: "connected" as const,
             displayName: p.name,
+            isEnabled: p.isEnabled,
             identifiers: p.type === "admob"
               ? { publisherId: p.identifier }
               : { networkCode: p.identifier, accountName: p.name },
           }))
 
           setProviders(mappedProviders)
+        } else if (response.status === 401) {
+          // Auth error - token might be stale, will retry when user updates
+          console.warn('Auth error fetching providers, will retry')
+          return
         }
+
+        setFetchAttempted(true)
       } catch (error) {
         console.error('Failed to fetch providers:', error)
+        setFetchAttempted(true)
       } finally {
         setIsLoading(false)
       }
     }
 
-    if (!isUserLoading) {
+    // Only fetch when user is loaded AND we have a user
+    if (!isUserLoading && user) {
       fetchProviders()
     }
-  }, [getAccessToken, isUserLoading])
+  }, [getAccessToken, isUserLoading, user])
 
-  if (isLoading) {
+  // Show loading while user is loading
+  if (isUserLoading) {
     return (
       <div className="h-full flex items-center justify-center">
         <Spinner size="md" className="text-muted-foreground" />
@@ -66,5 +82,5 @@ export default function ChatPage() {
   }
 
   // Key forces remount when navigating from /chat/[id] to /chat
-  return <ChatContainer key="new-chat" providers={providers} />
+  return <ChatContainer key="new-chat" providers={providers} isLoadingProviders={isLoading} />
 }

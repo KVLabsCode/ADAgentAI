@@ -54,8 +54,9 @@ export default function SettingsPage() {
         description="Manage your application preferences."
       />
 
-      {/* Sections container with 48px gap between sections (Linear ground truth) */}
-      <div className="flex flex-col gap-[var(--section-gap)]">
+      {/* Sections container - gap handled by SettingsSection margin-bottom */}
+      {/* [&>*:last-child]:mb-0 removes margin from last section to avoid double spacing with page padding */}
+      <div className="flex flex-col [&>*:last-child]:mb-0">
         {/* Invitations To You - Shows pending invitations user has received */}
         <MyInvitationsSection />
 

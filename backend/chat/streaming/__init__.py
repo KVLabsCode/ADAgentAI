@@ -11,6 +11,9 @@ from .events import (
     ToolApprovalRequiredEvent,
     ToolDeniedEvent,
     ToolExecutingEvent,
+    TaskProgressEvent,
+    TaskCompleteEvent,
+    TaskErrorEvent,
     format_sse,
 )
 
@@ -46,6 +49,9 @@ __all__ = [
     "ToolApprovalRequiredEvent",
     "ToolDeniedEvent",
     "ToolExecutingEvent",
+    "TaskProgressEvent",
+    "TaskCompleteEvent",
+    "TaskErrorEvent",
     "format_sse",
     # State
     "is_streaming_active",

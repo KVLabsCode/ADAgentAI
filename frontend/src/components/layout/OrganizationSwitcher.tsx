@@ -57,25 +57,23 @@ export function OrganizationSwitcher() {
   return (
     <div className="px-2 py-2 border-b border-border/40">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent/50 transition-colors group-data-[collapsible=icon]:justify-center">
-            <div className="h-6 w-6 rounded-md flex items-center justify-center shrink-0 bg-muted">
-              {selectedOrganization ? (
-                <Users className="h-3.5 w-3.5 text-muted-foreground" />
-              ) : (
-                <User className="h-3.5 w-3.5 text-muted-foreground" />
-              )}
-            </div>
-            <span className="flex-1 text-left truncate text-[13px] group-data-[collapsible=icon]:hidden">
-              {selectedOrganization?.name || "Personal"}
-              {selectedOrgRole && (
-                <span className="ml-1 text-[10px] text-muted-foreground capitalize">
-                  ({selectedOrgRole})
-                </span>
-              )}
-            </span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground group-data-[collapsible=icon]:hidden" />
-          </button>
+        <DropdownMenuTrigger className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent/50 transition-colors group-data-[collapsible=icon]:justify-center">
+          <div className="h-6 w-6 rounded-md flex items-center justify-center shrink-0 bg-muted">
+            {selectedOrganization ? (
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
+          <span className="flex-1 text-left truncate text-[13px] group-data-[collapsible=icon]:hidden">
+            {selectedOrganization?.name || "Personal"}
+            {selectedOrgRole && (
+              <span className="ml-1 text-[10px] text-muted-foreground capitalize">
+                ({selectedOrgRole})
+              </span>
+            )}
+          </span>
+          <ChevronDown className="h-3 w-3 text-muted-foreground group-data-[collapsible=icon]:hidden" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
           <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal">

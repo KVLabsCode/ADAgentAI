@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/molecules/dialog"
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
+import { VisuallyHidden } from "@/atoms/visually-hidden"
 import {
   Select,
   SelectContent,
@@ -61,19 +61,19 @@ export function AuthenticatedWaitlistDialog({
       setOpen(isOpen)
       if (!isOpen && !submitted) resetForm()
     }}>
-      <DialogTrigger asChild>
-        {trigger || (
+      <DialogTrigger
+        render={React.isValidElement(trigger) ? trigger : (
           <Button className={cn(className)}>
             Join Waitlist
           </Button>
         )}
-      </DialogTrigger>
+      />
       <DialogContent className="sm:max-w-md">
         {submitted ? (
           <div className="py-6 text-center space-y-4">
-            <VisuallyHidden.Root>
+            <VisuallyHidden>
               <DialogTitle>Waitlist Confirmation</DialogTitle>
-            </VisuallyHidden.Root>
+            </VisuallyHidden>
             <div className="mx-auto w-14 h-14 rounded-full bg-success/10 flex items-center justify-center">
               <Check className="h-7 w-7 text-success" />
             </div>

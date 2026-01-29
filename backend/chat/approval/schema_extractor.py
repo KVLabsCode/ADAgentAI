@@ -1,8 +1,11 @@
 """Schema extraction for dangerous tools.
 
 Maps tool names to JSON schemas for frontend parameter editing.
-Schemas are auto-generated from Pydantic models for Ad Manager tools
-and manually defined for AdMob tools.
+Schemas are manually defined for AdMob tools.
+
+NOTE: Ad Manager tool schemas are no longer generated from Pydantic models
+since the architecture moved to dynamic FastMCP tool generation from
+Google Discovery specs. Ad Manager tools will use a generic JSON schema.
 
 Output format for RJSF (React JSON Schema Form):
 {
@@ -20,164 +23,10 @@ class RJSFSchema(TypedDict):
     schema: dict
     uiSchema: dict
 
-# Import all Ad Manager Pydantic models for schema extraction
-from admanager_mcp.models import (
-    # Ad Units
-    CreateNetworksAdUnitsInput,
-    PatchNetworksAdUnitsInput,
-    BatchCreateNetworksAdUnitsInput,
-    BatchUpdateNetworksAdUnitsInput,
-    BatchActivateNetworksAdUnitsInput,
-    BatchDeactivateNetworksAdUnitsInput,
-    BatchArchiveNetworksAdUnitsInput,
-    # Contacts
-    CreateNetworksContactsInput,
-    PatchNetworksContactsInput,
-    BatchCreateNetworksContactsInput,
-    BatchUpdateNetworksContactsInput,
-    # Custom Fields
-    CreateNetworksCustomFieldsInput,
-    PatchNetworksCustomFieldsInput,
-    BatchCreateNetworksCustomFieldsInput,
-    BatchUpdateNetworksCustomFieldsInput,
-    BatchActivateNetworksCustomFieldsInput,
-    BatchDeactivateNetworksCustomFieldsInput,
-    # Custom Targeting Keys
-    CreateNetworksCustomTargetingKeysInput,
-    PatchNetworksCustomTargetingKeysInput,
-    BatchCreateNetworksCustomTargetingKeysInput,
-    BatchUpdateNetworksCustomTargetingKeysInput,
-    BatchActivateNetworksCustomTargetingKeysInput,
-    BatchDeactivateNetworksCustomTargetingKeysInput,
-    # Entity Signals Mappings
-    CreateNetworksEntitySignalsMappingsInput,
-    PatchNetworksEntitySignalsMappingsInput,
-    BatchCreateNetworksEntitySignalsMappingsInput,
-    BatchUpdateNetworksEntitySignalsMappingsInput,
-    # Live Stream Events
-    CreateNetworksLiveStreamEventsAdBreaksInput,
-    CreateNetworksLiveStreamEventsByAssetKeyAdBreaksInput,
-    CreateNetworksLiveStreamEventsByCustomAssetKeyAdBreaksInput,
-    PatchNetworksLiveStreamEventsByAssetKeyAdBreaksInput,
-    DeleteNetworksLiveStreamEventsByAssetKeyAdBreaksInput,
-    # Placements
-    CreateNetworksPlacementsInput,
-    PatchNetworksPlacementsInput,
-    BatchCreateNetworksPlacementsInput,
-    BatchUpdateNetworksPlacementsInput,
-    BatchActivateNetworksPlacementsInput,
-    BatchDeactivateNetworksPlacementsInput,
-    BatchArchiveNetworksPlacementsInput,
-    # Private Auctions
-    CreateNetworksPrivateAuctionsInput,
-    PatchNetworksPrivateAuctionsInput,
-    CreateNetworksPrivateAuctionDealsInput,
-    PatchNetworksPrivateAuctionDealsInput,
-    # Reports
-    CreateNetworksReportsInput,
-    PatchNetworksReportsInput,
-    RunNetworksReportsInput,
-    # Sites
-    CreateNetworksSitesInput,
-    PatchNetworksSitesInput,
-    BatchCreateNetworksSitesInput,
-    BatchUpdateNetworksSitesInput,
-    BatchDeactivateNetworksSitesInput,
-    BatchSubmitForApprovalNetworksSitesInput,
-    # Teams
-    CreateNetworksTeamsInput,
-    PatchNetworksTeamsInput,
-    BatchCreateNetworksTeamsInput,
-    BatchUpdateNetworksTeamsInput,
-    BatchActivateNetworksTeamsInput,
-    BatchDeactivateNetworksTeamsInput,
-    # Web Properties
-    BatchAllowNetworksWebPropertiesAdReviewCenterAdsInput,
-    BatchBlockNetworksWebPropertiesAdReviewCenterAdsInput,
-    # Operations
-    CancelOperationsInput,
-    DeleteOperationsInput,
-)
 
-
-# Mapping from MCP tool names to Pydantic model classes
-AD_MANAGER_TOOL_MODELS: dict[str, Type[BaseModel]] = {
-    # Ad Units
-    "admanager_create_networks_ad_units": CreateNetworksAdUnitsInput,
-    "admanager_patch_networks_ad_units": PatchNetworksAdUnitsInput,
-    "admanager_batch_create_networks_ad_units": BatchCreateNetworksAdUnitsInput,
-    "admanager_batch_update_networks_ad_units": BatchUpdateNetworksAdUnitsInput,
-    "admanager_batch_activate_networks_ad_units": BatchActivateNetworksAdUnitsInput,
-    "admanager_batch_deactivate_networks_ad_units": BatchDeactivateNetworksAdUnitsInput,
-    "admanager_batch_archive_networks_ad_units": BatchArchiveNetworksAdUnitsInput,
-    # Contacts
-    "admanager_create_networks_contacts": CreateNetworksContactsInput,
-    "admanager_patch_networks_contacts": PatchNetworksContactsInput,
-    "admanager_batch_create_networks_contacts": BatchCreateNetworksContactsInput,
-    "admanager_batch_update_networks_contacts": BatchUpdateNetworksContactsInput,
-    # Custom Fields
-    "admanager_create_networks_custom_fields": CreateNetworksCustomFieldsInput,
-    "admanager_patch_networks_custom_fields": PatchNetworksCustomFieldsInput,
-    "admanager_batch_create_networks_custom_fields": BatchCreateNetworksCustomFieldsInput,
-    "admanager_batch_update_networks_custom_fields": BatchUpdateNetworksCustomFieldsInput,
-    "admanager_batch_activate_networks_custom_fields": BatchActivateNetworksCustomFieldsInput,
-    "admanager_batch_deactivate_networks_custom_fields": BatchDeactivateNetworksCustomFieldsInput,
-    # Custom Targeting Keys
-    "admanager_create_networks_custom_targeting_keys": CreateNetworksCustomTargetingKeysInput,
-    "admanager_patch_networks_custom_targeting_keys": PatchNetworksCustomTargetingKeysInput,
-    "admanager_batch_create_networks_custom_targeting_keys": BatchCreateNetworksCustomTargetingKeysInput,
-    "admanager_batch_update_networks_custom_targeting_keys": BatchUpdateNetworksCustomTargetingKeysInput,
-    "admanager_batch_activate_networks_custom_targeting_keys": BatchActivateNetworksCustomTargetingKeysInput,
-    "admanager_batch_deactivate_networks_custom_targeting_keys": BatchDeactivateNetworksCustomTargetingKeysInput,
-    # Entity Signals Mappings
-    "admanager_create_networks_entity_signals_mappings": CreateNetworksEntitySignalsMappingsInput,
-    "admanager_patch_networks_entity_signals_mappings": PatchNetworksEntitySignalsMappingsInput,
-    "admanager_batch_create_networks_entity_signals_mappings": BatchCreateNetworksEntitySignalsMappingsInput,
-    "admanager_batch_update_networks_entity_signals_mappings": BatchUpdateNetworksEntitySignalsMappingsInput,
-    # Live Stream Events
-    "admanager_create_networks_live_stream_events_ad_breaks": CreateNetworksLiveStreamEventsAdBreaksInput,
-    "admanager_create_networks_live_stream_events_by_asset_key_ad_breaks": CreateNetworksLiveStreamEventsByAssetKeyAdBreaksInput,
-    "admanager_create_networks_live_stream_events_by_custom_asset_key_ad_breaks": CreateNetworksLiveStreamEventsByCustomAssetKeyAdBreaksInput,
-    "admanager_patch_networks_live_stream_events_by_asset_key_ad_breaks": PatchNetworksLiveStreamEventsByAssetKeyAdBreaksInput,
-    "admanager_delete_networks_live_stream_events_by_asset_key_ad_breaks": DeleteNetworksLiveStreamEventsByAssetKeyAdBreaksInput,
-    # Placements
-    "admanager_create_networks_placements": CreateNetworksPlacementsInput,
-    "admanager_patch_networks_placements": PatchNetworksPlacementsInput,
-    "admanager_batch_create_networks_placements": BatchCreateNetworksPlacementsInput,
-    "admanager_batch_update_networks_placements": BatchUpdateNetworksPlacementsInput,
-    "admanager_batch_activate_networks_placements": BatchActivateNetworksPlacementsInput,
-    "admanager_batch_deactivate_networks_placements": BatchDeactivateNetworksPlacementsInput,
-    "admanager_batch_archive_networks_placements": BatchArchiveNetworksPlacementsInput,
-    # Private Auctions
-    "admanager_create_networks_private_auctions": CreateNetworksPrivateAuctionsInput,
-    "admanager_patch_networks_private_auctions": PatchNetworksPrivateAuctionsInput,
-    "admanager_create_networks_private_auction_deals": CreateNetworksPrivateAuctionDealsInput,
-    "admanager_patch_networks_private_auction_deals": PatchNetworksPrivateAuctionDealsInput,
-    # Reports
-    "admanager_create_networks_reports": CreateNetworksReportsInput,
-    "admanager_patch_networks_reports": PatchNetworksReportsInput,
-    "admanager_run_networks_reports": RunNetworksReportsInput,
-    # Sites
-    "admanager_create_networks_sites": CreateNetworksSitesInput,
-    "admanager_patch_networks_sites": PatchNetworksSitesInput,
-    "admanager_batch_create_networks_sites": BatchCreateNetworksSitesInput,
-    "admanager_batch_update_networks_sites": BatchUpdateNetworksSitesInput,
-    "admanager_batch_deactivate_networks_sites": BatchDeactivateNetworksSitesInput,
-    "admanager_batch_submit_for_approval_networks_sites": BatchSubmitForApprovalNetworksSitesInput,
-    # Teams
-    "admanager_create_networks_teams": CreateNetworksTeamsInput,
-    "admanager_patch_networks_teams": PatchNetworksTeamsInput,
-    "admanager_batch_create_networks_teams": BatchCreateNetworksTeamsInput,
-    "admanager_batch_update_networks_teams": BatchUpdateNetworksTeamsInput,
-    "admanager_batch_activate_networks_teams": BatchActivateNetworksTeamsInput,
-    "admanager_batch_deactivate_networks_teams": BatchDeactivateNetworksTeamsInput,
-    # Web Properties
-    "admanager_batch_allow_networks_web_properties_ad_review_center_ads": BatchAllowNetworksWebPropertiesAdReviewCenterAdsInput,
-    "admanager_batch_block_networks_web_properties_ad_review_center_ads": BatchBlockNetworksWebPropertiesAdReviewCenterAdsInput,
-    # Operations
-    "admanager_cancel_operations": CancelOperationsInput,
-    "admanager_delete_operations": DeleteOperationsInput,
-}
+# Ad Manager tool models removed - architecture now uses FastMCP dynamic generation
+# Ad Manager tools will use generic JSON body schema for approval forms
+AD_MANAGER_TOOL_MODELS: dict[str, Type[BaseModel]] = {}
 
 
 def _pydantic_to_rjsf(model: Type[BaseModel]) -> RJSFSchema:
@@ -237,7 +86,40 @@ def get_tool_schema_by_mcp_name(mcp_tool_name: str) -> Optional[RJSFSchema]:
     if mcp_tool_name in ADMOB_TOOL_SCHEMAS:
         return ADMOB_TOOL_SCHEMAS[mcp_tool_name]
 
+    # Check Discovery-generated tool name mapping
+    # Maps raw API tool names to curated schema keys
+    mapped_name = DISCOVERY_TOOL_NAME_MAP.get(mcp_tool_name)
+    if mapped_name and mapped_name in ADMOB_TOOL_SCHEMAS:
+        return ADMOB_TOOL_SCHEMAS[mapped_name]
+
     return None
+
+
+# =============================================================================
+# Discovery-generated tool name mappings
+# =============================================================================
+# Maps raw API tool names (from Google Discovery JSON) to curated schema keys.
+# Discovery tools use format: accounts_<resource>_<action>
+# Curated schemas use format: admob_<action>_<resource>
+DISCOVERY_TOOL_NAME_MAP: dict[str, str] = {
+    # AdMob Apps
+    "accounts_apps_create": "admob_create_app",
+
+    # AdMob Ad Units
+    "accounts_adUnits_create": "admob_create_ad_unit",
+
+    # AdMob Ad Unit Mappings
+    "accounts_adUnitMappings_create": "admob_create_ad_unit_mapping",
+    "accounts_adUnits_adUnitMappings_create": "admob_create_ad_unit_mapping",
+
+    # AdMob Mediation Groups
+    "accounts_mediationGroups_create": "admob_create_mediation_group",
+    "accounts_mediationGroups_patch": "admob_update_mediation_group",
+
+    # AdMob Mediation A/B Experiments
+    "accounts_mediationGroups_mediationAbExperiments_create": "admob_create_mediation_ab_experiment",
+    "accounts_mediationGroups_mediationAbExperiments_stop": "admob_stop_mediation_ab_experiment",
+}
 
 
 # =============================================================================
@@ -341,7 +223,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
             },
             "app_id": {
                 "ui:widget": "EntitySelectWidget",
-                "ui:options": {"fetchType": "apps", "dependsOn": "account_id"}
+                "ui:options": {"fetchType": "apps", "dependsOn": "parent"}
             },
             "reward_settings": {
                 "ui:order": ["unit_amount", "unit_type"]
@@ -386,11 +268,11 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
             },
             "ad_unit_id": {
                 "ui:widget": "EntitySelectWidget",
-                "ui:options": {"fetchType": "ad_units", "dependsOn": "account_id"}
+                "ui:options": {"fetchType": "ad_units", "dependsOn": "parent"}
             },
             "ad_source_id": {
                 "ui:widget": "AdSourceSelectWidget",
-                "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
+                "ui:options": {"fetchType": "ad_sources", "dependsOn": "parent"}
             }
         }
     },
@@ -426,9 +308,10 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
         "schema": {
             "type": "object",
             "properties": {
-                "account_id": {
+                "parent": {
                     "type": "string",
-                    "description": "Publisher account ID"
+                    "title": "Account",
+                    "description": "Publisher account (e.g., accounts/pub-XXXXX)"
                 },
                 "display_name": {
                     "type": "string",
@@ -485,10 +368,6 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                     "items": {
                         "type": "object",
                         "properties": {
-                            "display_name": {
-                                "type": "string",
-                                "description": "Network label (e.g., 'AdMob Bidding')"
-                            },
                             "ad_source_id": {
                                 "type": "string",
                                 "description": "Bidding ad network source ID"
@@ -505,7 +384,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                                 "description": "A/B test variant assignment (optional)"
                             }
                         },
-                        "required": ["display_name", "ad_source_id"]
+                        "required": ["ad_source_id"]
                     }
                 },
                 "waterfall_lines": {
@@ -514,10 +393,6 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                     "items": {
                         "type": "object",
                         "properties": {
-                            "display_name": {
-                                "type": "string",
-                                "description": "Network label (e.g., 'Meta Waterfall')"
-                            },
                             "ad_source_id": {
                                 "type": "string",
                                 "description": "Waterfall ad network source ID"
@@ -544,19 +419,19 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                                 "description": "A/B test variant assignment (optional)"
                             }
                         },
-                        "required": ["display_name", "ad_source_id"]
+                        "required": ["ad_source_id"]
                     }
                 }
             },
-            "required": ["account_id", "display_name", "platform", "ad_format", "ad_unit_ids"]
+            "required": ["parent", "display_name", "platform", "ad_format", "ad_unit_ids"]
         },
         "uiSchema": {
             "ui:order": [
-                "account_id", "display_name", "state", "platform", "ad_format",
+                "parent", "display_name", "state", "platform", "ad_format",
                 "ad_unit_ids", "advanced_targeting",
                 "bidding_lines", "waterfall_lines"
             ],
-            "account_id": {
+            "parent": {
                 "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
@@ -564,7 +439,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 "ui:widget": "MultiSelectWidget",
                 "ui:options": {
                     "fetchType": "ad_units",
-                    "dependsOn": "account_id",
+                    "dependsOn": "parent",
                     "filterBy": ["ad_format"]
                 }
             },
@@ -590,51 +465,19 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 }
             },
             "bidding_lines": {
-                "ui:title": "Bidding (Real-time auction)",
+                "ui:title": "Bidding Networks",
+                "ui:field": "AdSourceToggleField",
                 "ui:options": {
-                    "orderable": True,
-                    "addable": True,
-                    "removable": True
-                },
-                "items": {
-                    "ui:order": ["ad_source_id", "display_name", "state", "experiment_variant"],
-                    "display_name": {"ui:placeholder": "e.g., AdMob Bidding"},
-                    "ad_source_id": {
-                        "ui:widget": "AdSourceSelectWidget",
-                        "ui:options": {
-                            "fetchType": "bidding_ad_sources",
-                            "dependsOn": "account_id"
-                        }
-                    },
-                    "state": {"ui:widget": "hidden"},
-                    "experiment_variant": {"ui:widget": "hidden"}
+                    "fetchType": "bidding_ad_sources",
+                    "dependsOn": "parent"
                 }
             },
             "waterfall_lines": {
-                "ui:title": "Waterfall (Priority-based)",
+                "ui:title": "Waterfall Networks",
+                "ui:field": "AdSourceToggleField",
                 "ui:options": {
-                    "orderable": True,
-                    "addable": True,
-                    "removable": True
-                },
-                "items": {
-                    "ui:order": ["ad_source_id", "display_name", "pricing_mode", "cpm_floor", "state", "experiment_variant"],
-                    "display_name": {"ui:placeholder": "e.g., Meta Waterfall"},
-                    "ad_source_id": {
-                        "ui:widget": "AdSourceSelectWidget",
-                        "ui:options": {
-                            "fetchType": "waterfall_ad_sources",
-                            "dependsOn": "account_id"
-                        }
-                    },
-                    "pricing_mode": {"ui:widget": "RadioWidget"},
-                    "cpm_floor": {
-                        "ui:widget": "CurrencyWidget",
-                        "ui:placeholder": "e.g., 1.50",
-                        "ui:options": {"showWhen": {"pricing_mode": "FIXED"}}
-                    },
-                    "state": {"ui:widget": "hidden"},
-                    "experiment_variant": {"ui:widget": "hidden"}
+                    "fetchType": "waterfall_ad_sources",
+                    "dependsOn": "parent"
                 }
             }
         }
@@ -644,9 +487,10 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
         "schema": {
             "type": "object",
             "properties": {
-                "account_id": {
+                "parent": {
                     "type": "string",
-                    "description": "Publisher account ID"
+                    "title": "Account",
+                    "description": "Publisher account (e.g., accounts/pub-XXXXX)"
                 },
                 "mediation_group_id": {
                     "type": "string",
@@ -699,10 +543,6 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                                 "type": "string",
                                 "description": "Existing line ID to update (leave empty to add new)"
                             },
-                            "display_name": {
-                                "type": "string",
-                                "description": "Network label"
-                            },
                             "ad_source_id": {
                                 "type": "string",
                                 "description": "Bidding ad network source ID"
@@ -719,7 +559,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                                 "description": "A/B test variant assignment (optional)"
                             }
                         },
-                        "required": ["display_name", "ad_source_id"]
+                        "required": ["ad_source_id"]
                     }
                 },
                 "waterfall_lines": {
@@ -731,10 +571,6 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                             "line_id": {
                                 "type": "string",
                                 "description": "Existing line ID to update (leave empty to add new)"
-                            },
-                            "display_name": {
-                                "type": "string",
-                                "description": "Network label"
                             },
                             "ad_source_id": {
                                 "type": "string",
@@ -762,31 +598,31 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                                 "description": "A/B test variant assignment (optional)"
                             }
                         },
-                        "required": ["display_name", "ad_source_id"]
+                        "required": ["ad_source_id"]
                     }
                 }
             },
-            "required": ["account_id", "mediation_group_id"]
+            "required": ["parent", "mediation_group_id"]
         },
         "uiSchema": {
             "ui:order": [
-                "account_id", "mediation_group_id", "display_name", "state",
+                "parent", "mediation_group_id", "display_name", "state",
                 "ad_unit_ids", "advanced_targeting",
                 "bidding_lines", "waterfall_lines"
             ],
-            "account_id": {
+            "parent": {
                 "ui:widget": "EntitySelectWidget",
                 "ui:options": {"fetchType": "accounts"}
             },
             "mediation_group_id": {
                 "ui:widget": "EntitySelectWidget",
-                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
+                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "parent"}
             },
             "ad_unit_ids": {
                 "ui:widget": "MultiSelectWidget",
                 "ui:options": {
                     "fetchType": "ad_units",
-                    "dependsOn": "account_id",
+                    "dependsOn": "parent",
                     "filterBy": ["ad_format"]
                 }
             },
@@ -806,53 +642,19 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                 }
             },
             "bidding_lines": {
-                "ui:title": "Bidding (Real-time auction)",
+                "ui:title": "Bidding Networks",
+                "ui:field": "AdSourceToggleField",
                 "ui:options": {
-                    "orderable": True,
-                    "addable": True,
-                    "removable": True
-                },
-                "items": {
-                    "ui:order": ["line_id", "ad_source_id", "display_name", "state", "experiment_variant"],
-                    "line_id": {"ui:placeholder": "Leave empty for new lines"},
-                    "display_name": {"ui:placeholder": "e.g., AdMob Bidding"},
-                    "ad_source_id": {
-                        "ui:widget": "AdSourceSelectWidget",
-                        "ui:options": {
-                            "fetchType": "bidding_ad_sources",
-                            "dependsOn": "account_id"
-                        }
-                    },
-                    "state": {"ui:widget": "hidden"},
-                    "experiment_variant": {"ui:widget": "hidden"}
+                    "fetchType": "bidding_ad_sources",
+                    "dependsOn": "parent"
                 }
             },
             "waterfall_lines": {
-                "ui:title": "Waterfall (Priority-based)",
+                "ui:title": "Waterfall Networks",
+                "ui:field": "AdSourceToggleField",
                 "ui:options": {
-                    "orderable": True,
-                    "addable": True,
-                    "removable": True
-                },
-                "items": {
-                    "ui:order": ["line_id", "ad_source_id", "display_name", "pricing_mode", "cpm_floor", "state", "experiment_variant"],
-                    "line_id": {"ui:placeholder": "Leave empty for new lines"},
-                    "display_name": {"ui:placeholder": "e.g., Meta Waterfall"},
-                    "ad_source_id": {
-                        "ui:widget": "AdSourceSelectWidget",
-                        "ui:options": {
-                            "fetchType": "waterfall_ad_sources",
-                            "dependsOn": "account_id"
-                        }
-                    },
-                    "pricing_mode": {"ui:widget": "RadioWidget"},
-                    "cpm_floor": {
-                        "ui:widget": "CurrencyWidget",
-                        "ui:placeholder": "e.g., 1.50",
-                        "ui:options": {"showWhen": {"pricing_mode": "FIXED"}}
-                    },
-                    "state": {"ui:widget": "hidden"},
-                    "experiment_variant": {"ui:widget": "hidden"}
+                    "fetchType": "waterfall_ad_sources",
+                    "dependsOn": "parent"
                 }
             }
         }
@@ -899,7 +701,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                                 "type": "string",
                                 "description": "Ad network source ID",
                                 "ui:widget": "EntitySelectWidget",
-                                "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
+                                "ui:options": {"fetchType": "ad_sources", "dependsOn": "parent"}
                             },
                             "cpm_mode": {
                                 "type": "string",
@@ -932,7 +734,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
             },
             "mediation_group_id": {
                 "ui:widget": "EntitySelectWidget",
-                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
+                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "parent"}
             },
             "treatment_mediation_lines": {
                 "ui:options": {
@@ -946,7 +748,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
                     "display_name": {"ui:placeholder": "e.g., AdMob Bidding"},
                     "ad_source_id": {
                         "ui:widget": "AdSourceSelectWidget",
-                        "ui:options": {"fetchType": "ad_sources", "dependsOn": "account_id"}
+                        "ui:options": {"fetchType": "ad_sources", "dependsOn": "parent"}
                     },
                     "cpm_micros": {"ui:placeholder": "e.g., 1500000 = $1.50"}
                 }
@@ -982,7 +784,7 @@ ADMOB_TOOL_SCHEMAS: dict[str, RJSFSchema] = {
             },
             "mediation_group_id": {
                 "ui:widget": "EntitySelectWidget",
-                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "account_id"}
+                "ui:options": {"fetchType": "mediation_groups", "dependsOn": "parent"}
             }
         }
     },

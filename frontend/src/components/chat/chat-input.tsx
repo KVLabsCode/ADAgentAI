@@ -1,33 +1,103 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUp, Square, Settings, Layers, ShieldCheck, Check } from "lucide-react"
+import { ArrowUp, Square, Database } from "lucide-react"
 import { Button } from "@/atoms/button"
-import { Popover, PopoverAnchor, PopoverTrigger, PopoverContent } from "@/molecules/popover"
+import { PopoverTrigger } from "@/molecules/popover"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/molecules/tooltip"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/molecules/dialog"
 import { cn } from "@/lib/utils"
 import { CommandPaletteContent } from "./command-palette/chat-command-palette"
 import { useCommandPalette } from "./command-palette/use-command-palette"
 import type { InlineMention } from "./command-palette/use-command-palette"
 import { ContextBadges } from "./badges/context-badges"
-import { ModelSelector } from "@/components/layout/model-selector"
 import { PromptInput } from "@/molecules/prompt-input"
 import { useUser } from "@/hooks/use-user"
-import { useChatSettings } from "@/lib/chat-settings"
 import { authFetch } from "@/lib/api"
 import type { Provider, ProviderApp } from "@/lib/types"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 interface ChatInputProps {
   onSend: (message: string) => void
   onStop?: () => void
   disabled?: boolean
   isLoading?: boolean
+  isLoadingProviders?: boolean
   placeholder?: string
   providers?: Provider[]
   isCentered?: boolean
   children?: React.ReactNode
+}
+
+// Provider context indicator with tooltip showing what LLM has loaded
+function ProviderContext({ providers, isLoading }: { providers: Provider[], isLoading?: boolean }) {
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 animate-pulse">
+        <div className="h-3 w-3 rounded bg-muted-foreground/20" />
+        <div className="h-3 w-20 rounded bg-muted-foreground/20" />
+      </div>
+    )
+  }
+
+  if (providers.length === 0) return null
+
+  const connectedProviders = providers.filter(p => p.status === "connected")
+  if (connectedProviders.length === 0) return null
+
+  // For single provider, show publisher ID
+  const singleProvider = connectedProviders.length === 1 ? connectedProviders[0] : null
+  const isAdMob = !!singleProvider?.identifiers.publisherId
+  const rawId = singleProvider?.identifiers.publisherId || singleProvider?.identifiers.networkCode || ""
+  const cleanId = rawId.replace(/^accounts\//, "")
+  const providerName = isAdMob ? "AdMob" : "Ad Manager"
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 hover:bg-muted/80 transition-colors cursor-default select-none">
+            <Database className="h-3 w-3 text-muted-foreground/70" />
+            {singleProvider ? (
+              <span className="text-[10px] text-muted-foreground">
+                <span className="font-medium">{providerName}</span>
+                {cleanId && (
+                  <span className="ml-1 text-muted-foreground/60 font-mono">{cleanId}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">
+                <span className="font-medium">{connectedProviders.length}</span>
+                <span className="ml-1 text-muted-foreground/70">accounts</span>
+              </span>
+            )}
+          </div>
+        }
+      />
+      <TooltipContent side="top" align="start" className="max-w-xs p-0">
+        <div className="px-3 py-2 border-b border-border/30">
+          <p className="text-xs font-medium">Connected Accounts</p>
+          <p className="text-[10px] text-muted-foreground">Data available to the assistant</p>
+        </div>
+        <div className="px-3 py-2 space-y-1.5">
+          {connectedProviders.map(p => {
+            const isAdMob = !!p.identifiers.publisherId
+            const rawId = p.identifiers.publisherId || p.identifiers.networkCode || ""
+            const id = rawId.replace(/^accounts\//, "")
+            const name = isAdMob ? "AdMob" : "Ad Manager"
+            return (
+              <div key={p.id} className="flex items-center justify-between gap-4">
+                <span className="text-xs font-medium">{name}</span>
+                <code className="text-[10px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded">
+                  {id}
+                </code>
+              </div>
+            )
+          })}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  )
 }
 
 export function ChatInput({
@@ -35,6 +105,7 @@ export function ChatInput({
   onStop,
   disabled = false,
   isLoading = false,
+  isLoadingProviders = false,
   placeholder = "Type your message...",
   providers = [],
   isCentered = false,
@@ -45,8 +116,6 @@ export function ChatInput({
   const savedRangeRef = React.useRef<Range | null>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const { getAccessToken } = useUser()
-  const { displayMode, setDisplayMode, safeMode, setSafeMode } = useChatSettings()
-  const [settingsOpen, setSettingsOpen] = React.useState(false)
 
   // Provider apps state (fetched on demand)
   const [providerApps, setProviderApps] = React.useState<Record<string, ProviderApp[]>>({})
@@ -186,7 +255,7 @@ export function ChatInput({
       setLoadingApps((prev) => new Set(prev).add(providerId))
       try {
         const accessToken = await getAccessToken()
-        const response = await authFetch(`${API_URL}/api/providers/${providerId}/apps`, accessToken)
+        const response = await authFetch(`/api/providers/${providerId}/apps`, accessToken)
         if (response.ok) {
           const data = await response.json()
           setProviderApps((prev) => ({ ...prev, [providerId]: data.apps || [] }))
@@ -360,7 +429,7 @@ export function ChatInput({
             className={cn(
               "min-h-[44px] max-h-[200px] overflow-y-auto px-4 py-3 text-sm",
               "bg-transparent outline-none",
-              "text-foreground",
+              "text-foreground caret-current",
               "[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground/40",
               (disabled || (isLoading && !onStop)) && "opacity-50 cursor-not-allowed pointer-events-none"
             )}
@@ -368,68 +437,18 @@ export function ChatInput({
         </div>
         <div className="flex items-center justify-between px-2.5 pb-2.5 pt-0">
           <div className="flex items-center gap-2">
-            <ModelSelector />
             <ContextBadges
               items={selectedContext}
               onRemove={removeFromContext}
               onAddClick={openFromButton}
             />
+            <ProviderContext providers={providers} isLoading={isLoadingProviders} />
           </div>
           <div className="flex items-center gap-2">
-            {/* Settings button with popover */}
-            <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-md hover:bg-muted/50 text-muted-foreground"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span className="sr-only">Chat settings</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="bottom"
-                align="end"
-                sideOffset={8}
-                className={cn(
-                  "w-52 p-1",
-                  "border border-border/50 bg-zinc-100 dark:bg-zinc-900/95 backdrop-blur-md",
-                  "shadow-lg shadow-black/10 dark:shadow-xl dark:shadow-black/40",
-                  "rounded-xl"
-                )}
-              >
-                <div className="space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setDisplayMode(displayMode === "compact" ? "detailed" : "compact")}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                  >
-                    <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="flex-1 text-sm text-left">Compact Mode</span>
-                    {displayMode === "compact" && (
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSafeMode(!safeMode)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="flex-1 text-sm text-left">Safe Mode</span>
-                    {safeMode && (
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    )}
-                  </button>
-                </div>
-              </PopoverContent>
-            </Popover>
             {mode === "dialog" ? (
-              <DialogTrigger asChild>{mentionButton}</DialogTrigger>
+              <DialogTrigger render={mentionButton}>{null}</DialogTrigger>
             ) : (
-              <PopoverTrigger asChild>{mentionButton}</PopoverTrigger>
+              <PopoverTrigger render={mentionButton}>{null}</PopoverTrigger>
             )}
             <Button
               type={isLoading ? "button" : "submit"}
@@ -508,88 +527,35 @@ export function ChatInput({
         )}
 
         {/* Input form - always rendered */}
-        <Popover open={isPaletteOpen} onOpenChange={setIsPaletteOpen}>
-          <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
             <div className="relative">
-              <PopoverAnchor asChild>
-                <div
-                  ref={editorRef}
-                  contentEditable={!disabled && !(isLoading && !onStop)}
-                  onInput={handleEditorInput}
-                  onKeyDown={handleEditorKeyDown}
-                  onPaste={handleEditorPaste}
-                  data-testid="chat-input"
-                  data-placeholder={placeholder}
-                  className={cn(
-                    "min-h-[44px] max-h-[200px] overflow-y-auto px-4 py-3 text-sm",
-                    "bg-transparent outline-none",
-                    "text-foreground",
-                    "[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground/40",
-                    (disabled || (isLoading && !onStop)) && "opacity-50 cursor-not-allowed pointer-events-none"
-                  )}
-                />
-              </PopoverAnchor>
+              <div
+                ref={editorRef}
+                contentEditable={!disabled && !(isLoading && !onStop)}
+                onInput={handleEditorInput}
+                onKeyDown={handleEditorKeyDown}
+                onPaste={handleEditorPaste}
+                data-testid="chat-input"
+                data-placeholder={placeholder}
+                className={cn(
+                  "min-h-[44px] max-h-[200px] overflow-y-auto px-4 py-3 text-sm",
+                  "bg-transparent outline-none",
+                  "text-foreground caret-current",
+                  "[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground/40",
+                  (disabled || (isLoading && !onStop)) && "opacity-50 cursor-not-allowed pointer-events-none"
+                )}
+              />
             </div>
             <div className="flex items-center justify-between px-2.5 pb-2.5 pt-0">
               <div className="flex items-center gap-2">
-                <ModelSelector />
                 <ContextBadges
                   items={selectedContext}
                   onRemove={removeFromContext}
                   onAddClick={openFromButton}
                 />
+                <ProviderContext providers={providers} isLoading={isLoadingProviders} />
               </div>
               <div className="flex items-center gap-2">
-                {/* Settings button with popover */}
-                <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-md hover:bg-muted/50 text-muted-foreground"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                      <span className="sr-only">Chat settings</span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="end"
-                    sideOffset={8}
-                    className={cn(
-                      "w-52 p-1",
-                      "border border-border/50 bg-zinc-100 dark:bg-zinc-900/95 backdrop-blur-md",
-                      "shadow-lg shadow-black/10 dark:shadow-xl dark:shadow-black/40",
-                      "rounded-xl"
-                    )}
-                  >
-                    <div className="space-y-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setDisplayMode(displayMode === "compact" ? "detailed" : "compact")}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                      >
-                        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="flex-1 text-sm text-left">Compact Mode</span>
-                        {displayMode === "compact" && (
-                          <Check className="h-3.5 w-3.5 text-primary" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSafeMode(!safeMode)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                      >
-                        <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="flex-1 text-sm text-left">Safe Mode</span>
-                        {safeMode && (
-                          <Check className="h-3.5 w-3.5 text-primary" />
-                        )}
-                      </button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
                 <Button
                   type="button"
                   variant="ghost"
@@ -629,7 +595,6 @@ export function ChatInput({
               </div>
             </div>
           </form>
-        </Popover>
       </div>
     </div>
   )

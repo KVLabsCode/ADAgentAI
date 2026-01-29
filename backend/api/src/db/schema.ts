@@ -502,9 +502,40 @@ export const deletedUsers = pgTable("deleted_users", {
 ]);
 
 // ============================================================
+// Network Credentials Table (API-key based networks)
+// ============================================================
+
+// Network Credentials - For API-key networks (AppLovin, Unity, etc.)
+// Note: Credentials are encrypted using AES-256-GCM at application layer
+export const networkCredentials = pgTable("network_credentials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(), // References neon_auth.users_sync.id
+  organizationId: text("organization_id"), // null = personal scope
+
+  // Network identification
+  networkName: varchar("network_name", { length: 100 }).notNull(), // applovin, unity, liftoff, etc.
+
+  // Encrypted credentials (AES-256-GCM via application layer)
+  // Structure varies by network - stored as encrypted JSONB
+  credentials: jsonb("credentials").notNull().$type<Record<string, string>>(),
+
+  // Status
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  lastVerifiedAt: timestamp("last_verified_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("network_credentials_user_org_idx").on(table.userId, table.organizationId),
+  index("network_credentials_network_idx").on(table.networkName),
+]);
+
+// ============================================================
 // Type Exports
 // ============================================================
 
+export type NetworkCredential = typeof networkCredentials.$inferSelect;
+export type NewNetworkCredential = typeof networkCredentials.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;

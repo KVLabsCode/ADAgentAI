@@ -52,10 +52,10 @@ function unwrapSingleKey(data: Record<string, unknown> | undefined): Record<stri
   if (!data) return data
 
   const keys = Object.keys(data)
-  // If there's exactly one key that looks like a wrapper, unwrap it
+  // If there's exactly one key that's a known wrapper, unwrap to show inner content directly
   if (keys.length === 1) {
     const key = keys[0]
-    const wrapperKeys = ["params", "input", "args", "arguments", "data", "payload"]
+    const wrapperKeys = ["params", "input", "args", "arguments", "data", "payload", "result", "response", "output", "body", "content"]
     if (wrapperKeys.includes(key.toLowerCase())) {
       const inner = data[key]
       if (inner && typeof inner === "object" && !Array.isArray(inner)) {
@@ -64,6 +64,20 @@ function unwrapSingleKey(data: Record<string, unknown> | undefined): Record<stri
     }
   }
   return data
+}
+
+/**
+ * Extract single-key object to display value directly (eliminating redundant root level).
+ * Returns { key, value } if data has exactly one key, otherwise returns { key: null, value: data }.
+ */
+function extractSingleKey(data: unknown): { key: string | null; value: unknown } {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const keys = Object.keys(data)
+    if (keys.length === 1) {
+      return { key: keys[0], value: (data as Record<string, unknown>)[keys[0]] }
+    }
+  }
+  return { key: null, value: data }
 }
 
 /**
@@ -85,7 +99,7 @@ const Tool = ({ toolPart, defaultOpen = false, className, approvalContent }: Too
 
   // Unwrap input/output if they have single wrapper keys
   const input = unwrapSingleKey(rawInput)
-  const output = rawOutput
+  const output = unwrapSingleKey(rawOutput)
 
   // Check if we have actual content to display
   const hasInput = hasContent(input)
@@ -193,104 +207,116 @@ const Tool = ({ toolPart, defaultOpen = false, className, approvalContent }: Too
   return (
     <div
       className={cn(
-        "mt-3 rounded-lg border",
-        "border-zinc-200/60 dark:border-zinc-700/40",
-        "bg-zinc-50/50 dark:bg-zinc-900/30",
+        "mt-3 rounded-[var(--card-radius)] border-[length:var(--card-border-width)]",
+        "border-[var(--card-border)] bg-[var(--card-bg)]",
         className
       )}
     >
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="h-auto w-full justify-between rounded-b-none px-3 py-2 font-normal hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30"
-          >
-            <div className="flex items-center gap-2">
-              {getStateIcon()}
-              <span className="font-mono text-sm font-medium">
-                {toolPart.type}
-              </span>
-              {getStateBadge()}
-            </div>
+        <CollapsibleTrigger
+          render={
+            <Button
+              variant="ghost"
+              className="h-auto w-full justify-between rounded-b-none px-3 py-2 font-normal hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30"
+            />
+          }
+        >
+          <div className="flex items-center gap-2">
+            {getStateIcon()}
+            <span className="text-sm font-medium">
+              {toolPart.type}
+            </span>
+            {getStateBadge()}
+          </div>
+          <div className="flex items-center gap-1">
+            {isOpen && (hasInput || hasOutput) && (
+              <div
+                role="button"
+                tabIndex={0}
+                className="h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setViewMode(viewMode === "tree" ? "json" : "tree")
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setViewMode(viewMode === "tree" ? "json" : "tree")
+                  }
+                }}
+              >
+                {viewMode === "tree" ? (
+                  <Code2 className="h-3.5 w-3.5" />
+                ) : (
+                  <ListTree className="h-3.5 w-3.5" />
+                )}
+                <span className="sr-only">Toggle {viewMode === "tree" ? "JSON" : "tree"} view</span>
+              </div>
+            )}
             <ChevronDown className={cn("h-4 w-4", isOpen && "rotate-180")} />
-          </Button>
+          </div>
         </CollapsibleTrigger>
         <CollapsibleContent
           className={cn(
-            "border-t border-zinc-200/60 dark:border-zinc-700/40",
+            "border-t border-[var(--card-header-border)]",
             "data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
           )}
           // Force overflow visible when open - inline style overrides Radix's inline overflow:hidden
           style={isOpen ? { overflow: 'visible' } : undefined}
         >
           <div className="space-y-3 p-3">
-            {/* View Mode Toggle - single icon button */}
-            {(hasInput || hasOutput) && (
-              <div className="flex items-center justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setViewMode(viewMode === "tree" ? "json" : "tree")
-                  }}
-                >
-                  {viewMode === "tree" ? (
-                    <Code2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <ListTree className="h-3.5 w-3.5" />
-                  )}
-                  <span className="sr-only">Toggle {viewMode === "tree" ? "JSON" : "tree"} view</span>
-                </Button>
-              </div>
-            )}
-
-            {input && (
-              <div>
-                <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
-                  Input
-                </h4>
-                <div className="rounded-md border border-zinc-200/80 dark:border-zinc-700/50 bg-background p-3">
-                  {viewMode === "tree" ? (
-                    <JsonTreeViewCompact
-                      data={input}
-                      collapsed={3}
-                      maxHeight="140px"
-                    />
-                  ) : (
-                    <ScrollArea className="max-h-[140px]">
-                      <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
-                        {formatValue(input)}
-                      </pre>
-                    </ScrollArea>
-                  )}
+            {input && (() => {
+              const { key: inputKey, value: inputValue } = extractSingleKey(input)
+              return (
+                <div>
+                  <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+                    Input{inputKey && <span className="ml-1 normal-case text-violet-400">({inputKey})</span>}
+                  </h4>
+                  <div className="rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] p-3">
+                    {viewMode === "tree" ? (
+                      <JsonTreeViewCompact
+                        data={inputValue}
+                        collapsed={3}
+                        maxHeight="140px"
+                      />
+                    ) : (
+                      <ScrollArea maxHeight="140px">
+                        <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
+                          {formatValue(input)}
+                        </pre>
+                      </ScrollArea>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
-            {output && (
-              <div>
-                <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
-                  Output
-                </h4>
-                <div className="rounded-md border border-zinc-200/80 dark:border-zinc-700/50 bg-background p-3">
-                  {viewMode === "tree" ? (
-                    <JsonTreeViewCompact
-                      data={output}
-                      collapsed={3}
-                      maxHeight="200px"
-                    />
-                  ) : (
-                    <ScrollArea className="max-h-[200px]">
-                      <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
-                        {formatValue(output)}
-                      </pre>
-                    </ScrollArea>
-                  )}
+            {output && (() => {
+              const { key: outputKey, value: outputValue } = extractSingleKey(output)
+              return (
+                <div>
+                  <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+                    Output{outputKey && <span className="ml-1 normal-case text-violet-400">({outputKey})</span>}
+                  </h4>
+                  <div className="rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] p-3">
+                    {viewMode === "tree" ? (
+                      <JsonTreeViewCompact
+                        data={outputValue}
+                        collapsed={3}
+                        maxHeight="200px"
+                      />
+                    ) : (
+                      <ScrollArea maxHeight="200px">
+                        <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
+                          {formatValue(output)}
+                        </pre>
+                      </ScrollArea>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {state === "output-error" && toolPart.errorText && (
               <div className="rounded-md border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 p-3">

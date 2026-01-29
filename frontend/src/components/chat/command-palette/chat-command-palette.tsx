@@ -171,21 +171,24 @@ export function CommandPaletteContent({
                     onOpenChange={() => hasApps && toggleExpanded(provider.id)}
                   >
                     <div className="flex items-center">
-                      {/* Expand/collapse trigger */}
-                      <CollapsibleTrigger asChild>
-                        <button
-                          className={cn(
-                            "flex items-center justify-center w-5 h-5 rounded hover:bg-muted/50",
-                            !hasApps && "opacity-0 pointer-events-none"
-                          )}
-                        >
-                          <ChevronRight
+                      {/* Expand/collapse trigger - stopPropagation prevents popover from closing */}
+                      <CollapsibleTrigger
+                        render={
+                          <button
                             className={cn(
-                              "h-3 w-3 text-muted-foreground transition-transform duration-200",
-                              isExpanded && "rotate-90"
+                              "flex items-center justify-center w-5 h-5 rounded hover:bg-muted/50",
+                              !hasApps && "opacity-0 pointer-events-none"
                             )}
+                            onClick={(e) => e.stopPropagation()}
                           />
-                        </button>
+                        }
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "h-3 w-3 text-muted-foreground transition-transform duration-200",
+                            isExpanded && "rotate-90"
+                          )}
+                        />
                       </CollapsibleTrigger>
 
                       {/* Provider row */}

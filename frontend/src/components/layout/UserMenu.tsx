@@ -44,24 +44,24 @@ export function UserMenu({ mounted }: UserMenuProps) {
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              className="h-9 data-[state=open]:bg-sidebar-accent"
-            >
-              <Avatar className="h-5 w-5 rounded">
-                <AvatarImage src={user?.avatar} alt={user?.name || 'User'} />
-                <AvatarFallback className="rounded bg-muted text-[10px] font-medium">
-                  {user?.name?.charAt(0).toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left leading-normal">
-                <span className="truncate text-xs font-medium leading-tight">{user?.name || 'User'}</span>
-                <span className="truncate text-[10px] text-muted-foreground leading-normal pb-0.5">
-                  {user?.email || ''}
-                </span>
-              </div>
-              <ChevronUp className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-            </SidebarMenuButton>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton className="h-9 data-[state=open]:bg-sidebar-accent" />
+            }
+          >
+            <Avatar className="h-5 w-5 rounded">
+              <AvatarImage src={user?.avatar} alt={user?.name || 'User'} />
+              <AvatarFallback className="rounded bg-muted text-[10px] font-medium">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left leading-normal">
+              <span className="truncate text-xs font-medium leading-tight">{user?.name || 'User'}</span>
+              <span className="truncate text-[10px] text-muted-foreground leading-normal pb-0.5">
+                {user?.email || ''}
+              </span>
+            </div>
+            <ChevronUp className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-[--radix-dropdown-menu-trigger-width] min-w-48"
@@ -69,11 +69,9 @@ export function UserMenu({ mounted }: UserMenuProps) {
             align="start"
             sideOffset={4}
           >
-            <DropdownMenuItem asChild className="cursor-pointer text-xs">
-              <Link href="/?view=public">
-                <Globe className="mr-2 h-3.5 w-3.5" />
-                Visit Website
-              </Link>
+            <DropdownMenuItem render={<Link href="/?view=public" />} className="cursor-pointer text-xs">
+              <Globe className="mr-2 h-3.5 w-3.5" />
+              Visit Website
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

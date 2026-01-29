@@ -2,23 +2,62 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../db";
-import { waitlist } from "../db/schema";
+import { waitlist, verifications } from "../db/schema";
 import { eq, desc, count, sql } from "drizzle-orm";
 import { sendEmail, waitlistConfirmationEmail, waitlistInviteEmail } from "../lib/email";
 import { nanoid } from "nanoid";
 
 const app = new Hono();
 
-// OAuth state storage (in production, use Redis or DB)
-const oauthStates = new Map<string, { createdAt: number }>();
+// OAuth state storage using database (verifications table)
+const OAUTH_STATE_IDENTIFIER = "waitlist_oauth_state";
+const OAUTH_STATE_EXPIRY_MINUTES = 10;
 
-// Clean up expired states (older than 10 minutes)
-function cleanupOauthStates() {
-  const now = Date.now();
-  for (const [state, data] of oauthStates) {
-    if (now - data.createdAt > 10 * 60 * 1000) {
-      oauthStates.delete(state);
+// Clean up expired OAuth states from database
+async function cleanupOauthStates() {
+  try {
+    await db
+      .delete(verifications)
+      .where(
+        sql`${verifications.identifier} = ${OAUTH_STATE_IDENTIFIER} AND ${verifications.expiresAt} < NOW()`
+      );
+  } catch (error) {
+    console.error("[Waitlist OAuth] Failed to cleanup states:", error);
+  }
+}
+
+// Store OAuth state in database
+async function storeOauthState(state: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + OAUTH_STATE_EXPIRY_MINUTES * 60 * 1000);
+  await db.insert(verifications).values({
+    id: state,
+    identifier: OAUTH_STATE_IDENTIFIER,
+    value: JSON.stringify({ createdAt: Date.now() }),
+    expiresAt,
+  });
+}
+
+// Verify and consume OAuth state from database
+async function verifyAndConsumeOauthState(state: string): Promise<boolean> {
+  try {
+    const [result] = await db
+      .select()
+      .from(verifications)
+      .where(
+        sql`${verifications.id} = ${state} AND ${verifications.identifier} = ${OAUTH_STATE_IDENTIFIER} AND ${verifications.expiresAt} > NOW()`
+      )
+      .limit(1);
+
+    if (!result) {
+      return false;
     }
+
+    // Delete the state (one-time use)
+    await db.delete(verifications).where(eq(verifications.id, state));
+    return true;
+  } catch (error) {
+    console.error("[Waitlist OAuth] Failed to verify state:", error);
+    return false;
   }
 }
 
@@ -258,6 +297,7 @@ app.get("/stats", async (c) => {
 // Initialize OAuth flow for popup
 // Returns the OAuth URL to open in a popup
 app.post("/oauth/init", async (c) => {
+  // Clean up expired states in background (don't await)
   cleanupOauthStates();
 
   const clientId = Bun.env.GOOGLE_CLIENT_ID;
@@ -267,9 +307,9 @@ app.post("/oauth/init", async (c) => {
     return c.json({ error: "OAuth not configured" }, 500);
   }
 
-  // Generate state for CSRF protection
+  // Generate state for CSRF protection and store in DB
   const state = nanoid(32);
-  oauthStates.set(state, { createdAt: Date.now() });
+  await storeOauthState(state);
 
   // Build OAuth URL
   const redirectUri = `${apiUrl}/api/waitlist/oauth/callback`;
@@ -312,11 +352,11 @@ app.get("/oauth/callback", async (c) => {
     return redirectToFrontend({ success: "false", error: "Invalid callback parameters" });
   }
 
-  // Verify state
-  if (!oauthStates.has(state)) {
+  // Verify state (stored in database for production resilience)
+  const isValidState = await verifyAndConsumeOauthState(state);
+  if (!isValidState) {
     return redirectToFrontend({ success: "false", error: "Invalid or expired state" });
   }
-  oauthStates.delete(state);
 
   try {
     const clientId = Bun.env.GOOGLE_CLIENT_ID;

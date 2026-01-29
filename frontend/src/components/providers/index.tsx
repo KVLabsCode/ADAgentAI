@@ -15,8 +15,10 @@ import { EntityDataProvider } from "@/contexts/entity-data-context"
 // Re-export provider management components
 export { ConnectProviderDropdown } from "./ConnectProviderDropdown"
 export { ProviderListItem } from "./ProviderListItem"
-export { SupportedPlatformsContent } from "./SupportedPlatformsCard"
+export { SupportedPlatformsContent, AllPlatformsGrid, ALL_PLATFORMS } from "./SupportedPlatformsCard"
 export { AccountSelectionModal } from "./account-selection-modal"
+export { NetworkCredentialDialog } from "./NetworkCredentialDialog"
+export { NetworkListItem } from "./NetworkListItem"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter()

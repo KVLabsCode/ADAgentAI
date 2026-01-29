@@ -38,11 +38,9 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
           {/* CTA */}
           <div className="flex flex-col items-center gap-3">
             {isAuthenticated ? (
-              <Button asChild size="lg" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90">
-                <Link href="/dashboard">
-                  Go to Dashboard
-                  <ArrowRight className="ml-2 h-3.5 w-3.5" />
-                </Link>
+              <Button render={<Link href="/dashboard" />} size="lg" className="h-10 px-6 text-sm rounded-full bg-foreground text-background hover:bg-foreground/90">
+                Go to Dashboard
+                <ArrowRight className="ml-2 h-3.5 w-3.5" />
               </Button>
             ) : (
               <>

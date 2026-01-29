@@ -47,7 +47,7 @@ export const ChainOfThoughtTrigger = ({
         <span className="relative inline-flex size-4 items-center justify-center overflow-visible">
           <span
             className={cn(
-              "transition-opacity",
+              "inline-flex items-center justify-center transition-opacity",
               swapIconOnHover && "group-hover/cot:opacity-0"
             )}
           >
@@ -125,21 +125,38 @@ export type ChainOfThoughtStepProps = {
   children: React.ReactNode
   className?: string
   isLast?: boolean
+  /** Controlled open state - use this instead of defaultOpen for dynamic states */
+  open?: boolean
+  /** Callback when open state changes */
+  onOpenChange?: (open: boolean) => void
 }
 
 export const ChainOfThoughtStep = ({
   children,
   className,
   isLast = false,
-  ...props
-}: ChainOfThoughtStepProps & React.ComponentProps<typeof Collapsible>) => {
+  open,
+  onOpenChange,
+  ...restProps
+}: ChainOfThoughtStepProps & Omit<React.ComponentProps<typeof Collapsible>, 'open' | 'onOpenChange'>) => {
+  // Build props for Collapsible - use controlled mode if open prop is provided
+  const collapsibleProps = open !== undefined
+    ? { open, onOpenChange, ...restProps }
+    : { defaultOpen: restProps.defaultOpen, onOpenChange, ...restProps }
+
+  // Remove defaultOpen from controlled mode
+  if (open !== undefined) {
+    delete (collapsibleProps as Record<string, unknown>).defaultOpen
+  }
+
   return (
     <Collapsible
       className={cn("group/cotstep", className)}
       data-last={isLast}
-      {...props}
+      {...collapsibleProps}
     >
       {children}
+      {/* Connector line between steps - hidden for last item */}
       <div className="flex justify-start group-data-[last=true]/cotstep:hidden">
         <div className="bg-primary/20 ml-[7px] h-4 w-px" />
       </div>

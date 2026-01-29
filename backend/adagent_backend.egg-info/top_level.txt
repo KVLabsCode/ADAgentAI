@@ -1,3 +1,2 @@
-admanager_mcp
-admob_mcp
 chat
+mcp_servers

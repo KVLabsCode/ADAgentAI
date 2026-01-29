@@ -92,10 +92,20 @@ class EntityResolver:
 
         Args:
             ad_unit_id: The ad unit ID (e.g., "ca-app-pub-xxx/123456")
+                       Note: Ad unit IDs use SLASH (/), app IDs use TILDE (~)
 
         Returns:
             ResolvedEntity with id, name, and valid flag
         """
+        # Check for common format mistake: app ID (tilde) vs ad unit ID (slash)
+        if "~" in ad_unit_id and "/" not in ad_unit_id:
+            print(f"[entity_resolver] WARNING: '{ad_unit_id}' looks like an APP ID (uses ~), not an AD UNIT ID (uses /)")
+            return {
+                "id": ad_unit_id,
+                "name": f"Invalid format: '{ad_unit_id}' is an app ID, not an ad unit ID",
+                "valid": False,
+            }
+
         cache_key = self._cache_key("ad_units")
         if not self._is_cache_valid(cache_key):
             await self._fetch_ad_units()

@@ -23,12 +23,18 @@ export interface Subscription {
 }
 
 export interface Usage {
-  chatMessages: number
-  providerQueries: number
-  limit: {
-    chatMessages: number
-    providerQueries: number
+  queries: number       // Number of user messages
+  toolCalls: number     // Number of MCP tools executed
+  tokens: number        // Total tokens used
+  cost: number          // Estimated cost in USD
+  limits: {
+    queries: number
+    tokens: number
   }
+  isPro: boolean
+  isAdmin: boolean
+  periodStart: string
+  periodEnd: string
 }
 
 export interface Invoice {

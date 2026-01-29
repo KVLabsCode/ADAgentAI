@@ -6,7 +6,7 @@ import validator from "@rjsf/validator-ajv8"
 import { RJSFSchema, ArrayFieldTemplateProps, ArrayFieldItemTemplateProps, FieldTemplateProps, ObjectFieldTemplateProps } from "@rjsf/utils"
 import type { RJSFSchema as AppRJSFSchema } from "@/lib/types"
 import { Plus, Trash2, ChevronDown, ChevronRight, Power } from "lucide-react"
-import { customWidgets } from "./widgets"
+import { customWidgets, customFields } from "./widgets"
 import { getParamDisplayName } from "@/lib/entity-config"
 import { cn } from "@/lib/utils"
 
@@ -160,30 +160,29 @@ function ObjectFieldTemplate(props: ObjectFieldTemplateProps) {
 
   // Render collapsible section
   return (
-    <div className={cn(
-      "rounded-lg border border-input/50 bg-muted/5"
-    )}>
-      {/* Collapsible header */}
+    <div className="border-[length:var(--card-border-width)] border-[var(--card-border)] rounded-[var(--card-radius)] bg-[var(--card-bg)] overflow-hidden">
+      {/* Section header - collapsible */}
       <button
         type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
         className={cn(
-          "flex items-center gap-2 w-full px-3 py-2 text-left",
-          "hover:bg-muted/10 transition-colors",
-          "text-sm font-medium text-muted-foreground"
+          "flex items-center gap-1.5 w-full px-2.5 py-2 text-left",
+          "bg-[var(--input-bg)] hover:bg-[var(--input-bg)]/80 transition-colors border-b border-[var(--card-header-border)]"
         )}
       >
         {isCollapsed ? (
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-3.5 w-3.5" />
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         )}
-        <span>{displayTitle}</span>
+        <span className="text-xs font-medium text-muted-foreground">
+          {displayTitle}
+        </span>
       </button>
 
       {/* Content */}
       {!isCollapsed && (
-        <div className="px-3 pb-3 pt-1 border-t border-input/50 space-y-2">
+        <div className="px-2.5 pb-2 pt-1.5 space-y-2">
           {properties.map((prop) => (
             <div key={prop.name}>{prop.content}</div>
           ))}
@@ -214,8 +213,8 @@ function BaseInputTemplate(props: {
       disabled={disabled || readonly}
       placeholder={placeholder}
       className={cn(
-        "flex h-7 w-full rounded border px-2 py-1 text-xs",
-        "bg-transparent dark:bg-input/30 border-input",
+        "flex h-7 w-full rounded-[var(--input-radius)] border px-2 py-1 text-xs",
+        "bg-[var(--input-bg)] border-[var(--input-border)]",
         "text-foreground placeholder:text-muted-foreground",
         "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
         "disabled:cursor-not-allowed disabled:opacity-50",
@@ -453,7 +452,10 @@ export function RJSFParameterForm({
   className,
 }: RJSFParameterFormProps) {
   const [formData, setFormData] = React.useState<Record<string, unknown>>(initialValues)
-  const [initialValuesJson, setInitialValuesJson] = React.useState(() => JSON.stringify(initialValues))
+  // Store baseline as RJSF-transformed data (set after first onChange)
+  const baselineJson = React.useRef<string | null>(null)
+  // Track mount state - RJSF fires onChange on mount with transformed data
+  const changeCount = React.useRef(0)
 
   // Extract underscore-prefixed fields for passing via formContext
   // These are backend-enriched fields (e.g., _resolved_ad_units) that RJSF would filter out
@@ -469,25 +471,42 @@ export function RJSFParameterForm({
 
   // Sync formData when initialValues change (e.g., after async parsing)
   React.useEffect(() => {
-    const newJson = JSON.stringify(initialValues)
-    if (newJson !== initialValuesJson && Object.keys(initialValues).length > 0) {
+    if (Object.keys(initialValues).length > 0) {
       setFormData(initialValues)
-      setInitialValuesJson(newJson)
+      // Reset baseline when initialValues change
+      baselineJson.current = null
+      changeCount.current = 0
     }
-  }, [initialValues, initialValuesJson])
+  }, [initialValues])
 
   const handleChange = React.useCallback(
     (data: IChangeEvent<Record<string, unknown>>) => {
       const newFormData = data.formData ?? {}
       setFormData(newFormData)
       const hasErrors = data.errors && data.errors.length > 0
-      const hasChanges = JSON.stringify(newFormData) !== initialValuesJson
+
+      changeCount.current += 1
+      const newFormDataJson = JSON.stringify(newFormData)
+
+      // First 2 onChange calls are from RJSF initialization - use as baseline
+      if (changeCount.current <= 2) {
+        baselineJson.current = newFormDataJson
+        // Report no changes during initialization
+        queueMicrotask(() => {
+          onChange?.(newFormData, false, hasErrors as boolean)
+        })
+        return
+      }
+
+      // After initialization, compare with baseline (RJSF-transformed data)
+      const hasChanges = baselineJson.current !== null && newFormDataJson !== baselineJson.current
+
       // Defer parent callback to avoid setState during render
       queueMicrotask(() => {
         onChange?.(newFormData, hasChanges, hasErrors as boolean)
       })
     },
-    [onChange, initialValuesJson]
+    [onChange]
   )
 
   // Callback to update a field in an array item (used by ArrayFieldTemplate header toggle)
@@ -500,7 +519,7 @@ export function RJSFParameterForm({
         newFormData[arrayName] = array
 
         // Trigger onChange with updated formData (deferred to avoid setState during render)
-        const hasChanges = JSON.stringify(newFormData) !== initialValuesJson
+        const hasChanges = baselineJson.current !== null && JSON.stringify(newFormData) !== baselineJson.current
         queueMicrotask(() => {
           onChange?.(newFormData, hasChanges, false)
         })
@@ -508,12 +527,30 @@ export function RJSFParameterForm({
         return newFormData
       })
     },
-    [onChange, initialValuesJson]
+    [onChange]
+  )
+
+  // Callback to update an entire array field (used by AdSourceToggleField)
+  const updateArrayField = React.useCallback(
+    (arrayName: string, newArray: unknown[]) => {
+      setFormData((prev) => {
+        const newFormData = { ...prev, [arrayName]: newArray }
+
+        // Trigger onChange with updated formData (deferred to avoid setState during render)
+        const hasChanges = baselineJson.current !== null && JSON.stringify(newFormData) !== baselineJson.current
+        queueMicrotask(() => {
+          onChange?.(newFormData, hasChanges, false)
+        })
+
+        return newFormData
+      })
+    },
+    [onChange]
   )
 
   // Pass formData, enrichedFields, and callbacks to templates via formContext
   // enrichedFields contains backend-resolved data like _resolved_ad_units
-  const formContext = { formData, updateArrayItemField, enrichedFields }
+  const formContext = { formData, updateArrayItemField, updateArrayField, enrichedFields }
 
   // Generate a key based on whether formData has key fields populated
   // This forces remount when initial values become available
@@ -533,6 +570,7 @@ export function RJSFParameterForm({
         onChange={handleChange}
         validator={validator}
         widgets={customWidgets}
+        fields={customFields}
         templates={{
           FieldTemplate,
           ObjectFieldTemplate,

@@ -19,13 +19,76 @@ from langgraph.types import RunnableConfig
 
 from ..state import GraphState
 from .entity_loader import build_entity_system_prompt
+from .tool_retriever import search_tools_within_set
 from ...tools import get_tools_for_service
+from ...tools.registry import get_tool_registry
 from ...streaming.events import format_sse, ThinkingEvent
 from ...utils.prompts import (
     get_system_prompt_template,
     get_service_instructions,
     get_agent_role,
 )
+from mcp_servers.annotations import get_tools_for_network_capability
+
+# Threshold for when to use FTS refinement
+TOOL_COUNT_THRESHOLD = 15
+FTS_TOP_K = 5
+
+# Model mapping by execution path for auto-selection
+# Reactive: simple queries → fast, cheap model
+# Workflow: complex queries → capable model with extended thinking
+MODEL_BY_PATH = {
+    "reactive": "claude-3-5-haiku-20241022",
+    "workflow": "claude-sonnet-4-20250514",
+}
+
+# Maps service names to account types stored in user context
+# Used by _service_has_enabled_accounts to check if user has connected accounts
+SERVICE_ACCOUNT_TYPES = {
+    "admob": "admob",
+    "admanager": "gam",
+    "applovin": "applovin",
+    "unity": "unity",
+    "mintegral": "mintegral",
+    "liftoff": "liftoff",
+    "inmobi": "inmobi",
+    "pangle": "pangle",
+    "dtexchange": "dtexchange",
+}
+
+CAPABILITY_KEYWORDS = {
+    "inventory": [
+        "app",
+        "apps",
+        "ad_unit",
+        "ad_units",
+        "placement",
+        "placements",
+        "site",
+        "sites",
+        "network",
+        "networks",
+        "contact",
+        "team",
+        "custom_field",
+        "custom_targeting",
+        "entity_signals",
+    ],
+    "reporting": ["report", "reports", "reporting", "metrics"],
+    "mediation": [
+        "mediation",
+        "ad_source",
+        "ad_sources",
+        "mediation_group",
+        "ab_experiment",
+        "experiment",
+        "ad_unit_mapping",
+    ],
+    "experimentation": ["experiment", "ab_experiment", "a_b"],
+    "orders": ["order", "line_item", "creative", "proposal"],
+    "deals": ["deal", "private_auction", "auction"],
+    "targeting": ["targeting", "custom_targeting", "custom_field", "key"],
+}
 
 
 def _build_system_prompt(
@@ -187,6 +250,52 @@ def _get_model_from_selection(selected_model: str | None, enable_thinking: bool 
     return ChatAnthropic(**llm_kwargs)
 
 
+def _get_model_for_execution_path(
+    execution_path: str,
+    user_override: str | None = None,
+) -> tuple[BaseChatModel, str]:
+    """Auto-select model based on execution path.
+
+    Args:
+        execution_path: "reactive" or "workflow" from router classification
+        user_override: User's model selection (None or "auto" means auto-select)
+
+    Returns:
+        Tuple of (configured LLM instance, model name string)
+    """
+    # Allow user override if explicitly set to non-"auto" value
+    if user_override and user_override != "auto":
+        llm = _get_model_from_selection(user_override)
+        model_name = user_override
+        print(f"[specialist] User override model: {model_name}")
+        return llm, model_name
+
+    # Auto-select based on execution path
+    model_name = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
+    print(f"[specialist] Auto-selected model for path='{execution_path}': {model_name}")
+
+    # Configure model based on path
+    # Reactive path: no extended thinking (faster)
+    # Workflow path: enable extended thinking for complex reasoning
+    enable_thinking = execution_path == "workflow"
+
+    llm_kwargs: dict[str, Any] = {
+        "model": model_name,
+        "max_tokens": 16000,
+    }
+
+    if enable_thinking:
+        llm_kwargs["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": 4096,
+        }
+        llm_kwargs["temperature"] = 1  # Required for thinking mode
+    else:
+        llm_kwargs["temperature"] = 0.1
+
+    return ChatAnthropic(**llm_kwargs), model_name
+
+
 def _sanitize_tool_name(name: str) -> str:
     """Sanitize tool name to meet Gemini's requirements.
 
@@ -243,6 +352,182 @@ def _sanitize_tools_for_gemini(tools: list) -> list:
     return sanitized_tools
 
 
+def _get_tool_text(tool: Any) -> str:
+    name = getattr(tool, "name", "") or ""
+    description = getattr(tool, "description", "") or ""
+    return f"{name} {description}".lower()
+
+
+def _filter_tools_for_capability(tools: list, capability: str) -> list:
+    """Filter tools using lightweight keyword matching to reduce tool list size.
+
+    Falls back to the full list if no tools match.
+    """
+    keywords = CAPABILITY_KEYWORDS.get(capability, [])
+    if not keywords:
+        return tools
+
+    filtered = [t for t in tools if any(k in _get_tool_text(t) for k in keywords)]
+    if not filtered:
+        print(f"[specialist] Tool filter returned 0 tools for capability={capability}, using full list")
+        return tools
+
+    print(f"[specialist] Filtered tools for capability={capability}: {len(filtered)}/{len(tools)}")
+    return filtered
+
+
+async def _filter_tools_by_network_capability(
+    tools: list,
+    network: str,
+    capability: str,
+    user_query: str,
+) -> list:
+    """Two-layer filtering: filter by network AND capability tags, then FTS refinement.
+
+    This implements the semantic routing visibility filter:
+    1. First get tools explicitly tagged for network+capability
+    2. Fall back to keyword matching if explicit tags don't match enough
+    3. If still >15 tools, use FTS to rank and return top 5
+
+    Args:
+        tools: Full list of LangChain tools
+        network: Network name (e.g., "admob", "unity")
+        capability: Capability name (e.g., "mediation", "reporting")
+        user_query: Original user query for FTS relevance ranking
+
+    Returns:
+        Filtered list of tools (typically 5-15 tools, not 171+)
+    """
+    filtered = []
+
+    # Try explicit tag-based filtering first (from annotations.py TOOL_TAGS)
+    tagged_tool_names = get_tools_for_network_capability(network, capability)
+
+    if tagged_tool_names:
+        # Filter to only tools in the explicit tag list
+        tagged_set = set(tagged_tool_names)
+        filtered = [t for t in tools if getattr(t, "name", "") in tagged_set]
+
+        if filtered:
+            print(f"[specialist] Tag-filtered {network}_{capability}: {len(filtered)} tools (explicit tags)")
+
+    # Fall back to registry-based filtering if no explicit tags
+    if not filtered:
+        registry = get_tool_registry()
+
+        # Ensure tools are loaded into registry
+        if registry.tool_count == 0:
+            registry.load_from_langchain_tools(tools, network)
+
+        # Use the registry's filter_by_network_capability
+        filtered_configs = registry.filter_by_network_capability(network, capability)
+
+        if filtered_configs:
+            filtered_names = {c.name for c in filtered_configs}
+            filtered = [t for t in tools if getattr(t, "name", "") in filtered_names]
+
+            if filtered:
+                print(f"[specialist] Registry-filtered {network}_{capability}: {len(filtered)} tools")
+
+    # Final fallback to keyword-based capability filtering
+    if not filtered:
+        print(f"[specialist] No tag/registry matches for {network}_{capability}, falling back to keywords")
+        filtered = _filter_tools_for_capability(tools, capability)
+
+    # FTS refinement: if too many tools, rank by query relevance
+    if len(filtered) > TOOL_COUNT_THRESHOLD:
+        tool_names = [getattr(t, "name", "") for t in filtered]
+        print(f"[specialist] {len(filtered)} tools > {TOOL_COUNT_THRESHOLD}, using FTS refinement")
+
+        try:
+            top_names = await search_tools_within_set(user_query, tool_names, FTS_TOP_K)
+            top_set = set(top_names)
+            filtered = [t for t in filtered if getattr(t, "name", "") in top_set]
+            # Preserve FTS ranking order
+            name_to_tool = {getattr(t, "name", ""): t for t in filtered}
+            filtered = [name_to_tool[n] for n in top_names if n in name_to_tool]
+            print(f"[specialist] FTS refined to {len(filtered)} tools")
+        except Exception as e:
+            print(f"[specialist] FTS refinement error: {e}, using first {FTS_TOP_K}")
+            filtered = filtered[:FTS_TOP_K]
+
+    return filtered
+
+
+def _filter_tools_for_orchestration(tools: list, capability: str) -> list:
+    """Filter tools for cross-network orchestration.
+
+    Includes:
+    1. Master controller tools (always included)
+    2. Tools matching capability across ALL networks
+
+    Args:
+        tools: Full list of tools from all networks
+        capability: Capability to filter for (e.g., "mediation", "reporting")
+
+    Returns:
+        Combined list of orchestration + capability-matching tools
+    """
+    # Master controller tools - always included
+    master_tools = [
+        "full_unity_admob_integration",
+        "global_revenue_summary",
+        "check_network_health",
+    ]
+
+    # Get capability keywords for filtering
+    keywords = CAPABILITY_KEYWORDS.get(capability, [])
+
+    # Build filtered list
+    filtered = []
+    filtered_names = set()
+
+    for tool in tools:
+        name = getattr(tool, "name", "")
+
+        # Include master controller tools
+        if name in master_tools:
+            if name not in filtered_names:
+                filtered.append(tool)
+                filtered_names.add(name)
+            continue
+
+        # Include tools matching capability keywords
+        if keywords and any(k in _get_tool_text(tool) for k in keywords):
+            if name not in filtered_names:
+                filtered.append(tool)
+                filtered_names.add(name)
+
+    if not filtered:
+        print(f"[specialist] No orchestration tools for capability={capability}, using full list")
+        return tools
+
+    print(f"[specialist] Orchestration filtered for {capability}: {len(filtered)} tools")
+    return filtered
+
+
+def _resolve_enabled_account_ids(user_context: dict) -> set[str]:
+    accounts = user_context.get("accounts", [])
+    enabled_by_pref = {a.get("id") for a in accounts if a.get("enabled", True)}
+    enabled_by_pref.discard(None)
+
+    selected = set(user_context.get("enabled_accounts", []))
+    if selected:
+        return {acc_id for acc_id in selected if acc_id in enabled_by_pref}
+    return enabled_by_pref
+
+
+def _service_has_enabled_accounts(user_context: dict, service: str) -> bool:
+    account_type = SERVICE_ACCOUNT_TYPES.get(service, service)
+    accounts = [a for a in user_context.get("accounts", []) if a.get("type") == account_type]
+    if not accounts:
+        return False
+    enabled_ids = _resolve_enabled_account_ids(user_context)
+    if not enabled_ids:
+        return False
+    return any(a.get("id") in enabled_ids for a in accounts)
+
+
 @traceable(name="specialist_node", run_type="llm")
 async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     """Invoke the specialist LLM to generate a response or tool calls.
@@ -273,6 +558,7 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     service = routing.get("service", "general")
     capability = routing.get("capability", "assistant")
     user_id = user_context.get("user_id")
+    organization_id = user_context.get("organization_id")
 
     # Build system prompt
     # Debug: log user_context to verify entity loading
@@ -300,16 +586,46 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
             entity_end = min(entity_start + 500, len(system_prompt))
         print(f"[specialist] Entity section preview: {system_prompt[entity_start:entity_end][:300]}...")
 
-    # Get appropriate LLM
-    llm = _get_model_from_selection(selected_model)
+    # Get execution path from routing for auto-model selection
+    execution_path = routing.get("execution_path", "workflow")
+
+    # Get appropriate LLM using auto-selection based on execution path
+    llm, actual_model_name = _get_model_for_execution_path(execution_path, selected_model)
 
     # Check if we're using an OpenRouter model (needs tool name sanitization)
-    is_openrouter = selected_model and selected_model.startswith("openrouter/")
+    # Check both user's selection and actual model name in case of auto-selection
+    is_openrouter = (
+        (selected_model and selected_model.startswith("openrouter/")) or
+        actual_model_name.startswith("openrouter/")
+    )
 
     # Load MCP tools for this service
+    retrieved_tools = state.get("retrieved_tools")  # From tool_retriever node
+
     try:
-        tools = await get_tools_for_service(service, user_id)
-        print(f"[specialist] Loaded {len(tools)} tools for service: {service}")
+        # Handle orchestration service specially - load all network tools
+        if service == "orchestration":
+            tools = await get_tools_for_service("all", user_id, organization_id)
+            print(f"[specialist] Loaded {len(tools)} tools for orchestration (all networks)")
+        else:
+            tools = await get_tools_for_service(service, user_id, organization_id)
+            print(f"[specialist] Loaded {len(tools)} tools for service: {service}")
+
+        if service not in ("general", "orchestration") and not _service_has_enabled_accounts(user_context, service):
+            print(f"[specialist] No enabled accounts for service={service}; skipping tool binding")
+            tools = []
+
+        # Use retrieved tools from semantic search if available
+        if tools and retrieved_tools:
+            retrieved_set = set(retrieved_tools)
+            tools = [t for t in tools if getattr(t, "name", "") in retrieved_set]
+            print(f"[specialist] Filtered to {len(tools)} tools from semantic retrieval")
+        # Two-layer tag-based filtering (network + capability) + FTS refinement
+        elif tools and service not in ("general", "orchestration"):
+            tools = await _filter_tools_by_network_capability(tools, service, capability, user_query)
+        # Orchestration: filter to relevant capability across all networks
+        elif tools and service == "orchestration":
+            tools = _filter_tools_for_orchestration(tools, capability)
 
         # Bind tools to LLM
         if tools:
@@ -395,39 +711,38 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                     for block in chunk_content:
                         if isinstance(block, dict):
                             if block.get("type") == "thinking":
-                                # Accumulate thinking (Claude sends all thinking before text)
+                                # Stream thinking chunks immediately as they arrive
                                 thinking_text = block.get("thinking", "")
                                 if thinking_text:
                                     thinking_content = (thinking_content or "") + thinking_text
+                                    # Emit each thinking chunk immediately
+                                    if output_queue:
+                                        await output_queue.put(format_sse(
+                                            ThinkingEvent(content=thinking_text).model_dump(mode='json')
+                                        ))
+                                        thinking_emitted = True
                             elif block.get("type") == "text":
                                 text = block.get("text", "")
                                 if text:
-                                    # First text chunk means thinking is complete
-                                    # Emit thinking to output_queue BEFORE content
-                                    if not thinking_emitted and thinking_content and output_queue:
-                                        await output_queue.put(format_sse(
-                                            ThinkingEvent(content=thinking_content).model_dump(mode='json')
-                                        ))
-                                        thinking_emitted = True
                                     # Stream text to content queue
                                     if content_queue:
                                         await content_queue.put(text)
                                     response_text += text
                         elif hasattr(block, "type"):
                             if block.type == "thinking":
+                                # Stream thinking chunks immediately as they arrive
                                 thinking_text = getattr(block, "thinking", "")
                                 if thinking_text:
                                     thinking_content = (thinking_content or "") + thinking_text
+                                    # Emit each thinking chunk immediately
+                                    if output_queue:
+                                        await output_queue.put(format_sse(
+                                            ThinkingEvent(content=thinking_text).model_dump(mode='json')
+                                        ))
+                                        thinking_emitted = True
                             elif block.type == "text":
                                 text = getattr(block, "text", "")
                                 if text:
-                                    # First text chunk means thinking is complete
-                                    # Emit thinking to output_queue BEFORE content
-                                    if not thinking_emitted and thinking_content and output_queue:
-                                        await output_queue.put(format_sse(
-                                            ThinkingEvent(content=thinking_content).model_dump(mode='json')
-                                        ))
-                                        thinking_emitted = True
                                     # Stream text to content queue
                                     if content_queue:
                                         await content_queue.put(text)
@@ -462,8 +777,30 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                 final_response = final_response + chunk
 
             # Extract token usage from final response metadata
-            if hasattr(final_response, "response_metadata"):
+            # Note: In streaming mode, usage is often only in the last chunk
+            usage: dict = {}
+
+            if hasattr(final_response, "response_metadata") and final_response.response_metadata:
                 usage = final_response.response_metadata.get("usage", {})
+                print(f"[specialist] response_metadata: {final_response.response_metadata}")
+
+            # Fallback: check usage_metadata (some LangChain versions use this)
+            if not usage and hasattr(final_response, "usage_metadata") and final_response.usage_metadata:
+                usage = {
+                    "input_tokens": getattr(final_response.usage_metadata, "input_tokens", 0),
+                    "output_tokens": getattr(final_response.usage_metadata, "output_tokens", 0),
+                }
+                print(f"[specialist] usage_metadata fallback: {usage}")
+
+            # Fallback: check last chunk directly for usage
+            if not usage and response_chunks:
+                last_chunk = response_chunks[-1]
+                if hasattr(last_chunk, "response_metadata") and last_chunk.response_metadata:
+                    usage = last_chunk.response_metadata.get("usage", {})
+                    print(f"[specialist] last_chunk response_metadata: {last_chunk.response_metadata}")
+
+            # Build token_usage dict from whatever we found
+            if usage:
                 token_usage = {
                     "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens", 0),
                     "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens", 0),
@@ -479,10 +816,11 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                         "args": tc.get("args", {}),
                     })
 
-        # Get model name
-        model_name = getattr(llm, "model", "unknown")
+        # Use actual_model_name from auto-selection (more accurate than extracting from llm)
+        model_name = actual_model_name
 
-        print(f"[specialist] Model: {model_name}")
+        print(f"[specialist] Model: {model_name}, execution_path: {execution_path}")
+        print(f"[specialist] Token usage: {token_usage}")
         print(f"[specialist] Thinking: {thinking_content[:100] if thinking_content else 'None'}...")
         print(f"[specialist] Response: {response_text[:100] if response_text else 'None'}...")
 

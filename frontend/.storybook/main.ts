@@ -3,9 +3,14 @@ import type { StorybookConfig } from "@storybook/nextjs";
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|ts|tsx|mdx)"],
   addons: [
-    "@storybook/addon-essentials",
-    "@storybook/addon-interactions",
     "@storybook/addon-a11y",
+    "@storybook/addon-docs",
+    {
+      name: "storybook-design-token",
+      options: {
+        designTokenGlob: "src/styles/tokens-storybook.css",
+      },
+    },
   ],
   framework: {
     name: "@storybook/nextjs",

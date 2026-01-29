@@ -65,16 +65,18 @@ export function AppSidebar() {
         {/* Desktop: show tooltip, Mobile: no tooltip to prevent it staying open */}
         <div className="hidden md:block">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:mx-auto"
-              >
-                <PanelLeftClose className={`h-3.5 w-3.5 transition-transform ${state === "collapsed" ? "rotate-180" : ""}`} />
-                <span className="sr-only">Toggle sidebar</span>
-              </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleSidebar}
+                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:mx-auto"
+                />
+              }
+            >
+              <PanelLeftClose className={`h-3.5 w-3.5 transition-transform ${state === "collapsed" ? "rotate-180" : ""}`} />
+              <span className="sr-only">Toggle sidebar</span>
             </TooltipTrigger>
             <TooltipContent side="right" className="text-xs">
               {state === "collapsed" ? "Expand" : "Collapse"} sidebar
@@ -101,24 +103,18 @@ export function AppSidebar() {
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    asChild
+                    render={item.title === "New Chat"
+                      ? <Link href="/chat" onClick={handleNewChat} />
+                      : <Link href={item.url} />
+                    }
                     isActive={item.title === "New Chat"
                       ? pathname === "/chat" && !pathname.includes("/chat/")
                       : pathname === item.url || pathname.startsWith(item.url + "/")}
                     tooltip={item.title}
                     className="h-8 text-xs"
                   >
-                    {item.title === "New Chat" ? (
-                      <Link href="/chat" onClick={handleNewChat}>
-                        <item.icon className="h-3.5 w-3.5" />
-                        <span>{item.title}</span>
-                      </Link>
-                    ) : (
-                      <Link href={item.url}>
-                        <item.icon className="h-3.5 w-3.5" />
-                        <span>{item.title}</span>
-                      </Link>
-                    )}
+                    <item.icon className="h-3.5 w-3.5" />
+                    <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -145,15 +141,13 @@ export function AppSidebar() {
                     return (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
-                          asChild
+                          render={<Link href={item.url} />}
                           isActive={isActive}
                           tooltip={item.title}
                           className="h-8 text-xs"
                         >
-                          <Link href={item.url}>
-                            <item.icon className="h-3.5 w-3.5" />
-                            <span>{item.title}</span>
-                          </Link>
+                          <item.icon className="h-3.5 w-3.5" />
+                          <span>{item.title}</span>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     )
@@ -172,15 +166,13 @@ export function AppSidebar() {
               {bottomNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    asChild
+                    render={<Link href={item.url} />}
                     isActive={pathname === item.url}
                     tooltip={item.title}
                     className="h-8 text-xs"
                   >
-                    <Link href={item.url}>
-                      <item.icon className="h-3.5 w-3.5" />
-                      <span>{item.title}</span>
-                    </Link>
+                    <item.icon className="h-3.5 w-3.5" />
+                    <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

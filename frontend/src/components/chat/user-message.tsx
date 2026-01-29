@@ -1,7 +1,7 @@
 "use client"
 
-import { cn } from "@/lib/utils"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 
 interface UserMessageProps {
@@ -18,8 +18,20 @@ export function UserMessage({ content }: UserMessageProps) {
   }
 
   return (
-    <div className="flex items-center gap-3 pb-2">
-      {/* Avatar - sized to match text line height */}
+    <div className="flex items-start gap-3 justify-end pb-2">
+      {/* Message bubble - right-aligned */}
+      <div
+        className={cn(
+          "max-w-[85%] rounded-2xl rounded-tr-none px-4 py-2.5",
+          "bg-secondary text-secondary-foreground"
+        )}
+      >
+        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+          {content}
+        </p>
+      </div>
+
+      {/* Avatar - on the right for user messages */}
       <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
         {user?.avatar ? (
           <Image
@@ -35,14 +47,6 @@ export function UserMessage({ content }: UserMessageProps) {
           </span>
         )}
       </div>
-
-      {/* Query text */}
-      <p className={cn(
-        "flex-1 text-lg font-semibold leading-snug whitespace-pre-wrap",
-        "text-zinc-900 dark:text-zinc-50"
-      )}>
-        {content}
-      </p>
     </div>
   )
 }

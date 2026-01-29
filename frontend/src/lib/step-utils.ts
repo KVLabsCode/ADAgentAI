@@ -113,6 +113,92 @@ export function getCategoryIcon(category: StepCategory): StepIconName {
 }
 
 /**
+ * Extract a short descriptive phrase from content (like Claude/ChatGPT status).
+ * Returns the first meaningful sentence or phrase, truncated to ~50 chars.
+ *
+ * Examples:
+ * - "Let me analyze your revenue data..." → "Analyzing revenue data"
+ * - "I'll check the AdMob API for..." → "Checking AdMob API"
+ * - "Looking at your mediation groups..." → "Looking at mediation groups"
+ */
+function extractShortPhrase(content: string): string | null {
+  if (!content || content.length < 10) return null
+
+  // Clean up the content
+  let text = content.trim()
+
+  // Remove common preambles
+  const preambles = [
+    /^(let me |i'll |i will |i'm going to |i am going to |let's )/i,
+    /^(okay,? |sure,? |alright,? |yes,? )/i,
+    /^(now |first |next )/i,
+  ]
+  for (const regex of preambles) {
+    text = text.replace(regex, "")
+  }
+
+  // Get first sentence or phrase (up to period, newline, or em-dash)
+  const firstSentence = text.split(/[.\n—]/)[0]?.trim() || text
+
+  // Convert to present participle form for action verbs
+  // "check the API" → "Checking the API"
+  // "analyze your data" → "Analyzing your data"
+  let phrase = firstSentence
+  const verbMappings: [RegExp, string][] = [
+    [/^(check|checking)\b/i, "Checking"],
+    [/^(analyze|analyzing|analyse|analysing)\b/i, "Analyzing"],
+    [/^(look|looking)\b/i, "Looking at"],
+    [/^(search|searching)\b/i, "Searching"],
+    [/^(query|querying)\b/i, "Querying"],
+    [/^(fetch|fetching)\b/i, "Fetching"],
+    [/^(get|getting)\b/i, "Getting"],
+    [/^(retrieve|retrieving)\b/i, "Retrieving"],
+    [/^(find|finding)\b/i, "Finding"],
+    [/^(review|reviewing)\b/i, "Reviewing"],
+    [/^(examine|examining)\b/i, "Examining"],
+    [/^(calculate|calculating)\b/i, "Calculating"],
+    [/^(compare|comparing)\b/i, "Comparing"],
+    [/^(generate|generating)\b/i, "Generating"],
+    [/^(create|creating)\b/i, "Creating"],
+    [/^(update|updating)\b/i, "Updating"],
+    [/^(process|processing)\b/i, "Processing"],
+    [/^(prepare|preparing)\b/i, "Preparing"],
+    [/^(load|loading)\b/i, "Loading"],
+    [/^(read|reading)\b/i, "Reading"],
+    [/^(understand|understanding)\b/i, "Understanding"],
+    [/^(think|thinking)\b/i, "Thinking about"],
+    [/^(consider|considering)\b/i, "Considering"],
+    [/^(evaluate|evaluating)\b/i, "Evaluating"],
+  ]
+
+  for (const [regex, replacement] of verbMappings) {
+    if (regex.test(phrase)) {
+      phrase = phrase.replace(regex, replacement)
+      break
+    }
+  }
+
+  // Capitalize first letter
+  phrase = phrase.charAt(0).toUpperCase() + phrase.slice(1)
+
+  // Truncate if too long (aim for ~50 chars max for UI)
+  if (phrase.length > 55) {
+    // Find a good break point
+    const breakPoint = phrase.lastIndexOf(" ", 50)
+    if (breakPoint > 30) {
+      phrase = phrase.slice(0, breakPoint) + "..."
+    } else {
+      phrase = phrase.slice(0, 52) + "..."
+    }
+  }
+
+  // Remove trailing punctuation except ...
+  phrase = phrase.replace(/[,;:]$/, "")
+
+  return phrase || null
+}
+
+/**
  * Convert a stream event to step display info
  */
 export function getStepInfo(event: StreamEventItem): StepInfo {
@@ -133,10 +219,11 @@ export function getStepInfo(event: StreamEventItem): StepInfo {
   }
 
   if (event.type === "content") {
-    // Just show "Responding..." - content goes inside expanded view
+    // Extract a short descriptive phrase from the content
+    const shortPhrase = extractShortPhrase(event.content)
     return {
       icon: "MessageSquare",
-      label: "Responding...",
+      label: shortPhrase || "Responding...",
       category: "content"
     }
   }
@@ -210,6 +297,14 @@ export function getStepInfo(event: StreamEventItem): StepInfo {
     }
   }
 
+  if (event.type === "tool_cancelled") {
+    return {
+      icon: "X",
+      label: `Cancelled: ${extractEntity(event.tool_name)}`,
+      category: "action"
+    }
+  }
+
   if (event.type === "tool_executing") {
     // Tool execution started after approval
     const category = getStepCategory(event.tool_name)
@@ -218,6 +313,14 @@ export function getStepInfo(event: StreamEventItem): StepInfo {
       icon: getCategoryIcon(category),
       label: `Executing ${entity}...`,
       category
+    }
+  }
+
+  if (event.type === "finished") {
+    return {
+      icon: "Check",
+      label: event.message || "Finished",
+      category: "action"
     }
   }
 
@@ -262,9 +365,9 @@ export function formatResultSummary(result: unknown): string | undefined {
  * Check if an event should be included in the steps timeline
  */
 export function isTimelineStep(event: StreamEventItem): boolean {
-  // Include: routing, thinking, content (intermediate text), tool, tool_executing, tool_result
+  // Include: routing, thinking, content (intermediate text), tool, tool_executing, tool_result, finished
   // Exclude: result (final answer - rendered in FinalAnswerBlock), tool_approval_required (rendered separately)
-  return ["routing", "thinking", "content", "tool", "tool_executing", "tool_result"].includes(event.type)
+  return ["routing", "thinking", "content", "tool", "tool_executing", "tool_result", "finished"].includes(event.type)
 }
 
 /**

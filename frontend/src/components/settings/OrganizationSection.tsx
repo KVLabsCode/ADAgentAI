@@ -483,11 +483,9 @@ export function OrganizationSection() {
                       </p>
                     </div>
                     <AlertDialog onOpenChange={(open) => !open && org.resetDeleteConfirm()}>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </Button>
+                      <AlertDialogTrigger render={<Button variant="destructive" size="sm" />}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
                       </AlertDialogTrigger>
                       <AlertDialogContent className="sm:left-[calc(50%+var(--sidebar-width)/2)] sm:-translate-x-1/2">
                         <AlertDialogHeader>
@@ -495,24 +493,22 @@ export function OrganizationSection() {
                             <AlertTriangle className="h-5 w-5 text-destructive" />
                             Delete Organization
                           </AlertDialogTitle>
-                          <AlertDialogDescription asChild>
-                            <div className="space-y-3">
-                              <p>
-                                Are you sure you want to delete <strong>{selectedOrganization?.name}</strong>? This action cannot be undone.
+                          <AlertDialogDescription render={<div className="space-y-3" />}>
+                            <p>
+                              Are you sure you want to delete <strong>{selectedOrganization?.name}</strong>? This action cannot be undone.
+                            </p>
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-foreground">
+                                Type <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{selectedOrganization?.name}</span> to confirm:
                               </p>
-                              <div className="space-y-2">
-                                <p className="text-xs font-medium text-foreground">
-                                  Type <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{selectedOrganization?.name}</span> to confirm:
-                                </p>
-                                <Input
-                                  type="text"
-                                  value={org.deleteConfirmText}
-                                  onChange={(e) => org.setDeleteConfirmText(e.target.value)}
-                                  placeholder="Type organization name"
-                                  className="h-9 text-sm"
-                                  autoComplete="off"
-                                />
-                              </div>
+                              <Input
+                                type="text"
+                                value={org.deleteConfirmText}
+                                onChange={(e) => org.setDeleteConfirmText(e.target.value)}
+                                placeholder="Type organization name"
+                                className="h-9 text-sm"
+                                autoComplete="off"
+                              />
                             </div>
                           </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -556,22 +552,20 @@ export function OrganizationSection() {
               <Check className="h-5 w-5" />
               Invitation Created
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Copy this message and send it to <strong>{invitations.invitedEmail}</strong> via Slack, email, or any messaging app:
-                </p>
-                <div className="p-3 rounded-lg bg-muted border border-border font-mono text-xs leading-relaxed whitespace-pre-wrap">
-                  {selectedOrganization && invitations.invitedEmail && (
-                    <>
-                      I invited you to {selectedOrganization.name} on ADAgent!
-                      {"\n\n"}
-                      Sign in with Google ({invitations.invitedEmail}) to accept:
-                      {"\n"}
-                      {typeof window !== 'undefined' ? window.location.origin : ''}/login
-                    </>
-                  )}
-                </div>
+            <AlertDialogDescription render={<div className="space-y-3" />}>
+              <p className="text-sm text-muted-foreground">
+                Copy this message and send it to <strong>{invitations.invitedEmail}</strong> via Slack, email, or any messaging app:
+              </p>
+              <div className="p-3 rounded-lg bg-muted border border-border font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                {selectedOrganization && invitations.invitedEmail && (
+                  <>
+                    I invited you to {selectedOrganization.name} on ADAgent!
+                    {"\n\n"}
+                    Sign in with Google ({invitations.invitedEmail}) to accept:
+                    {"\n"}
+                    {typeof window !== 'undefined' ? window.location.origin : ''}/login
+                  </>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

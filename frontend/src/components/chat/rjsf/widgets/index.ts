@@ -8,8 +8,9 @@
  * 3. Use in backend schema: "ui:widget": "SliderWidget"
  */
 
-import { RegistryWidgetsType } from "@rjsf/utils"
+import { RegistryWidgetsType, RegistryFieldsType } from "@rjsf/utils"
 import { AdSourceSelectWidget } from "./ad-source-widget"
+import { AdSourceToggleField } from "./ad-source-toggle-widget"
 import { CurrencyWidget } from "./currency-widget"
 import { EntitySelectWidget } from "./entity-select-widget"
 import { MultiSelectWidget } from "./multi-select-widget"
@@ -19,7 +20,7 @@ import { RegionCodesWidget } from "./region-codes-widget"
 import { SelectWidget } from "./select-widget"
 import { ToggleWidget } from "./toggle-widget"
 
-// Widget registry for RJSF
+// Widget registry for RJSF (for scalar fields)
 export const customWidgets: RegistryWidgetsType = {
   // Override default select widget with dark-themed version
   SelectWidget,
@@ -39,8 +40,14 @@ export const customWidgets: RegistryWidgetsType = {
   RegionCodesWidget,
 }
 
+// Field registry for RJSF (for complex fields like arrays)
+export const customFields: RegistryFieldsType = {
+  AdSourceToggleField,
+}
+
 // Named exports for direct imports
 export { AdSourceSelectWidget } from "./ad-source-widget"
+export { AdSourceToggleField } from "./ad-source-toggle-widget"
 export { CurrencyWidget } from "./currency-widget"
 export { EntitySelectWidget } from "./entity-select-widget"
 export { MultiSelectWidget } from "./multi-select-widget"

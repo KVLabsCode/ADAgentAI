@@ -47,6 +47,8 @@ class UserContext(TypedDict, total=False):
     accounts: list[dict]  # [{id, name, type, identifier}]
     apps: list[dict]  # [{id, name, platform}]
     ad_units: list[dict]  # [{id, name, format}]
+    # Connected networks (admob, gam, mintegral, unity, etc.)
+    connected_networks: list[str]  # Network names that are connected
     # Context mode from frontend settings
     context_mode: str  # "soft" or "strict"
     enabled_accounts: list[str]  # Account IDs enabled in context settings
@@ -57,6 +59,7 @@ class RoutingResult(TypedDict, total=False):
     service: str  # "admob", "admanager", "general"
     capability: str  # "inventory", "reporting", "mediation", etc.
     thinking: str  # Router's reasoning
+    execution_path: str  # "reactive" | "workflow" - determines model selection
 
 
 class ToolCall(TypedDict, total=False):
@@ -127,8 +130,12 @@ class GraphState(TypedDict, total=False):
     # Entity grounding (populated by entity loader)
     available_accounts: Optional[list[dict]]  # Available AdMob accounts and GAM networks
     available_apps: Optional[list[dict]]  # Available apps with IDs and names
+    available_ad_units: Optional[list[dict]]  # Available ad units with IDs, names, and formats
     context_mode: Optional[str]  # "soft" or "strict" from frontend settings
     entity_system_prompt: Optional[str]  # Entity-grounded prompt section
+
+    # Action required (populated by entity_loader when user needs to take action)
+    action_required: Optional[dict]  # {action_type, message, deep_link, blocking, metadata}
 
     # Token tracking for metrics (set by specialist)
     token_usage: Optional[dict]  # {"input_tokens": N, "output_tokens": N}
@@ -138,3 +145,17 @@ class GraphState(TypedDict, total=False):
     # Prevents duplicate events in processor
     thinking_streamed: Optional[bool]
     content_streamed: Optional[bool]
+
+    # Tool retrieval (set by tool_retriever node)
+    retrieved_tools: Optional[list[str]]  # Tool names from semantic search
+
+    # Verification (set by verifier node)
+    verification_status: Optional[str]  # "complete" or "incomplete"
+    verification_explanation: Optional[str]  # Why verification passed/failed
+    verification_retry_hint: Optional[str]  # Hint for retry if incomplete
+    verification_retry_count: Optional[int]  # Number of verification retries
+
+    # Backflow control (set by specialist to trigger re-routing or entity refresh)
+    needs_entity_refresh: Optional[bool]  # Go back to entity_loader (after creating app/ad unit)
+    needs_reroute: Optional[str]  # Go back to router with this new query (topic change)
+    backflow_reason: Optional[str]  # Reason for backflow (for tracing/debugging)

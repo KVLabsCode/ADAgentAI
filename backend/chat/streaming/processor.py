@@ -28,11 +28,14 @@ from .events import (
     ThinkingEvent,
     ContentEvent,
     ResultEvent,
+    FinishedEvent,
     ErrorEvent,
     DoneEvent,
     ToolApprovalRequiredEvent,
     ToolDeniedEvent,
     ToolExecutingEvent,
+    ActionRequiredEvent,
+    ActionType,
 )
 from .state import (
     start_stream,
@@ -42,6 +45,7 @@ from .state import (
     clear_current_stream,
 )
 from ..graph import run_graph, resume_graph
+from ..graph.nodes.specialist import MODEL_BY_PATH
 from ..observability import RunMetrics, save_run_summary, calculate_cost
 
 
@@ -302,6 +306,10 @@ async def stream_chat_response(
         except Exception as e:
             print(f"[metrics] Failed to save run summary: {e}")
 
+        # Emit "Finished" event if no error (shows at end of chain of thought)
+        if metrics.status == "success":
+            yield format_sse(FinishedEvent().model_dump(mode='json'))
+
         yield format_sse(DoneEvent().model_dump(mode='json'))
 
 
@@ -312,6 +320,17 @@ def _update_metrics(metrics: StreamMetrics, node_name: str, state_update: dict):
         if routing:
             metrics.service = routing.get("service")
             metrics.capability = routing.get("capability")
+
+        # Track router token usage (uses Haiku)
+        router_usage = state_update.get("router_token_usage", {})
+        if router_usage:
+            metrics.add_tokens(
+                input_tokens=router_usage.get("input_tokens", 0),
+                output_tokens=router_usage.get("output_tokens", 0),
+            )
+            # If no model set yet, use router model
+            if not metrics.model:
+                metrics.model = state_update.get("router_model", "claude-3-5-haiku-20241022")
 
     elif node_name == "specialist":
         # Count tool calls
@@ -361,11 +380,19 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
         # Emit routing event
         routing = state_update.get("routing", {})
         if routing:
-            events.append(RoutingEvent(
+            execution_path = routing.get("execution_path", "workflow")
+            # Determine model that will be auto-selected for this path
+            model_selected = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
+            print(f"[DEBUG] Routing event: path={execution_path}, model={model_selected}", flush=True)
+            routing_event = RoutingEvent(
                 service=routing.get("service", "general"),
                 capability=routing.get("capability", "general"),
                 thinking=routing.get("thinking"),
-            ).model_dump(mode='json'))
+                execution_path=execution_path,
+                model_selected=model_selected,
+            )
+            print(f"[DEBUG] RoutingEvent dump: {routing_event.model_dump(mode='json')}", flush=True)
+            events.append(routing_event.model_dump(mode='json'))
 
             # Emit agent event
             service = routing.get("service", "general")
@@ -374,8 +401,16 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
             events.append(AgentEvent(agent=agent_name).model_dump(mode='json'))
 
     elif node_name == "entity_loader":
-        # Entity loader is transparent to the user
-        pass
+        # Check if action is required (e.g., no providers connected)
+        action_required = state_update.get("action_required")
+        if action_required:
+            events.append(ActionRequiredEvent(
+                action_type=ActionType(action_required.get("action_type", "connect_provider")),
+                message=action_required.get("message", "Action required"),
+                deep_link=action_required.get("deep_link"),
+                blocking=action_required.get("blocking", True),
+                metadata=action_required.get("metadata"),
+            ).model_dump(mode='json'))
 
     elif node_name == "specialist":
         # Check for thinking content (extended thinking from Claude)
@@ -483,6 +518,17 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
         error = state_update.get("error")
         if error:
             events.append(ErrorEvent(content=error).model_dump(mode='json'))
+
+        # Check for action required (e.g., credentials expired)
+        action_required = state_update.get("action_required")
+        if action_required:
+            events.append(ActionRequiredEvent(
+                action_type=ActionType(action_required.get("action_type", "connect_provider")),
+                message=action_required.get("message", "Action required"),
+                deep_link=action_required.get("deep_link"),
+                blocking=action_required.get("blocking", True),
+                metadata=action_required.get("metadata"),
+            ).model_dump(mode='json'))
 
     return events
 

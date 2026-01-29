@@ -152,8 +152,8 @@ export function JoinClient({ token }: JoinClientProps) {
             <h1 className="text-xl font-semibold">Invalid Invite Link</h1>
             <p className="text-sm text-muted-foreground">{pageState.message}</p>
           </div>
-          <Button asChild variant="outline">
-            <Link href="/">Return to Home</Link>
+          <Button render={<Link href="/" />} variant="outline">
+            Return to Home
           </Button>
         </div>
       </div>
@@ -194,8 +194,8 @@ export function JoinClient({ token }: JoinClientProps) {
               You&apos;re already a member of <strong>{pageState.orgName}</strong>
             </p>
           </div>
-          <Button asChild>
-            <Link href="/dashboard">Go to Dashboard</Link>
+          <Button render={<Link href="/dashboard" />}>
+            Go to Dashboard
           </Button>
         </div>
       </div>
@@ -289,8 +289,8 @@ export function JoinClient({ token }: JoinClientProps) {
                 Join Organization
               </Button>
 
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/">Cancel</Link>
+              <Button render={<Link href="/" />} variant="outline" className="w-full">
+                Cancel
               </Button>
             </div>
           </>
