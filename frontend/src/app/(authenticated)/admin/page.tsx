@@ -20,6 +20,8 @@ import {
   Server,
   Zap,
   RefreshCw,
+  Github,
+  LayoutList,
 } from "lucide-react"
 import {
   PageContainer,
@@ -35,6 +37,18 @@ import { authFetch } from "@/lib/api"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 const externalTools = [
+  {
+    name: "Linear",
+    description: "Project management & issues",
+    url: "https://linear.app",
+    icon: LayoutList,
+  },
+  {
+    name: "GitHub",
+    description: "Source code repository",
+    url: "https://github.com/KVLabsCode/ADAgentAI",
+    icon: Github,
+  },
   {
     name: "LangSmith",
     description: "LLM observability & tracing",
