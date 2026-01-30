@@ -100,8 +100,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Use Neon Auth's built-in organization hooks
   // useListOrganizations returns basic org info
   // useActiveOrganization returns the active org with user's membership/role
-  const { data: orgList, isPending: isLoadingOrgs, refetch: refetchOrgs } = authClient.useListOrganizations()
-  const { data: activeOrgData } = authClient.useActiveOrganization()
+  // Only enable these hooks when user is authenticated to avoid 401 errors
+  const isUserAuthenticated = e2eTestMode ? !!e2eTestUser : !!session?.user
+  const { data: orgList, isPending: isLoadingOrgs, refetch: refetchOrgs } = authClient.useListOrganizations({
+    query: { enabled: isUserAuthenticated }
+  })
+  const { data: activeOrgData } = authClient.useActiveOrganization({
+    query: { enabled: isUserAuthenticated }
+  })
 
   // Get user from Neon Auth session OR from E2E test mode
   const neonUser = session?.user
