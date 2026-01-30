@@ -148,7 +148,7 @@ export function AllPlatformsGrid({
   }
 
   // Filter platforms based on props
-  let platformsToShow = ALL_PLATFORMS
+  let platformsToShow: readonly (typeof ALL_PLATFORMS)[number][] = ALL_PLATFORMS
   if (showOnlyNetworks) {
     // Show ad sources + dual-role platforms (as ad sources)
     platformsToShow = ALL_PLATFORMS.filter(p => p.platformType === "ad_source" || p.platformType === "both")
