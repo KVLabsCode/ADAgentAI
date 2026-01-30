@@ -63,7 +63,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
   }, [checkOAuthCallback])
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
+    <Dialog open={open} modal={false} onOpenChange={(isOpen) => {
       setOpen(isOpen)
       if (!isOpen && step !== "success") resetForm()
     }}>
