@@ -97,17 +97,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [receivedInvitations, setReceivedInvitations] = useState<ReceivedInvitation[]>([])
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false)
 
-  // Use Neon Auth's built-in organization hooks
-  // useListOrganizations returns basic org info
-  // useActiveOrganization returns the active org with user's membership/role
-  // Only enable these hooks when user is authenticated to avoid 401 errors
-  const isUserAuthenticated = e2eTestMode ? !!e2eTestUser : !!session?.user
-  const { data: orgList, isPending: isLoadingOrgs, refetch: refetchOrgs } = authClient.useListOrganizations({
-    query: { enabled: isUserAuthenticated }
-  })
-  const { data: activeOrgData } = authClient.useActiveOrganization({
-    query: { enabled: isUserAuthenticated }
-  })
+  // Organization state - manually managed to avoid 401 errors when not authenticated
+  // The Neon Auth hooks don't support conditional fetching, so we use manual state
+  const [orgList, setOrgList] = useState<Array<{ id: string; name: string; slug: string; logo?: string | null; createdAt: Date }>>([])
+  const [activeOrgData, setActiveOrgData] = useState<Record<string, unknown> | null>(null)
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(false)
+
+  // Fetch organizations only when authenticated
+  const refetchOrgs = useCallback(async () => {
+    if (!session?.user && !(e2eTestMode && e2eTestUser)) return
+
+    setIsLoadingOrgs(true)
+    try {
+      const orgsResponse = await authClient.organization.list({})
+      if (orgsResponse.data) {
+        setOrgList(orgsResponse.data as typeof orgList)
+      }
+      // getFullOrganization with no args returns the active organization
+      const activeResponse = await authClient.organization.getFullOrganization({})
+      if (activeResponse.data) {
+        setActiveOrgData(activeResponse.data as Record<string, unknown>)
+      }
+    } catch (error) {
+      // Silently fail - user may not have orgs yet
+      console.debug('Failed to fetch organizations:', error)
+    } finally {
+      setIsLoadingOrgs(false)
+    }
+  }, [session?.user, e2eTestMode, e2eTestUser])
 
   // Get user from Neon Auth session OR from E2E test mode
   const neonUser = session?.user
@@ -179,10 +196,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Refetch organizations when user becomes authenticated
   // This ensures orgs load immediately after sign in without page refresh
   React.useEffect(() => {
-    if (neonUser && !isLoadingOrgs) {
+    if (neonUser) {
       refetchOrgs()
     }
-  }, [neonUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [neonUser?.id, refetchOrgs])
 
   // Reusable function to check waitlist access
   const recheckWaitlistAccess = useCallback(async () => {
