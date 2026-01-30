@@ -101,11 +101,11 @@ async def _fetch_apps_for_provider(provider_id: str) -> list[dict]:
     return []
 
 
-async def _fetch_api_key_networks(user_id: str, organization_id: str | None) -> list[str]:
-    """Fetch user's connected API-key networks (AppLovin, Unity, Mintegral, etc.)
+async def _fetch_ad_sources(user_id: str, organization_id: str | None) -> list[str]:
+    """Fetch user's connected ad sources (AppLovin, Unity, Mintegral, etc.)
 
     Returns:
-        List of network names that are connected (e.g., ["mintegral", "unity"])
+        List of ad source names that are connected (e.g., ["mintegral", "unity"])
     """
     try:
         params = {"userId": user_id}
@@ -114,18 +114,22 @@ async def _fetch_api_key_networks(user_id: str, organization_id: str | None) -> 
 
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(
-                f"{API_URL}/api/networks/internal/list",
+                f"{API_URL}/api/ad-sources/internal/list",
                 params=params,
                 headers={"x-internal-api-key": INTERNAL_API_KEY},
             )
             if response.status_code == 200:
                 data = response.json()
-                networks = data.get("networks", [])
-                return [n.get("name") for n in networks if n.get("name")]
+                ad_sources = data.get("adSources", [])
+                return [s.get("name") for s in ad_sources if s.get("name")]
     except Exception as e:
-        print(f"[entity_loader] Error fetching API-key networks: {e}")
+        print(f"[entity_loader] Error fetching ad sources: {e}")
 
     return []
+
+
+# Legacy alias for backward compatibility
+_fetch_api_key_networks = _fetch_ad_sources
 
 
 async def _fetch_ad_units_for_provider(provider_id: str) -> list[dict]:
@@ -173,9 +177,11 @@ async def entity_loader_node(state: GraphState) -> dict:
     # Fetch all entities using the unified endpoint (with caching)
     entities = await _fetch_entities(user_id, organization_id, include_apps=True)
 
-    # Fetch API-key networks (AppLovin, Unity, Mintegral, etc.)
-    api_key_networks = await _fetch_api_key_networks(user_id, organization_id)
-    print(f"[entity_loader] Connected API-key networks: {api_key_networks}")
+    # Fetch ad sources (AppLovin, Unity, Mintegral, etc.)
+    ad_sources = await _fetch_ad_sources(user_id, organization_id)
+    print(f"[entity_loader] Connected ad sources: {ad_sources}")
+    # Legacy variable for backward compat
+    api_key_networks = ad_sources
 
     # Transform AdMob accounts to unified format
     accounts = []

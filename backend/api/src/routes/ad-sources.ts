@@ -5,14 +5,14 @@ import { eq, and, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 import { db } from "../db";
-import { networkCredentials, type NewNetworkCredential } from "../db/schema";
+import { adSources, connectedProviders, type NewAdSource } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { safeEncrypt, safeDecrypt } from "../lib/crypto";
 
-const networks = new Hono();
+const adSourcesRouter = new Hono();
 
 // Most routes require authentication
-networks.use("*", async (c, next) => {
+adSourcesRouter.use("*", async (c, next) => {
   const path = c.req.path;
   // Skip auth for internal endpoints (uses API key instead)
   if (path.includes("/internal/")) {
@@ -22,14 +22,14 @@ networks.use("*", async (c, next) => {
 });
 
 // ============================================================
-// Network Definitions
+// Ad Source Definitions
 // ============================================================
 
 /**
- * Network configuration with required credential fields.
- * These are the API-key based networks (not OAuth).
+ * Ad source configuration with required credential fields.
+ * These are the API-key based ad sources (not OAuth).
  */
-export const NETWORK_CONFIGS = {
+export const AD_SOURCE_CONFIGS = {
   applovin: {
     displayName: "AppLovin MAX",
     description: "AppLovin MAX mediation platform",
@@ -92,13 +92,13 @@ export const NETWORK_CONFIGS = {
   },
 } as const;
 
-export type NetworkName = keyof typeof NETWORK_CONFIGS;
+export type AdSourceName = keyof typeof AD_SOURCE_CONFIGS;
 
 // ============================================================
 // Schemas
 // ============================================================
 
-const networkNameSchema = z.enum([
+const adSourceNameSchema = z.enum([
   "applovin",
   "unity",
   "liftoff",
@@ -108,11 +108,12 @@ const networkNameSchema = z.enum([
   "dtexchange",
 ]);
 
-const connectNetworkSchema = z.object({
+const connectAdSourceSchema = z.object({
   credentials: z.record(z.string(), z.string()),
+  providerId: z.string().uuid().optional(), // Required in body, linked to parent provider
 });
 
-const toggleNetworkSchema = z.object({
+const toggleAdSourceSchema = z.object({
   isEnabled: z.boolean(),
 });
 
@@ -192,76 +193,103 @@ function maskCredentials(credentials: Record<string, string>): Record<string, st
 // ============================================================
 
 /**
- * GET /networks/config - Get network configuration schemas
- * Returns the field definitions for each network (for form generation)
+ * GET /ad-sources/config - Get ad source configuration schemas
+ * Returns the field definitions for each ad source (for form generation)
  */
-networks.get("/config", async (c) => {
-  return c.json({ networks: NETWORK_CONFIGS });
+adSourcesRouter.get("/config", async (c) => {
+  return c.json({ adSources: AD_SOURCE_CONFIGS });
 });
 
 /**
- * GET /networks - List user's connected networks
+ * GET /ad-sources - List user's connected ad sources
+ * Optionally filter by providerId query param
  */
-networks.get("/", async (c) => {
+adSourcesRouter.get("/", async (c) => {
   const user = c.get("user");
   const organizationId = user.organizationId;
+  const providerIdFilter = c.req.query("providerId");
 
-  const whereClause = organizationId
-    ? and(eq(networkCredentials.userId, user.id), eq(networkCredentials.organizationId, organizationId))
-    : and(eq(networkCredentials.userId, user.id), isNull(networkCredentials.organizationId));
+  let whereClause = organizationId
+    ? and(eq(adSources.userId, user.id), eq(adSources.organizationId, organizationId))
+    : and(eq(adSources.userId, user.id), isNull(adSources.organizationId));
 
-  const credentials = await db.query.networkCredentials.findMany({
+  // Add provider filter if specified
+  if (providerIdFilter) {
+    whereClause = and(whereClause, eq(adSources.providerId, providerIdFilter));
+  }
+
+  const sources = await db.query.adSources.findMany({
     where: whereClause,
     columns: {
       id: true,
-      networkName: true,
+      adSourceName: true,
       isEnabled: true,
       lastVerifiedAt: true,
       createdAt: true,
       credentials: true,
+      providerId: true,
     },
   });
 
-  // Check if user can manage networks
+  // Check if user can manage ad sources
   const canManage = await isOrgAdmin(user.id, organizationId);
 
   // Mask credentials for display
-  const networksWithMaskedCreds = credentials.map((cred) => ({
-    id: cred.id,
-    networkName: cred.networkName,
-    displayName: NETWORK_CONFIGS[cred.networkName as NetworkName]?.displayName || cred.networkName,
-    isEnabled: cred.isEnabled,
-    lastVerifiedAt: cred.lastVerifiedAt,
-    connectedAt: cred.createdAt,
-    maskedCredentials: maskCredentials(cred.credentials as Record<string, string>),
+  const adSourcesWithMaskedCreds = sources.map((source) => ({
+    id: source.id,
+    adSourceName: source.adSourceName,
+    displayName: AD_SOURCE_CONFIGS[source.adSourceName as AdSourceName]?.displayName || source.adSourceName,
+    isEnabled: source.isEnabled,
+    lastVerifiedAt: source.lastVerifiedAt,
+    connectedAt: source.createdAt,
+    providerId: source.providerId,
+    maskedCredentials: maskCredentials(source.credentials as Record<string, string>),
   }));
 
   return c.json({
-    networks: networksWithMaskedCreds,
+    adSources: adSourcesWithMaskedCreds,
     canManage,
   });
 });
 
 /**
- * POST /networks/:network - Connect a network with credentials
+ * POST /ad-sources/:adSource - Connect an ad source with credentials
+ * Requires providerId in body to link to parent provider
  */
-networks.post(
-  "/:network",
-  zValidator("param", z.object({ network: networkNameSchema })),
-  zValidator("json", connectNetworkSchema),
+adSourcesRouter.post(
+  "/:adSource",
+  zValidator("param", z.object({ adSource: adSourceNameSchema })),
+  zValidator("json", connectAdSourceSchema),
   async (c) => {
     const user = c.get("user");
-    const { network } = c.req.valid("param");
-    const { credentials } = c.req.valid("json");
+    const { adSource } = c.req.valid("param");
+    const { credentials, providerId } = c.req.valid("json");
 
-    // Check if user can manage networks
+    // Check if user can manage ad sources
     const canManage = await isOrgAdmin(user.id, user.organizationId);
     if (!canManage) {
-      return c.json({ error: "Only organization admins can connect networks" }, 403);
+      return c.json({ error: "Only organization admins can connect ad sources" }, 403);
+    }
+
+    // Validate providerId if provided
+    if (providerId) {
+      const provider = await db.query.connectedProviders.findFirst({
+        where: and(
+          eq(connectedProviders.id, providerId),
+          eq(connectedProviders.userId, user.id),
+          user.organizationId
+            ? eq(connectedProviders.organizationId, user.organizationId)
+            : isNull(connectedProviders.organizationId)
+        ),
+      });
+
+      if (!provider) {
+        return c.json({ error: "Provider not found or not accessible" }, 404);
+      }
     }
 
     // Validate required fields
-    const config = NETWORK_CONFIGS[network];
+    const config = AD_SOURCE_CONFIGS[adSource];
     for (const field of config.fields) {
       if (field.required && !credentials[field.key]) {
         return c.json({ error: `${field.label} is required` }, 400);
@@ -271,154 +299,163 @@ networks.post(
     // Encrypt credentials
     const encryptedCredentials = await encryptCredentials(credentials);
 
-    // Check if network already connected
-    const whereClause = user.organizationId
+    // Build where clause for checking existing
+    let existingWhereClause = user.organizationId
       ? and(
-          eq(networkCredentials.userId, user.id),
-          eq(networkCredentials.organizationId, user.organizationId),
-          eq(networkCredentials.networkName, network)
+          eq(adSources.userId, user.id),
+          eq(adSources.organizationId, user.organizationId),
+          eq(adSources.adSourceName, adSource)
         )
       : and(
-          eq(networkCredentials.userId, user.id),
-          isNull(networkCredentials.organizationId),
-          eq(networkCredentials.networkName, network)
+          eq(adSources.userId, user.id),
+          isNull(adSources.organizationId),
+          eq(adSources.adSourceName, adSource)
         );
 
-    const existing = await db.query.networkCredentials.findFirst({
-      where: whereClause,
+    // If providerId specified, scope to that provider
+    if (providerId) {
+      existingWhereClause = and(existingWhereClause, eq(adSources.providerId, providerId));
+    }
+
+    const existing = await db.query.adSources.findFirst({
+      where: existingWhereClause,
     });
 
     if (existing) {
       // Update existing
       await db
-        .update(networkCredentials)
+        .update(adSources)
         .set({
           credentials: encryptedCredentials,
           isEnabled: true,
+          providerId: providerId || existing.providerId,
           updatedAt: new Date(),
         })
-        .where(eq(networkCredentials.id, existing.id));
+        .where(eq(adSources.id, existing.id));
 
       return c.json({
         id: existing.id,
-        networkName: network,
+        adSourceName: adSource,
         displayName: config.displayName,
         isEnabled: true,
-        message: "Network credentials updated",
+        providerId: providerId || existing.providerId,
+        message: "Ad source credentials updated",
       });
     }
 
     // Insert new
     const [inserted] = await db
-      .insert(networkCredentials)
+      .insert(adSources)
       .values({
         userId: user.id,
         organizationId: user.organizationId,
-        networkName: network,
+        providerId: providerId,
+        adSourceName: adSource,
         credentials: encryptedCredentials,
         isEnabled: true,
-      } satisfies NewNetworkCredential)
-      .returning({ id: networkCredentials.id });
+      } satisfies NewAdSource)
+      .returning({ id: adSources.id });
 
     return c.json({
       id: inserted.id,
-      networkName: network,
+      adSourceName: adSource,
       displayName: config.displayName,
       isEnabled: true,
-      message: "Network connected successfully",
+      providerId: providerId,
+      message: "Ad source connected successfully",
     }, 201);
   }
 );
 
 /**
- * DELETE /networks/:id - Disconnect a network
+ * DELETE /ad-sources/:id - Disconnect an ad source
  */
-networks.delete("/:id", async (c) => {
+adSourcesRouter.delete("/:id", async (c) => {
   const user = c.get("user");
-  const networkId = c.req.param("id");
+  const adSourceId = c.req.param("id");
 
-  // Check if user can manage networks
+  // Check if user can manage ad sources
   const canManage = await isOrgAdmin(user.id, user.organizationId);
   if (!canManage) {
-    return c.json({ error: "Only organization admins can disconnect networks" }, 403);
+    return c.json({ error: "Only organization admins can disconnect ad sources" }, 403);
   }
 
   // Validate ownership and org context
   const whereClause = user.organizationId
     ? and(
-        eq(networkCredentials.id, networkId),
-        eq(networkCredentials.userId, user.id),
-        eq(networkCredentials.organizationId, user.organizationId)
+        eq(adSources.id, adSourceId),
+        eq(adSources.userId, user.id),
+        eq(adSources.organizationId, user.organizationId)
       )
     : and(
-        eq(networkCredentials.id, networkId),
-        eq(networkCredentials.userId, user.id),
-        isNull(networkCredentials.organizationId)
+        eq(adSources.id, adSourceId),
+        eq(adSources.userId, user.id),
+        isNull(adSources.organizationId)
       );
 
   const [deleted] = await db
-    .delete(networkCredentials)
+    .delete(adSources)
     .where(whereClause)
     .returning();
 
   if (!deleted) {
-    return c.json({ error: "Network not found" }, 404);
+    return c.json({ error: "Ad source not found" }, 404);
   }
 
   return c.json({ success: true });
 });
 
 /**
- * PATCH /networks/:id/toggle - Enable/disable network
+ * PATCH /ad-sources/:id/toggle - Enable/disable ad source
  */
-networks.patch(
+adSourcesRouter.patch(
   "/:id/toggle",
-  zValidator("json", toggleNetworkSchema),
+  zValidator("json", toggleAdSourceSchema),
   async (c) => {
     const user = c.get("user");
-    const networkId = c.req.param("id");
+    const adSourceId = c.req.param("id");
     const { isEnabled } = c.req.valid("json");
 
     // Validate ownership
-    const network = await db.query.networkCredentials.findFirst({
-      where: eq(networkCredentials.id, networkId),
+    const source = await db.query.adSources.findFirst({
+      where: eq(adSources.id, adSourceId),
     });
 
-    if (!network) {
-      return c.json({ error: "Network not found" }, 404);
+    if (!source) {
+      return c.json({ error: "Ad source not found" }, 404);
     }
 
     // Check access (same org context)
     const userOrgId = user.organizationId;
-    const networkOrgId = network.organizationId;
-    if (networkOrgId !== userOrgId) {
-      return c.json({ error: "Network not found" }, 404);
+    const sourceOrgId = source.organizationId;
+    if (sourceOrgId !== userOrgId) {
+      return c.json({ error: "Ad source not found" }, 404);
     }
 
     await db
-      .update(networkCredentials)
+      .update(adSources)
       .set({ isEnabled, updatedAt: new Date() })
-      .where(eq(networkCredentials.id, networkId));
+      .where(eq(adSources.id, adSourceId));
 
-    return c.json({ id: networkId, isEnabled });
+    return c.json({ id: adSourceId, isEnabled });
   }
 );
 
 /**
- * POST /networks/:network/verify - Verify network credentials
+ * POST /ad-sources/:adSource/verify - Verify ad source credentials
  * Makes a test API call to verify credentials work
  */
-networks.post(
-  "/:network/verify",
-  zValidator("param", z.object({ network: networkNameSchema })),
-  zValidator("json", connectNetworkSchema),
+adSourcesRouter.post(
+  "/:adSource/verify",
+  zValidator("param", z.object({ adSource: adSourceNameSchema })),
+  zValidator("json", connectAdSourceSchema),
   async (c) => {
-    const { network } = c.req.valid("param");
+    const { adSource } = c.req.valid("param");
     const { credentials } = c.req.valid("json");
 
-    // TODO: Implement actual verification for each network
+    // TODO: Implement actual verification for each ad source
     // For now, just validate required fields are present
-    const config = NETWORK_CONFIGS[network];
+    const config = AD_SOURCE_CONFIGS[adSource];
     for (const field of config.fields) {
       if (field.required && !credentials[field.key]) {
         return c.json({ valid: false, error: `${field.label} is required` });
@@ -438,10 +475,10 @@ networks.post(
 // ============================================================
 
 /**
- * GET /networks/internal/list - List user's enabled networks
+ * GET /ad-sources/internal/list - List user's enabled ad sources
  * Protected by internal API key
  */
-networks.get("/internal/list", async (c) => {
+adSourcesRouter.get("/internal/list", async (c) => {
   const apiKey = c.req.header("x-internal-api-key");
   const expectedKey = Bun.env.INTERNAL_API_KEY;
 
@@ -451,45 +488,53 @@ networks.get("/internal/list", async (c) => {
 
   const userId = c.req.query("userId");
   const organizationId = c.req.query("organizationId");
+  const providerIdFilter = c.req.query("providerId");
 
   if (!userId) {
     return c.json({ error: "userId is required" }, 400);
   }
 
-  const whereClause = organizationId
+  let whereClause = organizationId
     ? and(
-        eq(networkCredentials.userId, userId),
-        eq(networkCredentials.organizationId, organizationId),
-        eq(networkCredentials.isEnabled, true)
+        eq(adSources.userId, userId),
+        eq(adSources.organizationId, organizationId),
+        eq(adSources.isEnabled, true)
       )
     : and(
-        eq(networkCredentials.userId, userId),
-        isNull(networkCredentials.organizationId),
-        eq(networkCredentials.isEnabled, true)
+        eq(adSources.userId, userId),
+        isNull(adSources.organizationId),
+        eq(adSources.isEnabled, true)
       );
 
-  const credentials = await db.query.networkCredentials.findMany({
+  // Add provider filter if specified
+  if (providerIdFilter) {
+    whereClause = and(whereClause, eq(adSources.providerId, providerIdFilter));
+  }
+
+  const sources = await db.query.adSources.findMany({
     where: whereClause,
     columns: {
       id: true,
-      networkName: true,
+      adSourceName: true,
+      providerId: true,
     },
   });
 
   return c.json({
-    networks: credentials.map((c) => ({
-      id: c.id,
-      name: c.networkName,
-      displayName: NETWORK_CONFIGS[c.networkName as NetworkName]?.displayName || c.networkName,
+    adSources: sources.map((s) => ({
+      id: s.id,
+      name: s.adSourceName,
+      displayName: AD_SOURCE_CONFIGS[s.adSourceName as AdSourceName]?.displayName || s.adSourceName,
+      providerId: s.providerId,
     })),
   });
 });
 
 /**
- * POST /networks/internal/credentials - Get decrypted credentials for a network
+ * POST /ad-sources/internal/credentials - Get decrypted credentials for an ad source
  * Protected by internal API key
  */
-networks.post("/internal/credentials", async (c) => {
+adSourcesRouter.post("/internal/credentials", async (c) => {
   const apiKey = c.req.header("x-internal-api-key");
   const expectedKey = Bun.env.INTERNAL_API_KEY;
 
@@ -499,44 +544,51 @@ networks.post("/internal/credentials", async (c) => {
 
   const body = await c.req.json() as {
     userId: string;
-    networkName: string;
+    adSourceName: string;
     organizationId?: string;
+    providerId?: string;
   };
-  const { userId, networkName, organizationId } = body;
+  const { userId, adSourceName, organizationId, providerId } = body;
 
-  if (!userId || !networkName) {
-    return c.json({ error: "userId and networkName are required" }, 400);
+  if (!userId || !adSourceName) {
+    return c.json({ error: "userId and adSourceName are required" }, 400);
   }
 
-  const whereClause = organizationId
+  let whereClause = organizationId
     ? and(
-        eq(networkCredentials.userId, userId),
-        eq(networkCredentials.organizationId, organizationId),
-        eq(networkCredentials.networkName, networkName),
-        eq(networkCredentials.isEnabled, true)
+        eq(adSources.userId, userId),
+        eq(adSources.organizationId, organizationId),
+        eq(adSources.adSourceName, adSourceName),
+        eq(adSources.isEnabled, true)
       )
     : and(
-        eq(networkCredentials.userId, userId),
-        isNull(networkCredentials.organizationId),
-        eq(networkCredentials.networkName, networkName),
-        eq(networkCredentials.isEnabled, true)
+        eq(adSources.userId, userId),
+        isNull(adSources.organizationId),
+        eq(adSources.adSourceName, adSourceName),
+        eq(adSources.isEnabled, true)
       );
 
-  const credential = await db.query.networkCredentials.findFirst({
+  // Add provider filter if specified
+  if (providerId) {
+    whereClause = and(whereClause, eq(adSources.providerId, providerId));
+  }
+
+  const source = await db.query.adSources.findFirst({
     where: whereClause,
   });
 
-  if (!credential) {
-    return c.json({ error: "Network not connected or disabled" }, 404);
+  if (!source) {
+    return c.json({ error: "Ad source not connected or disabled" }, 404);
   }
 
   // Decrypt and return credentials
-  const decrypted = await decryptCredentials(credential.credentials as Record<string, string>);
+  const decrypted = await decryptCredentials(source.credentials as Record<string, string>);
 
   return c.json({
-    networkName: credential.networkName,
+    adSourceName: source.adSourceName,
     credentials: decrypted,
+    providerId: source.providerId,
   });
 });
 
-export default networks;
+export default adSourcesRouter;

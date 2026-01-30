@@ -1,5 +1,5 @@
-// Network types for API-key based ad networks
-export type NetworkName =
+// Ad source types for API-key based ad networks (mediation partners)
+export type AdSourceName =
   | "applovin"
   | "unity"
   | "liftoff"
@@ -8,7 +8,7 @@ export type NetworkName =
   | "pangle"
   | "dtexchange"
 
-export interface NetworkConfigField {
+export interface AdSourceConfigField {
   key: string
   label: string
   type: "text" | "password"
@@ -18,21 +18,30 @@ export interface NetworkConfigField {
   helpUrl?: string
 }
 
-export interface NetworkConfig {
-  name: NetworkName
+export interface AdSourceConfig {
+  name: AdSourceName
   displayName: string
   description?: string
   docsUrl?: string
-  fields: NetworkConfigField[]
+  fields: AdSourceConfigField[]
 }
 
-export interface NetworkCredential {
+export interface AdSource {
   id: string
-  networkName: NetworkName
+  adSourceName: AdSourceName
   displayName: string
   isEnabled: boolean
   connectedAt: string
+  providerId?: string
+  // Legacy alias for backward compatibility
+  networkName?: AdSourceName
 }
+
+// Legacy aliases for backward compatibility during migration
+export type NetworkName = AdSourceName
+export type NetworkConfigField = AdSourceConfigField
+export type NetworkConfig = AdSourceConfig
+export type NetworkCredential = AdSource
 
 // Action required types (for prompting user to connect provider, etc.)
 export type ActionRequiredType =

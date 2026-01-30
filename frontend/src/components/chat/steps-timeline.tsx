@@ -93,6 +93,12 @@ function eventsToSteps(events: StreamEventItem[]): TimelineStep[] {
       continue
     }
 
+    // Skip tool_executing events that have a corresponding approval event
+    // The approval step already shows the executing state
+    if (event.type === "tool_executing" && toolsWithApproval.has(event.tool_name)) {
+      continue
+    }
+
     const stepInfo = getStepInfo(event)
 
     // Find matching tool_result for tool events
@@ -147,10 +153,11 @@ interface ToolApprovalStepProps {
   isPending: boolean
   isExecuting: boolean
   isDenied: boolean
+  toolResult?: unknown  // Result from tool_result event (if execution completed)
   onApproval?: (approvalId: string, approved: boolean, modifiedParams?: Record<string, unknown>) => void
 }
 
-function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, onApproval }: ToolApprovalStepProps) {
+function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, toolResult, onApproval }: ToolApprovalStepProps) {
   // Parse initial values from tool input
   const initialValues = React.useMemo(() => {
     try {
@@ -202,7 +209,9 @@ function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, onApp
   }
 
   // Determine tool state
-  const toolState = isPending ? "approval-pending" : isExecuting ? "input-streaming" : isDenied ? "output-error" : "output-available"
+  // If we have a result, show it (even if isExecuting is still true from approval state)
+  const hasResult = toolResult !== undefined
+  const toolState = isPending ? "approval-pending" : isDenied ? "output-error" : hasResult ? "output-available" : isExecuting ? "input-streaming" : "output-available"
 
   // Render icon based on state - Plus icon for pending approval
   const renderIcon = () => {
@@ -213,6 +222,10 @@ function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, onApp
           <Plus className="relative h-4 w-4 text-orange-500" />
         </span>
       )
+    }
+    // Show completed state when result is available (even if isExecuting flag is still true)
+    if (hasResult || isDenied) {
+      return <Plus className="h-4 w-4 text-muted-foreground" />
     }
     if (isExecuting) {
       return (
@@ -269,6 +282,8 @@ function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, onApp
       <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={false}>
         {isPending ? (
           <TextShimmer duration={2}>{step.label}</TextShimmer>
+        ) : hasResult || isDenied ? (
+          step.label
         ) : isExecuting ? (
           <TextShimmer duration={2}>Executing {formatToolName(event.tool_name)}...</TextShimmer>
         ) : (
@@ -281,6 +296,7 @@ function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, onApp
             type: formatToolName(event.tool_name),
             state: toolState,
             input: event.parameter_schema && isPending ? undefined : initialValues,
+            output: hasResult ? (toolResult as Record<string, unknown>) : undefined,
             errorText: isDenied ? "Execution denied" : undefined,
           }}
           defaultOpen={true}
@@ -524,6 +540,16 @@ export function StepsTimeline({
             const isExecuting = approvalState === true
             const isDenied = approvalState === false
 
+            // Only look for tool_result if this approval has been resolved (not pending)
+            // This prevents showing results from a previous call when same tool is called twice
+            let toolResult: unknown = undefined
+            if (!isPending) {
+              const toolResultEvent = events.find(
+                (e) => e.type === "tool_result" && e.name === event.tool_name
+              )
+              toolResult = toolResultEvent?.type === "tool_result" ? toolResultEvent.result : undefined
+            }
+
             return (
               <ToolApprovalStep
                 key={step.id}
@@ -532,6 +558,7 @@ export function StepsTimeline({
                 isPending={isPending}
                 isExecuting={isExecuting}
                 isDenied={isDenied}
+                toolResult={toolResult}
                 onApproval={onToolApproval}
               />
             )

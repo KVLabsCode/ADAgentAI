@@ -90,6 +90,7 @@ def _serialize_result(result: Any) -> str:
     except (TypeError, ValueError):
         return str(result)
 
+
 from ..state import GraphState, ToolCall, ApprovalRequest
 from ..validators import (
     validate_entity_references,
@@ -415,11 +416,11 @@ async def tool_executor_node(state: GraphState, config: dict | None = None) -> d
             return {
                 "tool_calls": [{
                     **tool_call,
-                    "result": f"Tool '{tool_name}' was denied by user.",
+                    "result": f"Tool '{tool_name}' was DENIED by user.",
                 }],
                 "messages": [
                     ToolMessage(
-                        content=f"Tool execution denied by user.",
+                        content=f"Tool '{tool_name}' was DENIED by user. Do NOT retry this tool. Acknowledge the denial and ask if the user wants to try something else.",
                         tool_call_id=tool_id,
                     )
                 ],
@@ -511,7 +512,7 @@ async def tool_executor_node(state: GraphState, config: dict | None = None) -> d
                         "tool_calls": [updated_call],
                         "messages": [
                             ToolMessage(
-                                content="Tool execution denied by user.",
+                                content=f"Tool '{tool_name}' was DENIED by user. Do NOT retry this tool. Acknowledge the denial and ask if the user wants to try something else.",
                                 tool_call_id=tool_id,
                             )
                         ],
@@ -568,9 +569,14 @@ async def tool_executor_node(state: GraphState, config: dict | None = None) -> d
     user_id = user_context.get("user_id")
     organization_id = user_context.get("organization_id")
 
+    # NOTE: We rely on MCP caching in loader.py instead of passing tools through state.
+    # StructuredTool objects can't be serialized by the PostgreSQL checkpointer.
+
     # Execute the tool
     try:
-        result = await _execute_tool(tool_name, tool_args, service, user_id, organization_id)
+        result = await _execute_tool(
+            tool_name, tool_args, service, user_id, organization_id
+        )
 
         # Serialize result to JSON (not Python str representation)
         result_str = _serialize_result(result)
@@ -652,6 +658,10 @@ async def tool_executor_node(state: GraphState, config: dict | None = None) -> d
 
         if action_required:
             result["action_required"] = action_required
+            # For blocking errors, set a response so the graph can end cleanly
+            # without the specialist trying to retry
+            if action_required.get("blocking"):
+                result["response"] = action_required["message"]
 
         return result
 
@@ -1505,10 +1515,7 @@ async def _execute_tool(
     """Execute a tool by name with given arguments, with retry for transient errors.
 
     Uses the execute_tool function which keeps the MCP client context
-    open during tool execution.
-
-    Progress streaming: Creates a progress callback that forwards MCP tool
-    progress events to LangGraph's custom stream for real-time UI updates.
+    open during tool execution. MCP caching in loader.py handles tool reuse.
 
     Retry logic: Retries on transient errors (connection, timeout, 5xx) up to
     max_retries times with exponential backoff. Does NOT retry on auth errors

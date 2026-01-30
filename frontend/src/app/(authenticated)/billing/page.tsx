@@ -3,11 +3,12 @@
 import * as React from "react"
 import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertCircle, ArrowRight } from "lucide-react"
+import { AlertCircle, ChevronRight } from "lucide-react"
 import { Button } from "@/atoms/button"
 import { Skeleton } from "@/atoms/skeleton"
 import {
   PageContainer,
+  PageHeader,
   StatusMessage,
 } from "@/organisms/theme"
 import { useBilling } from "@/hooks/useBilling"
@@ -174,22 +175,13 @@ function BillingContent() {
     return (
       <PageContainer>
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-[length:var(--text-title)] font-[var(--font-weight-semibold)] leading-[var(--line-height-title)]">
-              Billing
-            </h1>
-            <p className="text-[length:var(--text-description)] leading-[var(--line-height-description)] text-[color:var(--text-color-description)]">
-              For questions about billing,{" "}
-              <Link href="/support" className="text-foreground hover:underline underline-offset-2">
-                contact us
-              </Link>
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Billing"
+          description="Manage your subscription and view usage."
+        />
 
         {/* Error card */}
-        <div className="mt-8 rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)] px-[var(--item-padding-x)] py-8">
+        <div className="mt-6 rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)] px-[var(--item-padding-x)] py-8">
           <div className="flex flex-col items-center text-center">
             <AlertCircle className="h-8 w-8 text-muted-foreground mb-3" />
             <p className="text-[length:var(--text-label)] font-[var(--font-weight-medium)] mb-1">
@@ -213,32 +205,23 @@ function BillingContent() {
         <StatusMessage type={statusMessage.type} message={statusMessage.text} />
       )}
 
-      {/* Header - Linear style */}
+      {/* Header */}
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-[length:var(--text-title)] font-[var(--font-weight-semibold)] leading-[var(--line-height-title)]">
-            Billing
-          </h1>
-          <p className="text-[length:var(--text-description)] leading-[var(--line-height-description)] text-[color:var(--text-color-description)]">
-            For questions about billing,{" "}
-            <Link href="/support" className="text-foreground hover:underline underline-offset-2">
-              contact us
-            </Link>
-          </p>
-        </div>
+        <PageHeader
+          title="Billing"
+          description="Manage your subscription and view usage."
+        />
         <Link
           href="/pricing"
-          className="flex items-center gap-1 text-[length:var(--text-description)] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-0.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
         >
           All plans
-          <ArrowRight className="h-3.5 w-3.5" />
+          <ChevronRight className="h-4 w-4" />
         </Link>
       </div>
 
       {/* Usage stats */}
-      <div className="mt-6">
-        <UsageCard usage={usage} loading={usageLoading} />
-      </div>
+      <UsageCard usage={usage} loading={usageLoading} />
 
       {/* Plan cards - two column grid */}
       <div className="mt-6">

@@ -439,13 +439,16 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
             if tc.get("result") is None:  # Pending tool call
                 tool_args = tc.get("args", {})
                 tool_name = tc.get("name", "unknown")
-                # Convert args to JSON string for frontend (expects input_preview/input_full)
                 args_json = json.dumps(tool_args) if tool_args else "{}"
                 print(f"[_convert_state_to_sse] EMITTING tool event: {tool_name} (id={tc_id})", flush=True)
                 events.append({
                     "type": "tool",
-                    "tool": tool_name,  # Frontend expects 'tool' not 'name'
-                    "input_preview": args_json,  # Frontend expects JSON string
+                    # New format (types.ts interface)
+                    "name": tool_name,  # Must match tool_result's "name" for pairing
+                    "params": tool_args,  # Frontend expects params as object
+                    # Legacy format (api.ts callbacks) - keep for backwards compat
+                    "tool": tool_name,
+                    "input_preview": args_json,
                     "input_full": args_json,
                     "approved": tc.get("approval_status") == "approved",
                 })

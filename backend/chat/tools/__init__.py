@@ -6,6 +6,7 @@ Key functions:
 - get_tools_for_service: Get tool schemas for LLM binding
 - execute_tool: Execute a tool within MCP context (the only way to run tools)
 - create_specialist_agent: Create a ReAct agent with MCP tools
+- clear_mcp_cache: Clear MCP client cache for manual invalidation
 
 Tool Registry:
 - get_tool_registry: Get the global tool registry instance
@@ -24,6 +25,7 @@ from .loader import (
     get_mcp_client,
     create_specialist_agent,
     execute_tool,
+    clear_mcp_cache,
 )
 from .registry import (
     get_tool_registry,
@@ -49,6 +51,7 @@ __all__ = [
     "get_mcp_client",
     "create_specialist_agent",
     "execute_tool",
+    "clear_mcp_cache",
     "get_tool_registry",
     "reset_tool_registry",
     "ToolConfig",

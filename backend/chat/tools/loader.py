@@ -8,6 +8,7 @@ a context manager. Just instantiate and call get_tools() directly.
 
 import os
 import sys
+import time
 import httpx
 from pathlib import Path
 from typing import Optional, Any
@@ -46,6 +47,115 @@ NETWORK_TO_PROVIDER_TYPE = {
 _token_cache: dict[str, tuple[str, float]] = {}
 _TOKEN_CACHE_TTL = 3600  # 1 hour
 
+# Cache for MCP clients (cache_key -> (client, tools, expiry))
+# Reusing clients avoids spawning new subprocesses for each operation
+_mcp_client_cache: dict[str, tuple["MultiServerMCPClient", list, float]] = {}
+_MCP_CLIENT_CACHE_TTL = 300  # 5 minutes - balance between reuse and freshness
+
+
+def _get_mcp_cache_key(
+    service: str,
+    user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
+) -> str:
+    """Generate cache key for MCP client."""
+    return f"{user_id or 'anon'}:{organization_id or 'personal'}:{service}"
+
+
+def _get_cached_mcp_tools(
+    service: str,
+    user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
+) -> Optional[list]:
+    """Get cached MCP tools if available and not expired.
+
+    Args:
+        service: Service name (admob, admanager, etc.)
+        user_id: User ID
+        organization_id: Organization ID
+
+    Returns:
+        Cached tools list or None if not cached/expired
+    """
+    cache_key = _get_mcp_cache_key(service, user_id, organization_id)
+
+    if cache_key in _mcp_client_cache:
+        client, tools, expiry = _mcp_client_cache[cache_key]
+        if time.time() < expiry:
+            print(f"[mcp_loader] Using cached MCP client/tools for {service}")
+            return tools
+        else:
+            # Expired - remove from cache
+            print(f"[mcp_loader] MCP cache expired for {service}, removing")
+            del _mcp_client_cache[cache_key]
+
+    return None
+
+
+def _set_cached_mcp_tools(
+    service: str,
+    client: "MultiServerMCPClient",
+    tools: list,
+    user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
+) -> None:
+    """Cache MCP client and tools.
+
+    Args:
+        service: Service name
+        client: The MultiServerMCPClient instance
+        tools: List of loaded tools
+        user_id: User ID
+        organization_id: Organization ID
+    """
+    cache_key = _get_mcp_cache_key(service, user_id, organization_id)
+    expiry = time.time() + _MCP_CLIENT_CACHE_TTL
+    _mcp_client_cache[cache_key] = (client, tools, expiry)
+    print(f"[mcp_loader] Cached MCP client/tools for {service} (TTL: {_MCP_CLIENT_CACHE_TTL}s)")
+
+
+def clear_mcp_cache(
+    service: Optional[str] = None,
+    user_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
+) -> int:
+    """Clear MCP client cache.
+
+    Args:
+        service: If provided, only clear cache for this service
+        user_id: If provided, only clear cache for this user
+        organization_id: If provided, only clear cache for this org
+
+    Returns:
+        Number of cache entries cleared
+    """
+    if service is None and user_id is None:
+        # Clear all
+        count = len(_mcp_client_cache)
+        _mcp_client_cache.clear()
+        print(f"[mcp_loader] Cleared entire MCP cache ({count} entries)")
+        return count
+
+    # Selective clear based on key patterns
+    keys_to_remove = []
+    for key in _mcp_client_cache:
+        parts = key.split(":")
+        if len(parts) == 3:
+            k_user, k_org, k_service = parts
+            if service and k_service != service:
+                continue
+            if user_id and k_user != user_id:
+                continue
+            if organization_id and k_org != organization_id:
+                continue
+            keys_to_remove.append(key)
+
+    for key in keys_to_remove:
+        del _mcp_client_cache[key]
+
+    print(f"[mcp_loader] Cleared {len(keys_to_remove)} MCP cache entries")
+    return len(keys_to_remove)
+
 
 async def _fetch_oauth_token(
     user_id: str,
@@ -62,8 +172,6 @@ async def _fetch_oauth_token(
     Returns:
         OAuth access token or None if not available
     """
-    import time
-
     # Check cache first
     cache_key = f"{user_id}:{provider_type}:{organization_id or 'personal'}"
     if cache_key in _token_cache:
@@ -250,21 +358,35 @@ async def get_tools_for_service(
     user_id: Optional[str] = None,
     organization_id: Optional[str] = None,
     populate_registry: bool = True,
+    use_cache: bool = True,
 ) -> list:
     """Get tool schemas for a specific service with OAuth tokens.
 
     NOTE: These tools are used for schema binding to the LLM only.
     For actual execution, use execute_tool() which runs within the MCP context.
 
+    Now with caching: Reuses MCP client connections to avoid spawning new
+    subprocesses for each operation. Cache TTL is 5 minutes.
+
     Args:
         service: Service name ("admob", "admanager", or "all")
         user_id: User ID for OAuth tokens
         organization_id: Organization ID for org-scoped operations
         populate_registry: If True, also populate the global tool registry
+        use_cache: If True, use cached tools if available (default: True)
 
     Returns:
         List of LangChain tools from MCP servers (for schema/binding only)
     """
+    # Check cache first if enabled
+    if use_cache:
+        cached_tools = _get_cached_mcp_tools(service, user_id, organization_id)
+        if cached_tools is not None:
+            # Still populate registry if requested (registry may have been cleared)
+            if populate_registry:
+                _populate_tool_registry(cached_tools, service)
+            return cached_tools
+
     config = await _get_service_config(service, user_id, organization_id)
 
     print(f"[mcp_loader] Loading tool schemas for service: {service}")
@@ -275,6 +397,9 @@ async def get_tools_for_service(
         client = MultiServerMCPClient(config)
         tools = await client.get_tools()
         print(f"[mcp_loader] Loaded {len(tools)} tool schemas: {[t.name for t in tools]}")
+
+        # Cache the client and tools for reuse
+        _set_cached_mcp_tools(service, client, tools, user_id, organization_id)
     except Exception as e:
         print(f"[mcp_loader] ERROR loading tools: {type(e).__name__}: {e}")
         import traceback
@@ -283,23 +408,33 @@ async def get_tools_for_service(
 
     # Populate the tool registry with metadata
     if populate_registry:
-        registry = get_tool_registry()
-        # Determine which providers are being loaded
-        if service == "all":
-            # Load tools for each provider separately to preserve provider info
-            for provider in SUPPORTED_NETWORKS:
-                provider_tools = [t for t in tools if t.name.startswith(f"{provider}_")]
-                if provider_tools:
-                    count = registry.load_from_langchain_tools(provider_tools, provider)
-                    print(f"[mcp_loader] Registered {count} tools for provider: {provider}")
-        else:
-            count = registry.load_from_langchain_tools(tools, service)
-            print(f"[mcp_loader] Registered {count} tools for provider: {service}")
-
-        stats = registry.get_stats()
-        print(f"[mcp_loader] Registry stats: {stats['total_tools']} total, {stats['dangerous_tools']} dangerous")
+        _populate_tool_registry(tools, service)
 
     return tools
+
+
+def _populate_tool_registry(tools: list, service: str) -> None:
+    """Populate the tool registry with metadata from loaded tools.
+
+    Args:
+        tools: List of LangChain tools
+        service: Service name for provider classification
+    """
+    registry = get_tool_registry()
+    # Determine which providers are being loaded
+    if service == "all":
+        # Load tools for each provider separately to preserve provider info
+        for provider in SUPPORTED_NETWORKS:
+            provider_tools = [t for t in tools if t.name.startswith(f"{provider}_")]
+            if provider_tools:
+                count = registry.load_from_langchain_tools(provider_tools, provider)
+                print(f"[mcp_loader] Registered {count} tools for provider: {provider}")
+    else:
+        count = registry.load_from_langchain_tools(tools, service)
+        print(f"[mcp_loader] Registered {count} tools for provider: {service}")
+
+    stats = registry.get_stats()
+    print(f"[mcp_loader] Registry stats: {stats['total_tools']} total, {stats['dangerous_tools']} dangerous")
 
 
 async def execute_tool(
@@ -308,11 +443,13 @@ async def execute_tool(
     service: str = "admob",
     user_id: Optional[str] = None,
     organization_id: Optional[str] = None,
+    preloaded_tools: Optional[list] = None,
 ) -> Any:
     """Execute a tool within the MCP client context with OAuth tokens.
 
-    This is the ONLY way to execute MCP tools - the tool must be invoked
-    while the MultiServerMCPClient context is still open.
+    Now with caching: Uses cached MCP client/tools when available to avoid
+    spawning new subprocesses. Can also accept pre-loaded tools directly
+    to skip loading entirely.
 
     Args:
         tool_name: Name of the tool to execute
@@ -320,6 +457,7 @@ async def execute_tool(
         service: Service name ("admob", "admanager", or "all")
         user_id: User ID for OAuth tokens
         organization_id: Organization ID for org-scoped operations
+        preloaded_tools: Optional list of pre-loaded tools to use directly
 
     Returns:
         Tool execution result
@@ -328,35 +466,65 @@ async def execute_tool(
         ValueError: If tool not found
         Exception: If tool execution fails
     """
-    config = await _get_service_config(service, user_id, organization_id)
-
     print(f"[mcp_loader] Executing tool: {tool_name}")
     print(f"[mcp_loader] Args: {tool_args}")
 
-    # As of langchain-mcp-adapters 0.1.0, no context manager needed
-    client = MultiServerMCPClient(config)
-    tools = await client.get_tools()
-
-    # Find the matching tool
+    # Try to find tool in preloaded tools first (fastest path)
     tool = None
-    for t in tools:
-        if t.name == tool_name:
-            tool = t
-            break
+    if preloaded_tools:
+        print(f"[mcp_loader] Using {len(preloaded_tools)} preloaded tools")
+        for t in preloaded_tools:
+            if t.name == tool_name:
+                tool = t
+                break
 
+    # If not found in preloaded, try cache
     if not tool:
-        # Try loading all services if not found
-        if service != "all":
+        cached_tools = _get_cached_mcp_tools(service, user_id, organization_id)
+        if cached_tools:
+            for t in cached_tools:
+                if t.name == tool_name:
+                    tool = t
+                    break
+
+    # If still not found, load fresh (and cache for future use)
+    if not tool:
+        print(f"[mcp_loader] Tool not in cache, loading fresh for service: {service}")
+        config = await _get_service_config(service, user_id, organization_id)
+        client = MultiServerMCPClient(config)
+        tools = await client.get_tools()
+
+        # Cache the freshly loaded tools
+        _set_cached_mcp_tools(service, client, tools, user_id, organization_id)
+
+        for t in tools:
+            if t.name == tool_name:
+                tool = t
+                break
+
+    # If still not found, try loading all services
+    if not tool and service != "all":
+        print(f"[mcp_loader] Tool not found in {service}, trying all services")
+        cached_all = _get_cached_mcp_tools("all", user_id, organization_id)
+        if cached_all:
+            for t in cached_all:
+                if t.name == tool_name:
+                    tool = t
+                    break
+
+        if not tool:
+            # Load all services fresh
             all_config = await _get_service_config("all", user_id, organization_id)
             all_client = MultiServerMCPClient(all_config)
             all_tools = await all_client.get_tools()
+            _set_cached_mcp_tools("all", all_client, all_tools, user_id, organization_id)
+
             for t in all_tools:
                 if t.name == tool_name:
-                    # Re-run with all services
-                    return await execute_tool(
-                        tool_name, tool_args, "all", user_id, organization_id
-                    )
+                    tool = t
+                    break
 
+    if not tool:
         raise ValueError(f"Tool '{tool_name}' not found in MCP servers")
 
     # Execute the tool

@@ -158,7 +158,9 @@ export function useChatApprovals({
                 )
               )
             },
-            onToolResult: (preview, full, dataType) => {
+            onToolResult: (toolName, preview, full, dataType) => {
+              // Use tool name from event (passed by backend) - falls back to lastToolName for backwards compat
+              const resolvedToolName = toolName !== "unknown" ? toolName : lastToolName
               let toolResult: unknown = preview
               if (dataType === "json" || dataType === "json_list") {
                 try {
@@ -169,7 +171,7 @@ export function useChatApprovals({
                   toolResult = preview
                 }
               }
-              resumeEvents.push({ type: "tool_result", name: lastToolName, result: toolResult })
+              resumeEvents.push({ type: "tool_result", name: resolvedToolName, result: toolResult })
               setMessages(prev =>
                 prev.map(m =>
                   m.id === assistantId ? { ...m, events: [...resumeEvents] } : m

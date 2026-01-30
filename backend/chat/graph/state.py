@@ -149,6 +149,9 @@ class GraphState(TypedDict, total=False):
     # Tool retrieval (set by tool_retriever node)
     retrieved_tools: Optional[list[str]]  # Tool names from semantic search
 
+    # NOTE: Don't store tool objects in state - they can't be serialized by checkpointer.
+    # MCP caching in loader.py handles tool reuse instead.
+
     # Verification (set by verifier node)
     verification_status: Optional[str]  # "complete" or "incomplete"
     verification_explanation: Optional[str]  # Why verification passed/failed

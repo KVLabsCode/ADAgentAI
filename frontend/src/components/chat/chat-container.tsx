@@ -345,8 +345,9 @@ export function ChatContainer({
             )
           )
         },
-        onToolResult: (preview, full, dataType) => {
-          const lastToolCall = toolCalls[toolCalls.length - 1]
+        onToolResult: (toolName, preview, full, dataType) => {
+          // Use tool name from event (passed by backend) instead of relying on lastToolCall
+          // This fixes the issue where tool results weren't matched correctly after approval resume
           let result: unknown = preview
           if (dataType === "json" || dataType === "json_list") {
             try {
@@ -357,8 +358,8 @@ export function ChatContainer({
               result = preview
             }
           }
-          events.push({ type: "tool_result", name: lastToolCall?.name || "unknown", result })
-          toolResults.push({ name: lastToolCall?.name || "unknown", result })
+          events.push({ type: "tool_result", name: toolName, result })
+          toolResults.push({ name: toolName, result })
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId ? { ...m, events: [...events] } : m

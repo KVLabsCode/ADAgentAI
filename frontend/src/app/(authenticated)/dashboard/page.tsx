@@ -55,43 +55,45 @@ export default function DashboardPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-2">
-        {showSkeleton ? (
-          <>
-            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/40 bg-card/50">
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <div>
-                <Skeleton className="h-5 w-8 mb-1" />
-                <Skeleton className="h-3 w-24" />
+      <SettingsSection title="Overview" bare>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-2">
+          {showSkeleton ? (
+            <>
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/40 bg-card/50">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <div>
+                  <Skeleton className="h-5 w-8 mb-1" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/40 bg-card/50">
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <div>
-                <Skeleton className="h-5 w-8 mb-1" />
-                <Skeleton className="h-3 w-20" />
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/40 bg-card/50">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <div>
+                  <Skeleton className="h-5 w-8 mb-1" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <StatCard
-              title="Providers"
-              value={connectedProviders}
-              subValue={connectedProviders === 0 ? "No providers" : "Providers"}
-              icon={Plug}
-              href="/providers"
-            />
-            <StatCard
-              title="Conversations"
-              value={chatCount}
-              subValue="Conversations"
-              icon={History}
-              href="/chat-history"
-            />
-          </>
-        )}
-      </div>
+            </>
+          ) : (
+            <>
+              <StatCard
+                title="Providers"
+                value={connectedProviders}
+                subValue={connectedProviders === 0 ? "No providers" : "Providers"}
+                icon={Plug}
+                href="/providers"
+              />
+              <StatCard
+                title="Conversations"
+                value={chatCount}
+                subValue="Conversations"
+                icon={History}
+                href="/chat-history"
+              />
+            </>
+          )}
+        </div>
+      </SettingsSection>
 
       {/* Quick Actions */}
       <SettingsSection title="Quick Actions" bare>

@@ -13,12 +13,16 @@ export interface DashboardProvider {
   name: string
 }
 
-export interface DashboardNetwork {
+export interface DashboardAdSource {
   id: string
-  networkName: string
+  adSourceName: string
   displayName: string
   isEnabled: boolean
+  providerId?: string
 }
+
+// Legacy alias
+export type DashboardNetwork = DashboardAdSource
 
 export interface DashboardSession {
   id: string
@@ -29,7 +33,9 @@ export interface DashboardSession {
 
 export interface DashboardData {
   providers: DashboardProvider[]
-  networks: DashboardNetwork[]
+  adSources: DashboardAdSource[]
+  // Legacy alias
+  networks: DashboardAdSource[]
   sessions: DashboardSession[]
 }
 
@@ -68,9 +74,9 @@ export function useDashboardData() {
         throw new Error('Access token not available yet')
       }
 
-      const [providersRes, networksRes, sessionsRes] = await Promise.all([
+      const [providersRes, adSourcesRes, sessionsRes] = await Promise.all([
         authFetch(`${API_URL}/api/providers`, accessToken, {}, selectedOrganizationId),
-        authFetch(`${API_URL}/api/networks`, accessToken, {}, selectedOrganizationId),
+        authFetch(`${API_URL}/api/ad-sources`, accessToken, {}, selectedOrganizationId),
         authFetch(`${API_URL}/api/chat/sessions`, accessToken, {}, selectedOrganizationId),
       ])
 
@@ -78,15 +84,15 @@ export function useDashboardData() {
         ? ((await providersRes.json()).providers || [])
         : []
 
-      const networks = networksRes.ok
-        ? ((await networksRes.json()).networks || [])
+      const adSources = adSourcesRes.ok
+        ? ((await adSourcesRes.json()).adSources || [])
         : []
 
       const sessions = sessionsRes.ok
         ? ((await sessionsRes.json()).sessions || [])
         : []
 
-      return { providers, networks, sessions }
+      return { providers, adSources, networks: adSources, sessions }
     },
     // Don't fetch until user is loaded AND authenticated AND we have a token
     // This prevents race condition where query runs before session token is ready

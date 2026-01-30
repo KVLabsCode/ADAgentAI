@@ -26,7 +26,7 @@ export function PlanCards({ isPro, isUpgrading, onUpgrade }: PlanCardsProps) {
           <div
             key={tier.name}
             className={cn(
-              "rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)]",
+              "flex flex-col rounded-[var(--card-radius)] border border-[color:var(--card-border)] bg-[var(--card-bg)]",
               "px-[var(--item-padding-x)] py-[var(--item-padding-y)]",
               tier.popular && !isCurrent && "border-primary/30"
             )}
@@ -64,7 +64,7 @@ export function PlanCards({ isPro, isUpgrading, onUpgrade }: PlanCardsProps) {
             </p>
 
             {/* Features list */}
-            <ul className="space-y-1.5 mb-4">
+            <ul className="space-y-1.5 flex-1">
               {tier.features.slice(0, 4).map((feature) => (
                 <li key={feature} className="flex items-center gap-2 text-[length:var(--text-description)] text-muted-foreground">
                   <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -78,10 +78,10 @@ export function PlanCards({ isPro, isUpgrading, onUpgrade }: PlanCardsProps) {
               )}
             </ul>
 
-            {/* Action button */}
+            {/* Action button - pushed to bottom */}
             <Button
               size="sm"
-              className="w-full"
+              className="w-full mt-4"
               variant={isCurrent ? "outline" : tier.popular ? "default" : "outline"}
               disabled={isCurrent || isUpgradingThis || (tier.name === 'Enterprise')}
               onClick={() => canUpgrade && onUpgrade(tier.priceId)}

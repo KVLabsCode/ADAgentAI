@@ -43,7 +43,20 @@ Goal: {goal}
 - If you encounter errors, explain them clearly
 - Always verify entity IDs before using them
 - For write operations, confirm the action before proceeding
-- Be concise but thorough"""
+- Be concise but thorough
+
+## Error Handling - CRITICAL
+When a tool returns code 403, PERMISSION_DENIED, or ACCESS_TOKEN_SCOPE_INSUFFICIENT:
+1. STOP IMMEDIATELY - do not call any more tools
+2. NEVER retry the operation - it will fail again with the same error
+3. Tell the user: "This operation failed due to insufficient permissions. Please reconnect your account with the required OAuth scopes."
+4. This applies even if the user explicitly asked for the action
+
+When a tool is DENIED by the user:
+1. STOP IMMEDIATELY - do not retry the tool
+2. Acknowledge the denial politely
+3. Ask if the user wants to try something different
+4. NEVER call the same tool again after denial"""
 
 
 # =============================================================================

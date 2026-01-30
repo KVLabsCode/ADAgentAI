@@ -18,7 +18,7 @@ import agentRoutes from "./routes/agents";
 import accountRoutes from "./routes/account";
 import inviteLinksRoutes from "./routes/invite-links";
 import internalRoutes from "./routes/internal";
-import networksRoutes from "./routes/networks";
+import adSourcesRoutes from "./routes/ad-sources";
 import adminUsageRoutes from "./routes/admin/usage";
 import adminConversationsRoutes from "./routes/admin/conversations";
 import adminStatsRoutes from "./routes/admin/stats";
@@ -120,7 +120,7 @@ api.get("/", (c) => {
 // Feature routes
 api.route("/chat", chatRoutes);
 api.route("/providers", providerRoutes);
-api.route("/networks", networksRoutes);
+api.route("/ad-sources", adSourcesRoutes);
 api.route("/billing", billingRoutes);
 api.route("/blog", publicBlog);
 api.route("/admin/blog", adminBlog);

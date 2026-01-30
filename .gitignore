@@ -53,6 +53,7 @@ tests/e2e/.auth/
 
 # Misc
 *.png
+!frontend/public/logos/*.png
 *.jpg
 *.jpeg
 .claude/

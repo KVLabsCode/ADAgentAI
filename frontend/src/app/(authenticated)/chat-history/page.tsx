@@ -2,11 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Download, Trash2, MessageSquare, MoreHorizontal, X, CheckSquare } from "lucide-react"
+import { Download, Trash2, MessageSquare, MoreHorizontal, X } from "lucide-react"
 import { Spinner } from "@/atoms/spinner"
 import { Button } from "@/atoms/button"
 import { SearchInput } from "@/molecules"
-import { Checkbox } from "@/atoms/checkbox"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
@@ -107,6 +106,18 @@ export default function ChatHistoryPage() {
     fetchChats()
   }, [fetchChats])
 
+  // Escape key to clear selection
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        setSelectedIds(new Set())
+        setLastSelectedId(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedIds.size])
+
   const filteredChats = chats.filter(
     chat =>
       chat.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -149,14 +160,6 @@ export default function ChatHistoryPage() {
 
     setSelectedIds(newSelected)
     setLastSelectedId(chatId)
-  }
-
-  const handleSelectAll = () => {
-    if (selectedIds.size === filteredChats.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredChats.map(c => c.id)))
-    }
   }
 
   const clearSelection = () => {
@@ -229,8 +232,6 @@ export default function ChatHistoryPage() {
     }
   }
 
-  const isAllSelected = filteredChats.length > 0 && selectedIds.size === filteredChats.length
-
   if (isLoading) {
     return (
       <PageContainer>
@@ -249,30 +250,27 @@ export default function ChatHistoryPage() {
         description="Browse and manage your conversations."
       />
 
-      {/* Search & Select All */}
-      <div className="flex items-center gap-3">
+      {/* Search */}
+      <div className="mt-4">
         <SearchInput
           placeholder="Search conversations..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           width="100%"
-          className="flex-1 h-8"
+          className="h-8"
         />
         {filteredChats.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={isAllSelected}
-              onCheckedChange={handleSelectAll}
-              className="h-3.5 w-3.5"
-            />
-            <span className="text-[length:var(--text-small)] text-muted-foreground whitespace-nowrap">
-              {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
-            </span>
-          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            {selectedIds.size > 0
+              ? `${selectedIds.size} selected · Click to deselect, Esc to clear`
+              : "⌘+click to select · Shift+click for range"
+            }
+          </p>
         )}
       </div>
 
       {/* Chat List */}
+      <div className="mt-4">
       {filteredChats.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
@@ -288,7 +286,7 @@ export default function ChatHistoryPage() {
           )}
         </EmptyState>
       ) : (
-        <div className="space-y-px">
+        <div className="space-y-0.5">
           {filteredChats.map((chat) => {
             const isSelected = selectedIds.has(chat.id)
 
@@ -296,107 +294,110 @@ export default function ChatHistoryPage() {
               <div
                 key={chat.id}
                 className={cn(
-                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                  "group relative flex items-center rounded-md transition-all cursor-pointer",
                   isSelected
-                    ? "bg-muted/70"
+                    ? "bg-accent ring-1 ring-accent-foreground/10"
                     : "hover:bg-muted/50"
                 )}
-              >
-                {/* Checkbox - visible on hover or when selected */}
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={() => {}}
-                  onClick={(e) => {
-                    e.stopPropagation()
+                onClick={(e) => {
+                  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    e.preventDefault()
                     handleSelect(chat.id, e)
-                  }}
+                  } else if (selectedIds.size > 0) {
+                    // If items are selected, clicking toggles selection
+                    handleSelect(chat.id, e)
+                  }
+                }}
+              >
+                {/* Selection indicator - left accent bar */}
+                <div
                   className={cn(
-                    "h-3.5 w-3.5 shrink-0 transition-opacity",
-                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    "w-0.5 self-stretch rounded-l-md transition-colors",
+                    isSelected ? "bg-primary" : "bg-transparent"
                   )}
                 />
 
-                {/* Chat content - clickable link */}
+                {/* Chat content */}
                 <Link
                   href={`/chat/${chat.id}`}
-                  className="flex-1 min-w-0"
+                  className="flex-1 min-w-0 px-3 py-2.5"
                   onClick={(e) => {
-                    // Prevent navigation if shift or ctrl is held
-                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    if (e.shiftKey || e.ctrlKey || e.metaKey || selectedIds.size > 0) {
                       e.preventDefault()
-                      handleSelect(chat.id, e)
                     }
                   }}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-[length:var(--text-label)] font-medium truncate group-hover:text-foreground transition-colors">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[13px] font-medium truncate">
                       {chat.title}
                     </h3>
-                    <span className="text-[length:var(--text-small)] text-muted-foreground shrink-0">
+                    <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">
                       {formatRelativeDate(chat.date)}
                     </span>
                   </div>
-                  <p className="text-[length:var(--text-description)] text-muted-foreground mt-0.5 line-clamp-1">
+                  <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
                     {stripMarkdown(chat.preview)}
                   </p>
                 </Link>
 
-                {/* Dropdown menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                      />
-                    }
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                    <span className="sr-only">Chat options</span>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-[length:var(--text-small)]">
-                      <Download className="h-3 w-3 mr-2" />
-                      Export as MD
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport(chat.id, "json")} className="text-[length:var(--text-small)]">
-                      <Download className="h-3 w-3 mr-2" />
-                      Export as JSON
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(chat.id)}
-                      className="text-[length:var(--text-small)] text-destructive focus:text-destructive"
+                {/* Dropdown menu - appears on hover */}
+                <div className="pr-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      }
                     >
-                      <Trash2 className="h-3 w-3 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                      <span className="sr-only">Chat options</span>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem onClick={() => handleExport(chat.id, "md")} className="text-xs">
+                        <Download className="h-3 w-3 mr-2" />
+                        Export as MD
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(chat.id, "json")} className="text-xs">
+                        <Download className="h-3 w-3 mr-2" />
+                        Export as JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(chat.id)}
+                        className="text-xs text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             )
           })}
         </div>
       )}
+      </div>
 
       {/* Floating action bar when items selected */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-background border border-[color:var(--card-border)] rounded-full shadow-xl">
-            <div className="flex items-center gap-2 text-[length:var(--text-label)] text-foreground">
-              <CheckSquare className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{selectedIds.size}</span>
-              <span className="text-muted-foreground">selected</span>
-            </div>
+          <div className="flex items-center gap-1 px-2 py-1.5 bg-background border border-border rounded-lg shadow-lg">
+            <span className="text-xs text-muted-foreground px-2">
+              {selectedIds.size} selected
+            </span>
 
-            <div className="w-px h-4 bg-[color:var(--item-divider)] mx-1" />
+            <div className="w-px h-4 bg-border" />
 
             <Button
               variant="ghost"
               size="sm"
               onClick={clearSelection}
-              className="h-7 px-2 text-[length:var(--text-small)]"
+              className="h-7 px-2 text-xs"
             >
               <X className="h-3 w-3 mr-1" />
               Clear
@@ -406,7 +407,7 @@ export default function ChatHistoryPage() {
               variant="destructive"
               size="sm"
               onClick={() => setShowBulkDeleteDialog(true)}
-              className="h-7 px-3 text-[length:var(--text-small)]"
+              className="h-7 px-2.5 text-xs"
             >
               <Trash2 className="h-3 w-3 mr-1" />
               Delete
@@ -419,21 +420,21 @@ export default function ChatHistoryPage() {
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">
+            <AlertDialogTitle className="text-sm">
               Delete {selectedIds.size} conversation{selectedIds.size > 1 ? 's' : ''}?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[length:var(--text-description)]">
-              This action cannot be undone. All selected conversations will be permanently deleted.
+            <AlertDialogDescription className="text-xs">
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-8 text-[length:var(--text-small)]" disabled={isDeleting}>
+            <AlertDialogCancel className="h-8 text-xs" disabled={isDeleting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBulkDelete}
               disabled={isDeleting}
-              className="h-8 text-[length:var(--text-small)] bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? (
                 <>
@@ -441,7 +442,7 @@ export default function ChatHistoryPage() {
                   Deleting...
                 </>
               ) : (
-                `Delete ${selectedIds.size} conversation${selectedIds.size > 1 ? 's' : ''}`
+                "Delete"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -127,24 +127,24 @@ async def get_connected_providers(
         except Exception as e:
             print(f"[visibility] Error fetching OAuth providers: {type(e).__name__}")
 
-        # Fetch API-key networks (AppLovin, Unity, etc.)
+        # Fetch ad sources (AppLovin, Unity, etc.)
         try:
             response = await client.get(
-                f"{API_URL}/api/networks/internal/list",
+                f"{API_URL}/api/ad-sources/internal/list",
                 params=params,
                 headers={"x-internal-api-key": INTERNAL_API_KEY},
             )
 
             if response.status_code == 200:
                 data = response.json()
-                networks = data.get("networks", [])
-                for n in networks:
-                    network_name = n.get("name")
-                    if network_name:
-                        connected.add(network_name)
+                ad_sources = data.get("adSources", [])
+                for s in ad_sources:
+                    ad_source_name = s.get("name")
+                    if ad_source_name:
+                        connected.add(ad_source_name)
 
         except Exception as e:
-            print(f"[visibility] Error fetching API-key networks: {type(e).__name__}")
+            print(f"[visibility] Error fetching ad sources: {type(e).__name__}")
 
     return connected
 

@@ -2,92 +2,110 @@
 
 import * as React from "react"
 import { Suspense } from "react"
-import { Plug } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Plug, ChevronRight } from "lucide-react"
 import {
   PageContainer,
   PageHeader,
   SettingsSection,
   ConfigFieldGroup,
   EmptyState,
-  StatusMessage,
 } from "@/organisms/theme"
 import {
-  ProviderListItem,
   AllPlatformsGrid,
   AccountSelectionModal,
-  NetworkCredentialDialog,
-  NetworkListItem,
 } from "@/components/providers"
+import { Switch } from "@/atoms/switch"
+import { Spinner } from "@/atoms/spinner"
+import { ProviderLogo } from "@/components/icons/provider-logos"
 import { useProviderManagement } from "@/hooks/useProviderManagement"
-import { useNetworkManagement } from "@/hooks/useNetworkManagement"
-import type { NetworkName } from "@/lib/types"
+import type { Provider } from "@/lib/types"
+
+// Clickable provider card component with inline toggle
+interface ProviderCardProps {
+  provider: Provider & { isEnabled: boolean }
+  onClick: () => void
+  onToggle: (enabled: boolean) => void
+  isToggling: boolean
+}
+
+function ProviderCard({ provider, onClick, onToggle, isToggling }: ProviderCardProps) {
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent navigation when clicking toggle
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-center justify-between w-full px-[var(--item-padding-x)] py-[var(--item-padding-y)] border-b border-border/40 last:border-b-0 hover:bg-muted/50 transition-colors cursor-pointer"
+    >
+      <div className="flex items-center gap-[var(--item-gap)]">
+        <ProviderLogo provider={provider.type} size="sm" />
+        <div>
+          <p className="text-[length:var(--text-label)] font-medium">
+            {provider.displayName}
+          </p>
+          <p className="text-[length:var(--text-small)] text-muted-foreground">
+            {provider.type === "admob"
+              ? `Publisher ID: ${provider.identifiers.publisherId || "—"}`
+              : `Network Code: ${provider.identifiers.networkCode || "—"}`
+            }
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        {/* Inline toggle with label */}
+        <div onClick={handleToggleClick} className="flex items-center gap-2">
+          <span className={`text-[length:var(--text-small)] ${
+            provider.isEnabled ? "text-[var(--token-success-default)]" : "text-muted-foreground"
+          }`}>
+            {provider.isEnabled ? "Enabled" : "Disabled"}
+          </span>
+          {isToggling && <Spinner size="sm" className="text-muted-foreground" />}
+          <Switch
+            checked={provider.isEnabled}
+            onCheckedChange={onToggle}
+            disabled={isToggling}
+            aria-label={provider.isEnabled ? "Disable provider" : "Enable provider"}
+          />
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </div>
+    </div>
+  )
+}
 
 function ProvidersContent() {
+  const router = useRouter()
+
   // OAuth provider management (AdMob, GAM)
   const {
     providers,
     canManage,
     pendingAccounts,
-    isLoading: isLoadingProviders,
-    connectingType: _connectingType,
-    statusMessage: providerStatusMessage,
+    isLoading,
     accountSelectionOpen,
     togglingProvider,
     handleConnect: handleConnectOAuth,
-    handleDisconnect: handleDisconnectProvider,
-    handleToggleEnabled: handleToggleProvider,
+    handleToggleEnabled,
     handleAccountSelected,
     handleAccountSelectionCancel,
     setAccountSelectionOpen,
   } = useProviderManagement()
 
-  // API-key network management
-  const {
-    networks,
-    configs,
-    isLoading: isLoadingNetworks,
-    connectingNetwork,
-    statusMessage: networkStatusMessage,
-    togglingNetwork,
-    handleConnect: handleConnectNetwork,
-    handleDisconnect: handleDisconnectNetwork,
-    handleToggle: handleToggleNetwork,
-  } = useNetworkManagement()
-
-  // Dialog state for network credentials
-  const [networkDialogOpen, setNetworkDialogOpen] = React.useState(false)
-  const [selectedNetworkName, setSelectedNetworkName] = React.useState<NetworkName | null>(null)
-
-  const isLoading = isLoadingProviders || isLoadingNetworks
-  const statusMessage = providerStatusMessage || networkStatusMessage
-
-  // Handle clicking connect on a network
-  const handleNetworkConnectClick = (networkName: NetworkName) => {
-    setSelectedNetworkName(networkName)
-    setNetworkDialogOpen(true)
+  // Navigate to provider detail page
+  const handleProviderClick = (provider: Provider) => {
+    router.push(`/providers/${provider.type}`)
   }
 
-  // Get the config for the selected network
-  const selectedNetworkConfig = selectedNetworkName && configs
-    ? configs[selectedNetworkName]
-    : null
-
-  // Calculate connected provider types and network names for the grid
+  // Calculate connected provider types for the grid
   const connectedProviderTypes = providers.map(p => p.type)
-  const connectedNetworkNames = networks.map(n => n.networkName)
-
-  // Combined count of all connections
-  const totalConnections = providers.length + networks.length
 
   return (
     <PageContainer>
-      {statusMessage && (
-        <StatusMessage type={statusMessage.type} message={statusMessage.text} />
-      )}
-
       <PageHeader
         title="Connected Providers"
-        description="Manage your ad platform connections."
+        description="Manage your ad platform connections. Click a provider to configure ad sources."
       />
 
       {isLoading ? (
@@ -104,7 +122,7 @@ function ProvidersContent() {
             ))}
           </div>
         </SettingsSection>
-      ) : totalConnections === 0 ? (
+      ) : providers.length === 0 ? (
         <SettingsSection title="Connected Accounts">
           <EmptyState
             icon={Plug}
@@ -116,65 +134,37 @@ function ProvidersContent() {
           />
         </SettingsSection>
       ) : (
-        <>
-          {/* OAuth Providers Section */}
-          {providers.length > 0 && (
-            <SettingsSection title="Google Platforms">
-              <ConfigFieldGroup>
-                {providers.map((provider) => (
-                  <ProviderListItem
-                    key={provider.id}
-                    provider={provider}
-                    canManage={canManage ?? false}
-                    togglingProvider={togglingProvider}
-                    onToggleEnabled={handleToggleProvider}
-                    onDisconnect={handleDisconnectProvider}
-                  />
-                ))}
-              </ConfigFieldGroup>
-            </SettingsSection>
-          )}
-
-          {/* API-Key Networks Section */}
-          {networks.length > 0 && (
-            <SettingsSection title="Ad Networks">
-              <ConfigFieldGroup>
-                {networks.map((network) => (
-                  <NetworkListItem
-                    key={network.id}
-                    network={network}
-                    canManage={canManage ?? false}
-                    togglingNetwork={togglingNetwork}
-                    onToggle={handleToggleNetwork}
-                    onDisconnect={handleDisconnectNetwork}
-                  />
-                ))}
-              </ConfigFieldGroup>
-            </SettingsSection>
-          )}
-        </>
+        <SettingsSection title="Connected Accounts">
+          <ConfigFieldGroup>
+            {providers.map((provider) => (
+              <ProviderCard
+                key={provider.id}
+                provider={provider}
+                onClick={() => handleProviderClick(provider)}
+                onToggle={(enabled) => handleToggleEnabled(provider.id, enabled)}
+                isToggling={togglingProvider === provider.id}
+              />
+            ))}
+          </ConfigFieldGroup>
+        </SettingsSection>
       )}
 
-      {/* All Platforms Grid */}
-      <SettingsSection title="All Platforms" bare>
-        <AllPlatformsGrid
-          connectedProviders={connectedProviderTypes}
-          connectedNetworks={connectedNetworkNames}
-          onConnectOAuth={handleConnectOAuth}
-          onConnectNetwork={handleNetworkConnectClick}
-          canManage={canManage ?? false}
-        />
-      </SettingsSection>
-
-      {/* Network Credentials Dialog */}
-      <NetworkCredentialDialog
-        open={networkDialogOpen}
-        onOpenChange={setNetworkDialogOpen}
-        networkName={selectedNetworkName}
-        config={selectedNetworkConfig}
-        onConnect={handleConnectNetwork}
-        isConnecting={connectingNetwork !== null}
-      />
+      {/* Connect Provider Section - only show OAuth providers (AdMob, GAM) */}
+      {canManage && (
+        <SettingsSection title="Connect a Provider" bare>
+          <AllPlatformsGrid
+            connectedProviders={connectedProviderTypes}
+            connectedNetworks={[]}
+            onConnectOAuth={handleConnectOAuth}
+            onConnectNetwork={() => {}}
+            canManage={canManage ?? false}
+            showOnlyProviders={true}
+          />
+          <p className="text-[length:var(--text-small)] text-muted-foreground mt-3 px-1">
+            Connect a provider, then configure ad sources from the provider detail page.
+          </p>
+        </SettingsSection>
+      )}
 
       {/* GAM Account Selection Modal */}
       <AccountSelectionModal

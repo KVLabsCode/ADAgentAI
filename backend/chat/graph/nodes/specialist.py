@@ -601,6 +601,7 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
 
     # Load MCP tools for this service
     retrieved_tools = state.get("retrieved_tools")  # From tool_retriever node
+    tools = []  # Initialize to avoid undefined variable if loading fails
 
     try:
         # Handle orchestration service specially - load all network tools
@@ -677,7 +678,13 @@ Use these account IDs when calling tools. If the user asks about "my account" or
             llm_messages.append(AIMessage(content="I understand. I'll use your connected AdMob account for this request."))
 
     # Add current query if not already in messages
-    if not messages or messages[-1].content != user_query:
+    # Check if user_query exists in ANY HumanMessage, not just the last one
+    # This prevents re-adding the query after tool execution (which would confuse the LLM)
+    user_query_exists = any(
+        isinstance(msg, HumanMessage) and msg.content == user_query
+        for msg in messages
+    )
+    if not user_query_exists:
         llm_messages.append(HumanMessage(content=user_query))
 
     # Get streaming queues from config
@@ -850,6 +857,9 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                 "token_usage": token_usage,
                 "model": model_name,
             }
+
+            # NOTE: Don't pass tools through state - StructuredTool objects can't be
+            # serialized by the PostgreSQL checkpointer. MCP caching handles reuse.
 
             # Include partial response text if any (text before tool calls)
             # Mark as streamed so processor knows not to duplicate

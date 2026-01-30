@@ -137,14 +137,14 @@ async def fetch_api_key_credentials(
     organization_id: Optional[str],
     network: str,
 ) -> Optional[NetworkCredentials]:
-    """Fetch API-key credentials from network_credentials table.
+    """Fetch API-key credentials from ad_sources table.
 
     Used for AppLovin, Unity, Liftoff, InMobi, Pangle, Mintegral, DT Exchange.
 
     Args:
         user_id: User ID
         organization_id: Optional org scope
-        network: Network name
+        network: Network name (ad source name)
 
     Returns:
         NetworkCredentials or None if not found
@@ -152,14 +152,14 @@ async def fetch_api_key_credentials(
     try:
         body = {
             "userId": user_id,
-            "networkName": network,
+            "adSourceName": network,
         }
         if organization_id:
             body["organizationId"] = organization_id
 
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(
-                f"{API_URL}/api/networks/internal/credentials",
+                f"{API_URL}/api/ad-sources/internal/credentials",
                 json=body,
                 headers={"x-internal-api-key": INTERNAL_API_KEY},
             )

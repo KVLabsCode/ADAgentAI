@@ -7,60 +7,72 @@ import type { NetworkName } from "@/lib/types"
 
 // All supported platforms with their metadata
 export const ALL_PLATFORMS = [
-  // OAuth-based providers
+  // OAuth-based providers (only)
   {
     id: "admob" as const,
     name: "AdMob",
     connectionType: "oauth" as const,
+    platformType: "provider" as const,
     status: "available" as const,
   },
   {
     id: "gam" as const,
     name: "Google Ad Manager",
     connectionType: "oauth" as const,
+    platformType: "provider" as const,
     status: "coming_soon" as const,
   },
-  // API-key based networks
+  // Dual-role: Both providers AND ad sources
   {
     id: "applovin" as NetworkName,
     name: "AppLovin MAX",
     connectionType: "api_key" as const,
-    status: "available" as const,
+    platformType: "both" as const, // Provider + Ad Source
+    providerStatus: "coming_soon" as const, // As provider (no OAuth yet)
+    status: "available" as const, // As ad source
   },
   {
     id: "unity" as NetworkName,
     name: "Unity LevelPlay",
     connectionType: "api_key" as const,
-    status: "available" as const,
+    platformType: "both" as const, // Provider + Ad Source
+    providerStatus: "coming_soon" as const, // As provider (no OAuth yet)
+    status: "available" as const, // As ad source
   },
+  // API-key based ad sources only
   {
     id: "liftoff" as NetworkName,
     name: "Liftoff Monetize",
     connectionType: "api_key" as const,
+    platformType: "ad_source" as const,
     status: "available" as const,
   },
   {
     id: "inmobi" as NetworkName,
     name: "InMobi",
     connectionType: "api_key" as const,
+    platformType: "ad_source" as const,
     status: "available" as const,
   },
   {
     id: "mintegral" as NetworkName,
     name: "Mintegral",
     connectionType: "api_key" as const,
+    platformType: "ad_source" as const,
     status: "available" as const,
   },
   {
     id: "pangle" as NetworkName,
     name: "Pangle",
     connectionType: "api_key" as const,
+    platformType: "ad_source" as const,
     status: "available" as const,
   },
   {
     id: "dtexchange" as NetworkName,
     name: "DT Exchange",
     connectionType: "api_key" as const,
+    platformType: "ad_source" as const,
     status: "available" as const,
   },
 ] as const
@@ -73,6 +85,8 @@ interface SupportedPlatformsContentProps {
   onConnectOAuth?: (type: "admob" | "gam") => void
   onConnectNetwork?: (networkName: NetworkName) => void
   canManage?: boolean
+  showOnlyNetworks?: boolean // Only show API-key networks (for provider detail page)
+  showOnlyProviders?: boolean // Only show OAuth providers (for main providers page)
 }
 
 // Simple display version (no interactivity)
@@ -112,6 +126,8 @@ export function AllPlatformsGrid({
   onConnectOAuth,
   onConnectNetwork,
   canManage = false,
+  showOnlyNetworks = false,
+  showOnlyProviders = false,
 }: SupportedPlatformsContentProps) {
   const isConnected = (platform: (typeof ALL_PLATFORMS)[number]): boolean => {
     if (platform.connectionType === "oauth") {
@@ -131,22 +147,36 @@ export function AllPlatformsGrid({
     }
   }
 
+  // Filter platforms based on props
+  let platformsToShow = ALL_PLATFORMS
+  if (showOnlyNetworks) {
+    // Show ad sources + dual-role platforms (as ad sources)
+    platformsToShow = ALL_PLATFORMS.filter(p => p.platformType === "ad_source" || p.platformType === "both")
+  } else if (showOnlyProviders) {
+    // Show providers + dual-role platforms (as providers)
+    platformsToShow = ALL_PLATFORMS.filter(p => p.platformType === "provider" || p.platformType === "both")
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {ALL_PLATFORMS.map((platform) => {
+      {platformsToShow.map((platform) => {
         const connected = isConnected(platform)
-        const isComingSoon = platform.status === "coming_soon"
+        // For dual-role platforms shown as providers, check providerStatus
+        const effectiveStatus = showOnlyProviders && 'providerStatus' in platform
+          ? platform.providerStatus
+          : platform.status
+        const isComingSoon = effectiveStatus === "coming_soon"
         const showConnectButton = canManage && !connected && !isComingSoon
 
         return (
           <div
             key={platform.id}
-            className={`flex flex-col p-4 rounded-[var(--card-radius)] border bg-[var(--card-bg)] min-h-[140px] ${
+            className={`flex flex-col gap-3 p-3 rounded-[var(--card-radius)] border bg-[var(--card-bg)] ${
               connected ? "border-[var(--token-success-default)]/40" : "border-border/40"
             }`}
           >
             {/* Logo + Name row */}
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3">
               <NetworkLogo
                 network={platform.id}
                 size="md"
@@ -159,62 +189,46 @@ export function AllPlatformsGrid({
               </p>
             </div>
 
-            {/* Status row */}
-            <div className="flex items-center gap-2 mb-auto">
-              {connected ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-[var(--token-success-default)]" />
-                  <span className="text-[12px] text-[var(--token-success-default)] font-medium">Connected</span>
-                </>
-              ) : isComingSoon ? (
-                <span className="text-[12px] text-muted-foreground font-medium">Coming soon</span>
-              ) : (
-                <span className="text-[12px] text-muted-foreground font-medium">Not connected</span>
-              )}
-            </div>
-
-            {/* Button row - always at bottom */}
-            <div className="pt-3 mt-auto">
-              {connected ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  disabled
-                >
-                  <Check className="h-3 w-3 mr-1.5" />
-                  Connected
-                </Button>
-              ) : isComingSoon ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  disabled
-                >
-                  Coming soon
-                </Button>
-              ) : showConnectButton ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  onClick={() => handleConnect(platform)}
-                >
-                  <Plus className="h-3 w-3 mr-1.5" />
-                  Connect
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  disabled
-                >
-                  Connect
-                </Button>
-              )}
-            </div>
+            {/* Button */}
+            {connected ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs border-[var(--token-success-default)]/40 text-[var(--token-success-default)]"
+                disabled
+              >
+                <Check className="h-3 w-3 mr-1.5" />
+                Connected
+              </Button>
+            ) : isComingSoon ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs"
+                disabled
+              >
+                Coming soon
+              </Button>
+            ) : showConnectButton ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={() => handleConnect(platform)}
+              >
+                <Plus className="h-3 w-3 mr-1.5" />
+                Connect
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs"
+                disabled
+              >
+                Connect
+              </Button>
+            )}
           </div>
         )
       })}

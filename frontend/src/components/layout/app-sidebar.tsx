@@ -126,9 +126,9 @@ export function AppSidebar() {
           <>
             <div className="my-2 h-px bg-border/40" />
             <SidebarGroup className="p-0">
-              <div className="flex items-center gap-1.5 px-2 mb-1.5 group-data-[collapsible=icon]:justify-center">
-                <Shield className="h-3 w-3 text-amber-500" />
-                <span className="text-[10px] font-medium text-amber-500 uppercase tracking-wider group-data-[collapsible=icon]:hidden">
+              <div className="flex items-center gap-2 px-2 mb-2 group-data-[collapsible=icon]:justify-center">
+                <Shield className="h-4 w-4 text-amber-500" />
+                <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide group-data-[collapsible=icon]:hidden">
                   Admin
                 </span>
               </div>

@@ -61,9 +61,15 @@ def _should_continue_after_tool_executor(state: GraphState) -> Literal["speciali
     - Potentially calling more tools
     - Generating final response
 
-    If there's an error, end the graph.
+    If there's an error or blocking action required, end the graph.
     """
     if state.get("error"):
+        return "end"
+
+    # Check for blocking action_required (permission errors, auth issues, etc.)
+    # These shouldn't be retried - just end and show the error to user
+    action_required = state.get("action_required")
+    if action_required and action_required.get("blocking"):
         return "end"
 
     # Check if all tools are executed

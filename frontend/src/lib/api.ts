@@ -57,6 +57,7 @@ export interface StreamEvent {
   agent?: string;
   task?: string;
   tool?: string;
+  name?: string;  // Tool name in tool_result events (backend sends as "name")
   input_preview?: string;
   input_full?: string;
   preview?: string;
@@ -86,7 +87,7 @@ export interface ChatStreamCallbacks {
   onThinking?: (content: string) => void;
   onToolCall?: (tool: string, inputPreview: string, inputFull?: string, approved?: boolean) => void;
   onToolExecuting?: (toolName: string, message: string) => void;  // Tool started executing (shows spinner)
-  onToolResult?: (preview: string, full?: string, dataType?: string) => void;
+  onToolResult?: (toolName: string, preview: string, full?: string, dataType?: string) => void;
   onToolApprovalRequired?: (approvalId: string, toolName: string, toolInput: string, parameterSchema?: Record<string, unknown>) => void;
   onToolDenied?: (toolName: string, reason: string) => void;
   onActionRequired?: (actionType: string, message: string, deepLink?: string, blocking?: boolean, metadata?: Record<string, unknown>) => void;
@@ -247,7 +248,8 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       );
       break;
     case "tool_result":
-      callbacks.onToolResult?.(event.preview || "", event.full, event.data_type);
+      // Pass tool name from event (backend sends it as "name" field)
+      callbacks.onToolResult?.(event.name || event.tool_name || "unknown", event.preview || "", event.full, event.data_type);
       break;
     case "tool_executing":
       callbacks.onToolExecuting?.(event.tool_name || "", event.message || "Executing...");

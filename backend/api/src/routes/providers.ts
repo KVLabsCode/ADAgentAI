@@ -158,6 +158,76 @@ providers.get("/", async (c) => {
 });
 
 /**
+ * GET /providers/:id - Get single provider details
+ * Returns provider info with account details
+ */
+providers.get("/:id", async (c) => {
+  const user = c.get("user");
+  const providerId = c.req.param("id");
+
+  // Build filter with org context
+  const whereClause = user.organizationId
+    ? and(
+        eq(connectedProviders.id, providerId),
+        eq(connectedProviders.userId, user.id),
+        eq(connectedProviders.organizationId, user.organizationId)
+      )
+    : and(
+        eq(connectedProviders.id, providerId),
+        eq(connectedProviders.userId, user.id),
+        isNull(connectedProviders.organizationId)
+      );
+
+  const provider = await db.query.connectedProviders.findFirst({
+    where: whereClause,
+    columns: {
+      id: true,
+      provider: true,
+      publisherId: true,
+      networkCode: true,
+      accountName: true,
+      isEnabled: true,
+      lastSyncAt: true,
+      createdAt: true,
+      organizationId: true,
+    },
+  });
+
+  if (!provider) {
+    return c.json({ error: "Provider not found" }, 404);
+  }
+
+  // Get user's preference for this provider
+  const userPref = await db.query.userProviderPreferences.findFirst({
+    where: and(
+      eq(userProviderPreferences.userId, user.id),
+      eq(userProviderPreferences.providerId, providerId)
+    ),
+  });
+
+  // Check if user can manage providers (admin/owner)
+  const canManage = await isOrgAdmin(user.id, user.organizationId);
+
+  return c.json({
+    provider: {
+      id: provider.id,
+      type: provider.provider,
+      name: provider.accountName || getProviderDisplayName(provider.provider),
+      identifier: provider.provider === "admob" ? provider.publisherId : provider.networkCode,
+      isEnabled: userPref?.isEnabled ?? true, // Default to enabled if no preference
+      lastSyncAt: provider.lastSyncAt,
+      connectedAt: provider.createdAt,
+      organizationId: provider.organizationId,
+      // Additional detail fields
+      publisherId: provider.publisherId,
+      networkCode: provider.networkCode,
+      accountName: provider.accountName,
+    },
+    canManage,
+  });
+});
+
+/**
  * POST /providers/connect/:type - Initiate OAuth for provider
  * Returns the OAuth URL to redirect the user to
  * Requires org admin role when in organization context

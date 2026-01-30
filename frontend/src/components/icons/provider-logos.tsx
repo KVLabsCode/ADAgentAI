@@ -160,6 +160,7 @@ export function MintegralLogo({ className, size = "md", disabled = false }: Netw
         src="/logos/mintegral.png"
         alt="Mintegral"
         fill
+        sizes="48px"
         className="object-contain"
       />
     </div>
@@ -275,6 +276,34 @@ export function ProviderLogoBadge({
   className
 }: ProviderLogoBadgeProps) {
   const Logo = type === "admob" ? AdMobLogo : GoogleAdManagerLogo
+
+  return (
+    <div className={cn(
+      disabled && "grayscale brightness-75 opacity-70",
+      className
+    )}>
+      <Logo size={size} />
+    </div>
+  )
+}
+
+/**
+ * Provider logo component for OAuth providers (AdMob, GAM)
+ */
+interface ProviderLogoProps {
+  provider: "admob" | "gam"
+  size?: "sm" | "md" | "lg"
+  disabled?: boolean
+  className?: string
+}
+
+export function ProviderLogo({
+  provider,
+  size = "md",
+  disabled = false,
+  className
+}: ProviderLogoProps) {
+  const Logo = provider === "admob" ? AdMobLogo : GoogleAdManagerLogo
 
   return (
     <div className={cn(

@@ -296,10 +296,7 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 }));
 
 // Note: No user relation - userId references Neon Auth users (neon_auth schema)
-export const connectedProvidersRelations = relations(connectedProviders, () => ({
-  // userId is stored as plain text referencing neon_auth.users_sync
-  // organizationId is stored as plain text (Neon Auth manages orgs)
-}));
+// connectedProvidersRelations and adSourcesRelations are defined after adSources table
 
 // Note: No user/org relations - userId and organizationId reference Neon Auth (neon_auth schema)
 export const chatSessionsRelations = relations(chatSessions, ({ many }) => ({
@@ -502,21 +499,24 @@ export const deletedUsers = pgTable("deleted_users", {
 ]);
 
 // ============================================================
-// Network Credentials Table (API-key based networks)
+// Ad Sources Table (API-key based ad networks for mediation)
 // ============================================================
 
-// Network Credentials - For API-key networks (AppLovin, Unity, etc.)
+// Ad Sources - For API-key networks (AppLovin, Unity, etc.) linked to providers
 // Note: Credentials are encrypted using AES-256-GCM at application layer
-export const networkCredentials = pgTable("network_credentials", {
+export const adSources = pgTable("ad_sources", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(), // References neon_auth.users_sync.id
   organizationId: text("organization_id"), // null = personal scope
 
-  // Network identification
-  networkName: varchar("network_name", { length: 100 }).notNull(), // applovin, unity, liftoff, etc.
+  // Link to parent provider (AdMob) - ad sources are nested under providers
+  providerId: uuid("provider_id").references(() => connectedProviders.id, { onDelete: "cascade" }),
+
+  // Ad source identification
+  adSourceName: varchar("ad_source_name", { length: 100 }).notNull(), // applovin, unity, liftoff, etc.
 
   // Encrypted credentials (AES-256-GCM via application layer)
-  // Structure varies by network - stored as encrypted JSONB
+  // Structure varies by ad source - stored as encrypted JSONB
   credentials: jsonb("credentials").notNull().$type<Record<string, string>>(),
 
   // Status
@@ -526,16 +526,36 @@ export const networkCredentials = pgTable("network_credentials", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
-  index("network_credentials_user_org_idx").on(table.userId, table.organizationId),
-  index("network_credentials_network_idx").on(table.networkName),
+  index("ad_sources_user_org_idx").on(table.userId, table.organizationId),
+  index("ad_sources_provider_id_idx").on(table.providerId),
+  index("ad_sources_name_idx").on(table.adSourceName),
 ]);
+
+// ============================================================
+// Provider and Ad Source Relations (defined after tables)
+// ============================================================
+
+// Connected providers relation to ad sources
+export const connectedProvidersRelations = relations(connectedProviders, ({ many }) => ({
+  // userId is stored as plain text referencing neon_auth.users_sync
+  // organizationId is stored as plain text (Neon Auth manages orgs)
+  adSources: many(adSources),
+}));
+
+// Ad sources relation - links to parent provider
+export const adSourcesRelations = relations(adSources, ({ one }) => ({
+  provider: one(connectedProviders, {
+    fields: [adSources.providerId],
+    references: [connectedProviders.id],
+  }),
+}));
 
 // ============================================================
 // Type Exports
 // ============================================================
 
-export type NetworkCredential = typeof networkCredentials.$inferSelect;
-export type NewNetworkCredential = typeof networkCredentials.$inferInsert;
+export type AdSource = typeof adSources.$inferSelect;
+export type NewAdSource = typeof adSources.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;

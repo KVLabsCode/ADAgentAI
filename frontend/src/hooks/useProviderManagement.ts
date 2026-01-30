@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 import { useUser } from "@/hooks/use-user"
 import { authFetch } from "@/lib/api"
 import type { Provider, OAuthAccount } from "@/lib/types"
@@ -12,11 +13,6 @@ export interface ProviderWithEnabled extends Provider {
   isEnabled: boolean
 }
 
-interface StatusMessage {
-  type: 'success' | 'error'
-  text: string
-}
-
 export function useProviderManagement() {
   const searchParams = useSearchParams()
   const { getAccessToken, selectedOrganizationId, isAuthenticated, isLoading: isAuthLoading } = useUser()
@@ -24,7 +20,6 @@ export function useProviderManagement() {
   const [providers, setProviders] = React.useState<ProviderWithEnabled[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [connectingType, setConnectingType] = React.useState<string | null>(null)
-  const [statusMessage, setStatusMessage] = React.useState<StatusMessage | null>(null)
   const [accountSelectionOpen, setAccountSelectionOpen] = React.useState(false)
   const [pendingAccounts, setPendingAccounts] = React.useState<OAuthAccount[]>([])
   const [canManage, setCanManage] = React.useState<boolean | null>(null)
@@ -105,10 +100,7 @@ export function useProviderManagement() {
     const error = searchParams.get('error')
 
     if (success) {
-      setStatusMessage({
-        type: 'success',
-        text: `Successfully connected ${success === 'admob' ? 'AdMob' : 'Google Ad Manager'}!`
-      })
+      toast.success(`Successfully connected ${success === 'admob' ? 'AdMob' : 'Google Ad Manager'}!`)
       fetchProviders()
       window.history.replaceState({}, '', '/providers')
     } else if (error) {
@@ -117,16 +109,8 @@ export function useProviderManagement() {
         'no_code': 'No authorization code received.',
         'access_denied': 'Access was denied. Please grant permission to connect.',
       }
-      setStatusMessage({
-        type: 'error',
-        text: errorMessages[error] || `Connection error: ${error}`
-      })
+      toast.error(errorMessages[error] || `Connection error: ${error}`)
       window.history.replaceState({}, '', '/providers')
-    }
-
-    if (success || error) {
-      const timer = setTimeout(() => setStatusMessage(null), 5000)
-      return () => clearTimeout(timer)
     }
   }, [searchParams, fetchProviders])
 
@@ -146,10 +130,7 @@ export function useProviderManagement() {
       window.location.href = authUrl
     } catch (error) {
       console.error('OAuth error:', error)
-      setStatusMessage({
-        type: 'error',
-        text: 'Failed to start connection. Please try again.'
-      })
+      toast.error('Failed to start connection. Please try again.')
       setConnectingType(null)
     }
   }, [getAccessToken, selectedOrganizationId])
@@ -182,20 +163,14 @@ export function useProviderManagement() {
 
       if (response.ok) {
         setProviders(prev => prev.filter(p => p.id !== providerId))
-        setStatusMessage({
-          type: 'success',
-          text: 'Provider disconnected successfully.'
-        })
+        toast.success('Provider disconnected')
       } else {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to disconnect')
       }
     } catch (error) {
       console.error('Disconnect error:', error)
-      setStatusMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to disconnect provider. Please try again.'
-      })
+      toast.error(error instanceof Error ? error.message : 'Failed to disconnect provider. Please try again.')
     }
   }, [getAccessToken, selectedOrganizationId])
 
@@ -218,10 +193,7 @@ export function useProviderManagement() {
       }
     } catch (error) {
       console.error('Toggle error:', error)
-      setStatusMessage({
-        type: 'error',
-        text: 'Failed to update provider. Please try again.'
-      })
+      toast.error('Failed to update provider. Please try again.')
     } finally {
       setTogglingProvider(null)
     }
@@ -235,7 +207,6 @@ export function useProviderManagement() {
     // State
     isLoading,
     connectingType,
-    statusMessage,
     accountSelectionOpen,
     togglingProvider,
     // Actions

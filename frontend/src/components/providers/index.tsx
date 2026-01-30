@@ -17,8 +17,10 @@ export { ConnectProviderDropdown } from "./ConnectProviderDropdown"
 export { ProviderListItem } from "./ProviderListItem"
 export { SupportedPlatformsContent, AllPlatformsGrid, ALL_PLATFORMS } from "./SupportedPlatformsCard"
 export { AccountSelectionModal } from "./account-selection-modal"
-export { NetworkCredentialDialog } from "./NetworkCredentialDialog"
-export { NetworkListItem } from "./NetworkListItem"
+
+// Ad source components (renamed from Network)
+export { AdSourceCredentialDialog, NetworkCredentialDialog } from "./AdSourceCredentialDialog"
+export { AdSourceListItem, NetworkListItem } from "./AdSourceListItem"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter()

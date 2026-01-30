@@ -7,6 +7,7 @@ import {
   HelpCircle,
   Settings,
   UserPlus,
+  SlidersHorizontal,
 } from "lucide-react"
 
 export const mainNavItems = [
@@ -23,6 +24,6 @@ export const bottomNavItems = [
 ]
 
 export const adminNavItems = [
-  { title: "Panel", url: "/admin", icon: LayoutDashboard },
+  { title: "Panel", url: "/admin", icon: SlidersHorizontal },
   { title: "Waitlist", url: "/admin/waitlist", icon: UserPlus },
 ]
