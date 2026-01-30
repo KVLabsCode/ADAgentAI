@@ -73,7 +73,7 @@ function SelectContent({
 }) {
   return (
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Positioner side={side} align={align} sideOffset={sideOffset}>
+      <SelectPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-[9999]">
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
