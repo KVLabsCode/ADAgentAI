@@ -4,7 +4,9 @@ import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { useUser } from "@/hooks/use-user"
+import { useDemo } from "@/contexts/demo-mode-context"
 import { authFetch } from "@/lib/api"
+import { getDemoProviders } from "@/lib/demo-user"
 import type { Provider, OAuthAccount } from "@/lib/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
@@ -16,6 +18,12 @@ export interface ProviderWithEnabled extends Provider {
 export function useProviderManagement() {
   const searchParams = useSearchParams()
   const { getAccessToken, selectedOrganizationId, isAuthenticated, isLoading: isAuthLoading } = useUser()
+  const { isDemoMode } = useDemo()
+
+  // In demo mode, use mock providers
+  const demoProviders: ProviderWithEnabled[] = React.useMemo(() =>
+    getDemoProviders().map(p => ({ ...p, isEnabled: true })),
+  [])
 
   const [providers, setProviders] = React.useState<ProviderWithEnabled[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -43,6 +51,14 @@ export function useProviderManagement() {
 
   // Fetch providers
   const fetchProviders = React.useCallback(async () => {
+    // Demo mode: use mock providers
+    if (isDemoMode) {
+      setProviders(demoProviders)
+      setCanManage(true)
+      setIsLoading(false)
+      return
+    }
+
     try {
       const accessToken = await getAccessToken()
 
@@ -83,16 +99,19 @@ export function useProviderManagement() {
     } finally {
       setIsLoading(false)
     }
-  }, [getAccessToken, selectedOrganizationId])
+  }, [getAccessToken, selectedOrganizationId, isDemoMode, demoProviders])
 
   // Wait for auth AND token to be ready before fetching
+  // In demo mode, fetch immediately (no auth needed)
   React.useEffect(() => {
-    if (!isAuthLoading && isAuthenticated && hasToken) {
+    if (isDemoMode) {
+      fetchProviders()
+    } else if (!isAuthLoading && isAuthenticated && hasToken) {
       fetchProviders()
     } else if (!isAuthLoading && !isAuthenticated) {
       setIsLoading(false)
     }
-  }, [fetchProviders, isAuthLoading, isAuthenticated, hasToken])
+  }, [fetchProviders, isAuthLoading, isAuthenticated, hasToken, isDemoMode])
 
   // Handle OAuth callback messages
   React.useEffect(() => {
@@ -115,6 +134,12 @@ export function useProviderManagement() {
   }, [searchParams, fetchProviders])
 
   const handleConnect = React.useCallback(async (type: "admob" | "gam") => {
+    // Demo mode: show info toast instead of connecting
+    if (isDemoMode) {
+      toast.info('Provider connection is not available in demo mode. Using synthetic data.')
+      return
+    }
+
     setConnectingType(type)
     try {
       const accessToken = await getAccessToken()
@@ -133,7 +158,7 @@ export function useProviderManagement() {
       toast.error('Failed to start connection. Please try again.')
       setConnectingType(null)
     }
-  }, [getAccessToken, selectedOrganizationId])
+  }, [getAccessToken, selectedOrganizationId, isDemoMode])
 
   const handleAccountSelected = React.useCallback((account: OAuthAccount) => {
     const newProvider: ProviderWithEnabled = {
@@ -155,6 +180,12 @@ export function useProviderManagement() {
   }, [])
 
   const handleDisconnect = React.useCallback(async (providerId: string) => {
+    // Demo mode: show info toast
+    if (isDemoMode) {
+      toast.info('Provider management is not available in demo mode.')
+      return
+    }
+
     try {
       const accessToken = await getAccessToken()
       const response = await authFetch(`${API_URL}/api/providers/${providerId}`, accessToken, {
@@ -172,7 +203,7 @@ export function useProviderManagement() {
       console.error('Disconnect error:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to disconnect provider. Please try again.')
     }
-  }, [getAccessToken, selectedOrganizationId])
+  }, [getAccessToken, selectedOrganizationId, isDemoMode])
 
   const handleToggleEnabled = React.useCallback(async (providerId: string, enabled: boolean) => {
     setTogglingProvider(providerId)

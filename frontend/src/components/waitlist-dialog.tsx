@@ -83,7 +83,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
       <DialogContent className="sm:max-w-[450px] p-0 gap-0 bg-[#08090a] border-[0.8px] border-white/[0.05] rounded-lg overflow-hidden">
         {/* Success Step - Linear style */}
         {step === "success" && (
-          <div className="py-12 px-6 text-center space-y-4">
+          <div className="py-12 px-6 flex flex-col items-center text-center space-y-4">
             <VisuallyHidden>
               <DialogTitle>Waitlist Confirmation</DialogTitle>
             </VisuallyHidden>
@@ -104,7 +104,7 @@ export function WaitlistDialog({ trigger, className }: WaitlistDialogProps) {
             </div>
 
             {referralCode && (
-              <div className="pt-6 space-y-3">
+              <div className="pt-6 space-y-3 w-full max-w-sm">
                 <div className="p-4 rounded-lg bg-white/[0.03] border-[0.8px] border-white/[0.05] space-y-3">
                   <p className="text-[13px] font-medium text-[#f7f8f8]">Share to move up the list</p>
                   <div className="flex items-center gap-2">

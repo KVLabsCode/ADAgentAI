@@ -230,13 +230,22 @@ export default function WaitlistAdminPage() {
     entry.role?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Group entries by status
+  // Group entries by status - preserve pending/invited as separate groups
   const groupedEntries = filteredEntries.reduce((acc, entry) => {
-    const group = entry.status === "joined" ? "joined" : entry.status === "rejected" ? "rejected" : "pending"
+    const group = entry.status
     if (!acc[group]) acc[group] = []
     acc[group].push(entry)
     return acc
   }, {} as Record<string, WaitlistEntry[]>)
+
+  // Define group order and labels
+  const groupOrder = ["pending", "invited", "joined", "rejected"]
+  const groupLabels: Record<string, string> = {
+    pending: "Pending",
+    invited: "Invited",
+    joined: "Joined",
+    rejected: "Rejected",
+  }
 
   const totalPages = Math.ceil(total / limit)
 
@@ -306,13 +315,17 @@ export default function WaitlistAdminPage() {
               <div className="w-[8%] min-w-0 pr-[var(--item-padding-x)]"></div>
             </div>
 
-            {/* Grouped sections */}
-            {Object.entries(groupedEntries).map(([group, groupEntries]) => (
+            {/* Grouped sections - ordered by groupOrder */}
+            {groupOrder
+              .filter((group) => groupedEntries[group]?.length > 0)
+              .map((group) => {
+                const groupEntries = groupedEntries[group]
+                return (
               <div key={group}>
                 {/* Section header - full width with negative margins */}
                 <div className="flex items-center gap-2 h-8 bg-[lch(10.633_3.033_272)] -mx-[var(--page-padding)] px-[var(--page-padding)]">
-                  <span className="text-xs font-medium text-foreground capitalize pl-[var(--item-padding-x)]">
-                    {group === "pending" ? "Awaiting" : group}
+                  <span className="text-xs font-medium text-foreground pl-[var(--item-padding-x)]">
+                    {groupLabels[group] || group}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {groupEntries.length}
@@ -410,7 +423,8 @@ export default function WaitlistAdminPage() {
                   </div>
                 ))}
               </div>
-            ))}
+                )
+              })}
 
             {/* Pagination - Linear style */}
             {totalPages > 1 && (

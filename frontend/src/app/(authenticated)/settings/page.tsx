@@ -10,6 +10,7 @@ import {
   AppearanceSection,
   NotificationsSection,
   PrivacySection,
+  DemoModeSection,
 } from "@/components/settings"
 
 export default function SettingsPage() {
@@ -88,6 +89,11 @@ export default function SettingsPage() {
         {/* Account Section */}
         <SettingsSection title="Account">
           <AccountSection />
+        </SettingsSection>
+
+        {/* Demo Mode Section */}
+        <SettingsSection title="Demo">
+          <DemoModeSection />
         </SettingsSection>
       </div>
     </PageContainer>

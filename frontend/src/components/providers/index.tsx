@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useCallback } from "react"
+import { Suspense, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { NeonAuthUIProvider } from "@neondatabase/auth/react"
@@ -9,6 +9,7 @@ import { authClient } from "@/lib/neon-auth/client"
 import { ThemeProvider } from "./theme-provider"
 import { QueryProvider, getQueryClient } from "./query-provider"
 import { PostHogProvider } from "./posthog-provider"
+import { DemoModeProvider } from "@/contexts/demo-mode-context"
 import { UserProvider } from "@/contexts/user-context"
 import { EntityDataProvider } from "@/contexts/entity-data-context"
 
@@ -47,13 +48,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
           redirectTo="/dashboard"
           Link={Link}
         >
-          <UserProvider>
-            <EntityDataProvider>
-              <ThemeProvider>
-                {children}
-              </ThemeProvider>
-            </EntityDataProvider>
-          </UserProvider>
+          <Suspense fallback={null}>
+            <DemoModeProvider>
+              <UserProvider>
+                <EntityDataProvider>
+                  <ThemeProvider>
+                    {children}
+                  </ThemeProvider>
+                </EntityDataProvider>
+              </UserProvider>
+            </DemoModeProvider>
+          </Suspense>
         </NeonAuthUIProvider>
       </QueryProvider>
     </PostHogProvider>

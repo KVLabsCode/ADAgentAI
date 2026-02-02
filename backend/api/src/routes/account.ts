@@ -312,9 +312,29 @@ account.delete("/", zValidator("json", deleteAccountSchema), async (c) => {
       deletionReason: "user_requested",
     });
 
-    // Note: We do NOT delete from Neon Auth tables (neon_auth schema)
-    // The user should sign out after this, and Neon Auth handles its own cleanup
-    // This separation is intentional - Neon Auth manages identity, we manage app data
+    // 13. Delete from Neon Auth tables (complete account removal)
+    // This ensures users can rejoin the waitlist after account deletion
+    try {
+      // Delete sessions first
+      await db.execute(sql`
+        DELETE FROM neon_auth.session WHERE "userId" = ${user.id}
+      `);
+
+      // Delete OAuth account links
+      await db.execute(sql`
+        DELETE FROM neon_auth.account WHERE "userId" = ${user.id}
+      `);
+
+      // Delete the user record
+      await db.execute(sql`
+        DELETE FROM neon_auth."user" WHERE id = ${user.id}
+      `);
+
+      console.log(`[Account] Neon Auth records deleted for user: ${user.id}`);
+    } catch (neonAuthError) {
+      // Log but don't fail - app data is already deleted
+      console.error("[Account] Failed to delete Neon Auth records:", neonAuthError);
+    }
 
     console.log(`[Account] GDPR deletion completed for user: ${user.id} (anonymized as ${anonymousId})`, deletionSummary);
 

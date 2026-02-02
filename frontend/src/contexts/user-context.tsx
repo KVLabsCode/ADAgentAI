@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/neon-auth/client"
 import { User, Organization, ReceivedInvitation } from "@/lib/types"
 import { storage } from "@/lib/storage"
+import { getDemoUser, getDemoOrganization } from "@/lib/demo-user"
+import { useDemo } from "@/contexts/demo-mode-context"
 
 const ORG_STORAGE_KEY = "adagent_selected_org"
 
@@ -73,6 +75,7 @@ function getE2ESessionToken(): string | null {
   return storage.get<string | null>('neon-auth.session_token', null)
 }
 
+
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const _router = useRouter()
   const { data: session, isPending, refetch } = authClient.useSession()
@@ -80,6 +83,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // E2E Test Mode: Check on mount if we should use test user
   const [e2eTestMode] = useState(() => isE2ETestMode())
   const [e2eTestUser] = useState(() => getE2ETestUser())
+
+  // Demo Mode: Get from DemoModeProvider context
+  const { isDemoMode: demoMode } = useDemo()
+  const demoUser = demoMode ? getDemoUser() : null
+  const demoOrg = demoMode ? getDemoOrganization() : null
 
   // Initialize from localStorage synchronously to avoid cascading renders
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(getInitialOrgId)
@@ -103,8 +111,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [activeOrgData, setActiveOrgData] = useState<Record<string, unknown> | null>(null)
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false)
 
-  // Fetch organizations only when authenticated
+  // Fetch organizations only when authenticated (skip for demo mode)
   const refetchOrgs = useCallback(async () => {
+    if (demoMode) return // Demo mode uses mock org
     if (!session?.user && !(e2eTestMode && e2eTestUser)) return
 
     setIsLoadingOrgs(true)
@@ -124,18 +133,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingOrgs(false)
     }
-  }, [session?.user, e2eTestMode, e2eTestUser])
+  }, [session?.user, e2eTestMode, e2eTestUser, demoMode])
 
   // Get user from Neon Auth session OR from E2E test mode
   const neonUser = session?.user
 
   // Map to our User type
-  // In E2E test mode, use the test user from localStorage
-  // Otherwise, use the Neon Auth session user
+  // Priority: Demo mode > E2E test mode > Neon Auth session
   const neonUserAny = neonUser as Record<string, unknown> | undefined
   const userRole = neonUserAny?.role === 'admin' ? 'admin' : 'user'
 
-  const user: User | null = e2eTestMode && e2eTestUser
+  const user: User | null = demoMode && demoUser
+    ? demoUser
+    : e2eTestMode && e2eTestUser
     ? {
         id: e2eTestUser.id,
         email: e2eTestUser.email,
@@ -199,10 +209,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (neonUser) {
       refetchOrgs()
     }
-  }, [neonUser?.id, refetchOrgs])
+  }, [neonUser?.id, refetchOrgs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reusable function to check waitlist access
   const recheckWaitlistAccess = useCallback(async () => {
+    // Demo mode: Bypass waitlist check - demo user has full access
+    if (demoMode && demoUser) {
+      setHasWaitlistAccess(true)
+      setWaitlistAccessReason(null)
+      return
+    }
+
     // E2E test mode: Bypass waitlist check - test user is already on waitlist
     if (e2eTestMode && e2eTestUser) {
       setHasWaitlistAccess(true)
@@ -245,7 +262,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsCheckingWaitlist(false)
     }
-  }, [neonUser?.email, e2eTestMode, e2eTestUser])
+  }, [neonUser?.email, e2eTestMode, e2eTestUser, demoMode, demoUser])
 
   // Check waitlist access when user authenticates
   React.useEffect(() => {
@@ -255,6 +272,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Check ToS acceptance when user authenticates and has waitlist access
   React.useEffect(() => {
     async function checkTosStatus() {
+      // Demo mode: Bypass ToS check - demo user has already accepted ToS
+      if (demoMode && demoUser) {
+        setHasAcceptedTos(true)
+        return
+      }
+
       // E2E test mode: Bypass ToS check - test user has already accepted ToS
       if (e2eTestMode && e2eTestUser) {
         setHasAcceptedTos(true)
@@ -305,19 +328,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     checkTosStatus()
-  }, [neonUser?.id, hasWaitlistAccess, session, e2eTestMode, e2eTestUser])
+  }, [neonUser?.id, hasWaitlistAccess, session, e2eTestMode, e2eTestUser, demoMode, demoUser])
 
   // Map organizations from Neon Auth hook
   // Include role for the active organization
-  const organizations: Organization[] = (orgList || []).map((org) => ({
-    id: org.id,
-    name: org.name,
-    slug: org.slug,
-    logo: org.logo ?? null,
-    createdAt: org.createdAt instanceof Date ? org.createdAt.toISOString() : String(org.createdAt),
-    // Add role if this is the active organization
-    role: activeOrgData && (activeOrgData as { id?: string }).id === org.id ? activeOrgRole ?? undefined : undefined,
-  }))
+  // Demo mode: return demo organization
+  const organizations: Organization[] = demoMode && demoOrg
+    ? [demoOrg]
+    : (orgList || []).map((org) => ({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo: org.logo ?? null,
+        createdAt: org.createdAt instanceof Date ? org.createdAt.toISOString() : String(org.createdAt),
+        // Add role if this is the active organization
+        role: activeOrgData && (activeOrgData as { id?: string }).id === org.id ? activeOrgRole ?? undefined : undefined,
+      }))
 
   // Find selected organization from list
   const selectedOrganization = selectedOrgId
@@ -387,8 +413,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // Get session token for backend API calls
   // Neon Auth provides the token in the session object
+  // In demo mode, return a demo token marker (API calls will be intercepted)
   // In E2E test mode, return the token from localStorage
   const getAccessToken = useCallback(async (): Promise<string | null> => {
+    // Demo mode: Return a marker token (actual API calls should be intercepted)
+    if (demoMode) {
+      return 'demo-mode-token'
+    }
+
     // E2E test mode: Return the session token from localStorage
     if (e2eTestMode) {
       return getE2ESessionToken()
@@ -416,7 +448,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     return null
-  }, [session, e2eTestMode])
+  }, [session, e2eTestMode, demoMode])
 
   // Select an organization (or null for personal scope)
   // Uses Neon Auth's organization.setActive() API
@@ -594,12 +626,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Platform admin check - uses role from Neon Auth (set in Neon Console)
   const isAdmin = user?.role === 'admin'
 
+  // In demo mode, we're authenticated if we have a demo user
   // In E2E test mode, we're authenticated if we have a test user
   // Otherwise, check for Neon Auth session user
-  const isAuthenticated = e2eTestMode ? !!e2eTestUser : !!neonUser
+  const isAuthenticated = demoMode ? !!demoUser : e2eTestMode ? !!e2eTestUser : !!neonUser
 
-  // In E2E test mode, we're never loading (user is available immediately from localStorage)
-  const isLoading = e2eTestMode ? false : isPending
+  // In demo mode or E2E test mode, we're never loading (user is available immediately)
+  const isLoading = demoMode ? false : e2eTestMode ? false : isPending
 
   const value: UserContextValue = {
     user,

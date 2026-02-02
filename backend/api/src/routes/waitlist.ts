@@ -458,14 +458,18 @@ app.get("/admin/list", async (c) => {
   const offset = parseInt(c.req.query("offset") || "0");
 
   try {
-    const whereClause = status
-      ? eq(waitlist.status, status as "pending" | "invited" | "joined")
-      : undefined;
+    // Build where conditions: filter by status + hide anonymized deleted users
+    const conditions = [
+      sql`${waitlist.email} NOT LIKE '%@deleted.local'`
+    ];
+    if (status) {
+      conditions.push(eq(waitlist.status, status as "pending" | "invited" | "joined"));
+    }
 
     const entries = await db
       .select()
       .from(waitlist)
-      .where(whereClause)
+      .where(sql.join(conditions, sql` AND `))
       .orderBy(desc(waitlist.createdAt))
       .limit(limit)
       .offset(offset);
@@ -474,7 +478,7 @@ app.get("/admin/list", async (c) => {
     const [{ value: total }] = await db
       .select({ value: count() })
       .from(waitlist)
-      .where(whereClause);
+      .where(sql.join(conditions, sql` AND `));
 
     return c.json({
       entries,

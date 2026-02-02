@@ -6,8 +6,10 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Spinner } from "@/atoms/spinner"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/organisms/sidebar"
 import { useUser } from "@/hooks/use-user"
+import { useDemo } from "@/contexts/demo-mode-context"
 import { TosModal } from "@/components/tos-modal"
 import { InvitationBanner } from "@/components/invitations"
+import { DemoBanner } from "@/components/demo-banner"
 
 export function AuthenticatedLayoutClient({
   children,
@@ -27,6 +29,8 @@ export function AuthenticatedLayoutClient({
     rejectInvitation,
   } = useUser()
 
+  const { isDemoMode } = useDemo()
+
   // Track if we've completed initial auth check to prevent flashing on subsequent updates
   const [hasInitialized, setHasInitialized] = React.useState(false)
 
@@ -42,17 +46,18 @@ export function AuthenticatedLayoutClient({
   }, [isLoading, isCheckingWaitlist, isCheckingTos])
 
   React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Skip login redirect in demo mode
+    if (!isLoading && !isAuthenticated && !isDemoMode) {
       router.push('/login')
     }
-  }, [isLoading, isAuthenticated, router])
+  }, [isLoading, isAuthenticated, isDemoMode, router])
 
-  // Redirect to access denied if user doesn't have waitlist access
+  // Redirect to access denied if user doesn't have waitlist access (skip for demo mode)
   React.useEffect(() => {
-    if (!isLoading && isAuthenticated && !isCheckingWaitlist && hasWaitlistAccess === false) {
+    if (!isLoading && isAuthenticated && !isCheckingWaitlist && hasWaitlistAccess === false && !isDemoMode) {
       router.push('/access-denied')
     }
-  }, [isLoading, isAuthenticated, isCheckingWaitlist, hasWaitlistAccess, router])
+  }, [isLoading, isAuthenticated, isCheckingWaitlist, hasWaitlistAccess, isDemoMode, router])
 
   // Show loading state only during initial load, not on subsequent re-checks
   if (!hasInitialized && (isLoading || isCheckingWaitlist || isCheckingTos)) {
@@ -63,8 +68,8 @@ export function AuthenticatedLayoutClient({
     )
   }
 
-  // Don't render protected content if not authenticated
-  if (!isAuthenticated) {
+  // Don't render protected content if not authenticated (unless demo mode)
+  if (!isAuthenticated && !isDemoMode) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Spinner size="lg" className="text-muted-foreground" />
@@ -72,8 +77,8 @@ export function AuthenticatedLayoutClient({
     )
   }
 
-  // Don't render if waitlist access is denied
-  if (hasWaitlistAccess === false) {
+  // Don't render if waitlist access is denied (unless demo mode)
+  if (hasWaitlistAccess === false && !isDemoMode) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Spinner size="lg" className="text-muted-foreground" />
@@ -88,6 +93,8 @@ export function AuthenticatedLayoutClient({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="relative overflow-y-auto">
+        {/* Demo Mode Banner */}
+        <DemoBanner />
         {/* Mobile sidebar trigger - only visible on small screens */}
         <div className="sticky top-0 z-50 flex h-12 shrink-0 items-center px-4 sm:px-6 md:hidden bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
           <SidebarTrigger />

@@ -12,7 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/molecules/dropdown-menu"
 import { useUser } from "@/hooks/use-user"
+import { useDemo } from "@/contexts/demo-mode-context"
 import { Logo, LogoSvgWide } from "@/components/brand/logo"
+import { DemoBanner } from "@/components/demo-banner"
 
 interface PublicLayoutClientProps {
   children: React.ReactNode
@@ -23,9 +25,12 @@ export function PublicLayoutClient({
 }: PublicLayoutClientProps) {
   const { theme, setTheme } = useTheme()
   const { user, isAuthenticated, isLoading, signOut } = useUser()
+  const { isDemoMode } = useDemo()
 
   return (
     <div className="min-h-screen flex flex-col bg-[#08090a]">
+      {/* Demo Mode Banner */}
+      {isDemoMode && <DemoBanner />}
       {/* Linear-style Navigation */}
       <header className="sticky top-0 z-50 bg-[#08090a]/80 backdrop-blur-md border-b border-white/[0.05]">
         <nav className="mx-auto flex h-14 max-w-[1200px] items-center px-6">
