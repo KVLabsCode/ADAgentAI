@@ -294,7 +294,7 @@ export default function ChatHistoryPage() {
               <div
                 key={chat.id}
                 className={cn(
-                  "group relative flex items-center rounded-md transition-all cursor-pointer",
+                  "group relative flex items-center rounded-md transition-colors cursor-pointer",
                   isSelected
                     ? "bg-accent ring-1 ring-accent-foreground/10"
                     : "hover:bg-muted/50"

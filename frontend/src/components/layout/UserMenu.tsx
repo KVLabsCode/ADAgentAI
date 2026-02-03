@@ -50,7 +50,11 @@ export function UserMenu({ mounted }: UserMenuProps) {
             }
           >
             <Avatar className="h-5 w-5 rounded">
-              <AvatarImage src={user?.avatar} alt={user?.name || 'User'} />
+              <AvatarImage
+                src={user?.avatar}
+                alt={user?.name || 'User'}
+                referrerPolicy="no-referrer"
+              />
               <AvatarFallback className="rounded bg-muted text-[10px] font-medium">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>

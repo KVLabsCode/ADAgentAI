@@ -340,7 +340,7 @@ function ModelUsageBar({ model, percentage, cost }: { model: string; percentage:
       </div>
       <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
         <div
-          className="h-full bg-primary/70 rounded-full transition-all duration-500"
+          className="h-full bg-primary/70 rounded-full transition-[width] duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>

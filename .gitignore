@@ -71,3 +71,7 @@ SPEC.md
 # Linear reverse engineering (local research)
 linear_copy/
 linear_reverse/
+
+# Local MCP servers and agents
+langsmith-mcp-server/
+.agents/

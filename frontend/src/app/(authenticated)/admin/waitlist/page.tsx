@@ -378,7 +378,7 @@ export default function WaitlistAdminPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-muted hover:bg-muted transition-all" />
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-muted hover:bg-muted transition-[opacity,background-color]" />
                           }
                         >
                           <span className="sr-only">Open menu</span>

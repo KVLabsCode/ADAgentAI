@@ -81,8 +81,9 @@ IMPORTANT: Always verify account IDs exist before using them.
 
 **STEP 2: Select appropriate ad sources** based on:
 - User's preferences (if specified)
-- App type (games benefit from Unity, Pangle; general apps from Meta, AdMob)
-- Common high-performing networks: AdMob Network, Meta Audience Network, Unity Ads, Pangle
+- App type (games benefit from Pangle, Mintegral; general apps from Liftoff, AdMob)
+- Supported high-performing networks: AdMob Network, Liftoff Monetize, InMobi, Pangle, Mintegral, AppLovin, DT Exchange
+- Note: Meta Audience Network and Unity Ads are coming soon and NOT yet supported
 
 **STEP 3: Configure bidding_lines and waterfall_lines** with actual ad source IDs from Step 1:
 - bidding_lines: Networks participating in real-time bidding auction (higher revenue potential)
@@ -97,8 +98,8 @@ IMPORTANT: Always verify account IDs exist before using them.
 
 Include in your explanation:
 1. **Available Ad Sources**: What networks you found from accounts_adSources_list
-2. **Bidding Networks**: Which networks you're adding to bidding and why (e.g., "I'm including AdMob Bidding and Meta Audience Network bidding since Meta typically performs well for casual games")
-3. **Waterfall Networks**: Which networks you're adding to the waterfall and why (e.g., "I'm adding AdMob as a network-optimized fallback to capture any impressions not won in bidding")
+2. **Bidding Networks**: Which networks you're adding to bidding and why (e.g., "I'm including AdMob Network and Pangle bidding since Pangle typically performs well for casual games")
+3. **Waterfall Networks**: Which networks you're adding to the waterfall and why (e.g., "I'm adding Liftoff Monetize as a network-optimized fallback to capture any impressions not won in bidding")
 4. **Pricing Strategy**: Explain your choice of FIXED vs NETWORK_OPTIMIZED pricing:
    - NETWORK_OPTIMIZED: Let the network optimize CPM automatically (recommended for most cases)
    - FIXED: Set a specific CPM floor (use when you have performance data to set floors)
@@ -107,13 +108,13 @@ Include in your explanation:
 Example good response:
 "I looked up the available ad sources for your account:
 
-**Available for bidding**: AdMob Network, Meta Audience Network (bidding), Unity Ads (bidding), Pangle (bidding)
-**Available for waterfall**: AdMob Network, Meta Audience Network, Unity Ads, Pangle, AppLovin
-**Not yet available (coming soon)**: InMobi, DT Exchange, Mintegral
+**Available for bidding**: AdMob Network, Liftoff Monetize (bidding), InMobi (SDK) (bidding), Pangle (bidding), Mintegral (bidding)
+**Available for waterfall**: Liftoff Monetize, InMobi, Pangle, Mintegral, AppLovin, DT Exchange
+**Not yet available (coming soon)**: Meta Audience Network, Unity Ads
 
 Based on your app being a casual game, I'm configuring:
-- **Bidding**: AdMob Network (strong baseline) + Meta Audience Network (excellent for gaming apps)
-- **Waterfall**: Unity Ads with network-optimized pricing as a fallback
+- **Bidding**: AdMob Network (strong baseline) + Pangle (excellent for gaming apps)
+- **Waterfall**: Liftoff Monetize with network-optimized pricing as a fallback
 
 This setup prioritizes real-time bidding for best prices while ensuring high fill rates."
 

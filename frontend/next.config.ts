@@ -38,7 +38,13 @@ const nextConfig: NextConfig = {
     },
     // Optimize barrel file imports for faster builds and reduced bundle size
     // Transforms `import { X } from 'lucide-react'` to direct imports
-    optimizePackageImports: ["lucide-react"],
+    // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/optimizePackageImports
+    optimizePackageImports: [
+      "lucide-react",
+      "@base-ui/react",
+      "@base-ui-components/react",
+      "date-fns",
+    ],
   },
 };
 

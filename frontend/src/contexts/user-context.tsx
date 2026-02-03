@@ -4,12 +4,14 @@ import * as React from "react"
 import { useCallback, useState, createContext, useContext } from "react"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/neon-auth/client"
-import { User, Organization, ReceivedInvitation } from "@/lib/types"
+import { User, Organization, ReceivedInvitation, Provider } from "@/lib/types"
 import { storage } from "@/lib/storage"
-import { getDemoUser, getDemoOrganization } from "@/lib/demo-user"
+import { authFetch } from "@/lib/api"
+import { getDemoUser, getDemoOrganization, getDemoProviders } from "@/lib/demo-user"
 import { useDemo } from "@/contexts/demo-mode-context"
 
 const ORG_STORAGE_KEY = "adagent_selected_org"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface UserContextValue {
   user: User | null
@@ -41,6 +43,10 @@ interface UserContextValue {
   fetchReceivedInvitations: () => Promise<void>
   acceptInvitation: (invitationId: string) => Promise<boolean>
   rejectInvitation: (invitationId: string) => Promise<boolean>
+  // Providers (for instant account dropdown)
+  providers: Provider[]
+  providersLoading: boolean
+  refreshProviders: () => Promise<void>
 }
 
 const UserContext = createContext<UserContextValue | null>(null)
@@ -105,6 +111,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [receivedInvitations, setReceivedInvitations] = useState<ReceivedInvitation[]>([])
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false)
 
+  // Providers state (for instant account dropdown in forms)
+  const [providers, setProviders] = useState<Provider[]>([])
+  const [providersLoading, setProvidersLoading] = useState(false)
+
   // Organization state - manually managed to avoid 401 errors when not authenticated
   // The Neon Auth hooks don't support conditional fetching, so we use manual state
   const [orgList, setOrgList] = useState<Array<{ id: string; name: string; slug: string; logo?: string | null; createdAt: Date }>>([])
@@ -134,6 +144,51 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingOrgs(false)
     }
   }, [session?.user, e2eTestMode, e2eTestUser, demoMode])
+
+  // Fetch providers for instant account dropdown
+  const refreshProviders = useCallback(async () => {
+    // Demo mode: use mock providers
+    if (demoMode) {
+      setProviders(getDemoProviders())
+      return
+    }
+
+    if (!session?.user && !(e2eTestMode && e2eTestUser)) return
+
+    setProvidersLoading(true)
+    try {
+      // Get token for auth
+      const sessionAny = session as Record<string, unknown> | undefined
+      let token: string | null = null
+      if (sessionAny?.session && typeof sessionAny.session === 'object') {
+        const nestedSession = sessionAny.session as Record<string, unknown>
+        if (nestedSession.token && typeof nestedSession.token === 'string') {
+          token = nestedSession.token
+        }
+      } else if (sessionAny?.token && typeof sessionAny.token === 'string') {
+        token = sessionAny.token
+      }
+
+      const response = await authFetch(`${API_URL}/api/providers`, token, { cache: 'no-store' }, selectedOrgId)
+      if (response.ok) {
+        const data = await response.json()
+        setProviders(data.providers.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          type: p.type as 'admob' | 'gam',
+          status: 'connected' as const,
+          displayName: p.name as string,
+          identifiers: p.type === 'admob'
+            ? { publisherId: p.identifier as string }
+            : { networkCode: p.identifier as string, accountName: p.name as string },
+          isEnabled: p.isEnabled !== false,
+        })))
+      }
+    } catch (error) {
+      console.debug('Failed to fetch providers:', error)
+    } finally {
+      setProvidersLoading(false)
+    }
+  }, [session, e2eTestMode, e2eTestUser, demoMode, selectedOrgId])
 
   // Get user from Neon Auth session OR from E2E test mode
   const neonUser = session?.user
@@ -206,10 +261,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Refetch organizations when user becomes authenticated
   // This ensures orgs load immediately after sign in without page refresh
   React.useEffect(() => {
-    if (neonUser) {
+    if (neonUser?.id) {
       refetchOrgs()
     }
-  }, [neonUser?.id, refetchOrgs]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [neonUser?.id, refetchOrgs])
+
+  // Fetch providers when user authenticates or organization changes
+  React.useEffect(() => {
+    if (neonUser?.id || demoMode || (e2eTestMode && e2eTestUser)) {
+      refreshProviders()
+    }
+  }, [neonUser?.id, selectedOrgId, demoMode, e2eTestMode, e2eTestUser, refreshProviders])
 
   // Reusable function to check waitlist access
   const recheckWaitlistAccess = useCallback(async () => {
@@ -454,12 +516,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Uses Neon Auth's organization.setActive() API
   const selectOrganization = useCallback(async (orgId: string | null) => {
     setSelectedOrgId(orgId)
+
+    // Skip Neon Auth API call in demo mode - demo org ID is not a valid UUID
+    const isDemoOrgId = orgId === getDemoOrganization().id
+
     if (orgId) {
       storage.set(ORG_STORAGE_KEY, orgId)
-      try {
-        await authClient.organization.setActive({ organizationId: orgId })
-      } catch (error) {
-        console.error('Failed to set active organization:', error)
+      if (!isDemoOrgId) {
+        try {
+          await authClient.organization.setActive({ organizationId: orgId })
+        } catch (error) {
+          console.error('Failed to set active organization:', error)
+        }
       }
     } else {
       storage.remove(ORG_STORAGE_KEY)
@@ -618,10 +686,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch received invitations when user authenticates
   React.useEffect(() => {
-    if (neonUser) {
+    if (neonUser?.id) {
       fetchReceivedInvitations()
     }
-  }, [neonUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [neonUser?.id, fetchReceivedInvitations])
 
   // Platform admin check - uses role from Neon Auth (set in Neon Console)
   const isAdmin = user?.role === 'admin'
@@ -661,6 +729,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     fetchReceivedInvitations,
     acceptInvitation,
     rejectInvitation,
+    // Providers for instant account dropdown
+    providers,
+    providersLoading,
+    refreshProviders,
   }
 
   return (

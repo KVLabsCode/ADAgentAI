@@ -1,11 +1,14 @@
 import { Metadata } from "next"
+import { cacheLife } from "next/cache"
 
 export const metadata: Metadata = {
   title: "Terms of Service | Ad Agent AI",
   description: "Terms of Service for Ad Agent AI platform",
 }
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  "use cache"
+  cacheLife("weeks")
   return (
     <div className="container mx-auto px-4 py-16 max-w-3xl">
       <h1 className="text-3xl font-semibold mb-8">Terms of Service</h1>

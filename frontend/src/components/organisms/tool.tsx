@@ -15,22 +15,29 @@ import {
   Code2,
   ListTree,
   Clock,
+  type LucideIcon,
 } from "lucide-react"
 import { Spinner } from "@/atoms/spinner"
-import { useState } from "react"
+import { useState, useCallback, memo } from "react"
 import { JsonTreeViewCompact } from "@/components/chat/json-tree-view"
 import { ScrollArea } from "@/molecules/scroll-area"
 
+// =============================================================================
+// Types
+// =============================================================================
+
 type ViewMode = "tree" | "json"
+
+type ToolState =
+  | "input-streaming"
+  | "input-available"
+  | "output-available"
+  | "output-error"
+  | "approval-pending"
 
 export type ToolPart = {
   type: string
-  state:
-    | "input-streaming"
-    | "input-available"
-    | "output-available"
-    | "output-error"
-    | "approval-pending"
+  state: ToolState
   input?: Record<string, unknown>
   output?: Record<string, unknown>
   toolCallId?: string
@@ -44,6 +51,68 @@ export type ToolProps = {
   approvalContent?: React.ReactNode
 }
 
+// =============================================================================
+// Tool State Configuration - O(1) lookup via Map (replaces switch statements)
+// =============================================================================
+
+interface ToolStateConfig {
+  icon: LucideIcon | null  // null means use Spinner
+  iconClassName: string
+  badgeClassName: string
+  badgeLabel: string
+}
+
+const TOOL_STATE_CONFIG = new Map<ToolState, ToolStateConfig>([
+  ["input-streaming", {
+    icon: null,  // Spinner component (not a LucideIcon)
+    iconClassName: "text-blue-500",
+    badgeClassName: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    badgeLabel: "Processing",
+  }],
+  ["input-available", {
+    icon: Settings,
+    iconClassName: "text-orange-500",
+    badgeClassName: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    badgeLabel: "Ready",
+  }],
+  ["output-available", {
+    icon: CheckCircle,
+    iconClassName: "text-green-500",
+    badgeClassName: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    badgeLabel: "Completed",
+  }],
+  ["output-error", {
+    icon: XCircle,
+    iconClassName: "text-red-500",
+    badgeClassName: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    badgeLabel: "Error",
+  }],
+  ["approval-pending", {
+    icon: Clock,
+    iconClassName: "text-orange-500",
+    badgeClassName: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    badgeLabel: "Awaiting Approval",
+  }],
+])
+
+// Default config for unknown states
+const DEFAULT_STATE_CONFIG: ToolStateConfig = {
+  icon: Settings,
+  iconClassName: "text-muted-foreground",
+  badgeClassName: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+  badgeLabel: "Pending",
+}
+
+// =============================================================================
+// Pure Helper Functions (hoisted outside component)
+// =============================================================================
+
+// Known wrapper keys for unwrapping - hoisted for reuse
+const WRAPPER_KEYS = new Set([
+  "params", "input", "args", "arguments", "data",
+  "payload", "result", "response", "output", "body", "content"
+])
+
 /**
  * Unwrap data if it has a single wrapper key like "params", "input", "args", etc.
  * This shows the actual parameters directly instead of wrapped in a container.
@@ -55,8 +124,7 @@ function unwrapSingleKey(data: Record<string, unknown> | undefined): Record<stri
   // If there's exactly one key that's a known wrapper, unwrap to show inner content directly
   if (keys.length === 1) {
     const key = keys[0]
-    const wrapperKeys = ["params", "input", "args", "arguments", "data", "payload", "result", "response", "output", "body", "content"]
-    if (wrapperKeys.includes(key.toLowerCase())) {
+    if (WRAPPER_KEYS.has(key.toLowerCase())) {
       const inner = data[key]
       if (inner && typeof inner === "object" && !Array.isArray(inner)) {
         return inner as Record<string, unknown>
@@ -91,11 +159,132 @@ function hasContent(data: unknown): boolean {
   return true
 }
 
+/**
+ * Format a value for JSON display
+ */
+function formatValue(value: unknown): string {
+  if (value === null) return "null"
+  if (value === undefined) return "undefined"
+  if (typeof value === "string") return value
+  if (typeof value === "object") {
+    return JSON.stringify(value, null, 2)
+  }
+  return String(value)
+}
+
+// =============================================================================
+// Sub-components (memoized for performance)
+// =============================================================================
+
+interface ToolStateIconProps {
+  state: ToolState
+}
+
+const ToolStateIcon = memo(function ToolStateIcon({ state }: ToolStateIconProps) {
+  const config = TOOL_STATE_CONFIG.get(state) ?? DEFAULT_STATE_CONFIG
+
+  // Special case: input-streaming uses Spinner component
+  if (state === "input-streaming") {
+    return <Spinner size="sm" className={config.iconClassName} />
+  }
+
+  const Icon = config.icon!
+  return <Icon className={cn("h-4 w-4", config.iconClassName)} />
+})
+
+interface ToolStateBadgeProps {
+  state: ToolState
+}
+
+const ToolStateBadge = memo(function ToolStateBadge({ state }: ToolStateBadgeProps) {
+  const config = TOOL_STATE_CONFIG.get(state) ?? DEFAULT_STATE_CONFIG
+
+  return (
+    <span className={cn("px-2 py-1 rounded-full text-xs font-medium", config.badgeClassName)}>
+      {config.badgeLabel}
+    </span>
+  )
+})
+
+interface ViewModeToggleProps {
+  viewMode: ViewMode
+  onToggle: () => void
+}
+
+const ViewModeToggle = memo(function ViewModeToggle({ viewMode, onToggle }: ViewModeToggleProps) {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    onToggle()
+  }, [onToggle])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      e.stopPropagation()
+      onToggle()
+    }
+  }, [onToggle])
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className="h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 transition-colors"
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
+      {viewMode === "tree" ? (
+        <Code2 className="h-3.5 w-3.5" />
+      ) : (
+        <ListTree className="h-3.5 w-3.5" />
+      )}
+      <span className="sr-only">Toggle {viewMode === "tree" ? "JSON" : "tree"} view</span>
+    </div>
+  )
+})
+
+interface DataSectionProps {
+  title: string
+  titleKey: string | null
+  data: unknown
+  viewMode: ViewMode
+  maxHeight: string
+}
+
+const DataSection = memo(function DataSection({ title, titleKey, data, viewMode, maxHeight }: DataSectionProps) {
+  return (
+    <div>
+      <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+        {title}{titleKey && <span className="ml-1 normal-case text-violet-400">({titleKey})</span>}
+      </h4>
+      <div className="rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] p-3">
+        {viewMode === "tree" ? (
+          <JsonTreeViewCompact
+            data={data}
+            collapsed={3}
+            maxHeight={maxHeight}
+          />
+        ) : (
+          <ScrollArea maxHeight={maxHeight}>
+            <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
+              {formatValue(data)}
+            </pre>
+          </ScrollArea>
+        )}
+      </div>
+    </div>
+  )
+})
+
+// =============================================================================
+// Main Component
+// =============================================================================
+
 const Tool = ({ toolPart, defaultOpen = false, className, approvalContent }: ToolProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const [viewMode, setViewMode] = useState<ViewMode>("tree")
 
-  const { state, input: rawInput, output: rawOutput, toolCallId: _toolCallId } = toolPart
+  const { state, input: rawInput, output: rawOutput } = toolPart
 
   // Unwrap input/output if they have single wrapper keys
   const input = unwrapSingleKey(rawInput)
@@ -105,104 +294,14 @@ const Tool = ({ toolPart, defaultOpen = false, className, approvalContent }: Too
   const hasInput = hasContent(input)
   const hasOutput = hasContent(output)
 
-  const getStateIcon = () => {
-    switch (state) {
-      case "input-streaming":
-        return <Spinner size="sm" className="text-blue-500" />
-      case "input-available":
-        return <Settings className="h-4 w-4 text-orange-500" />
-      case "output-available":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case "output-error":
-        return <XCircle className="h-4 w-4 text-red-500" />
-      case "approval-pending":
-        return <Clock className="h-4 w-4 text-orange-500" />
-      default:
-        return <Settings className="text-muted-foreground h-4 w-4" />
-    }
-  }
+  // Stable callback for view mode toggle
+  const handleViewModeToggle = useCallback(() => {
+    setViewMode(prev => prev === "tree" ? "json" : "tree")
+  }, [])
 
-  const getStateBadge = () => {
-    const baseClasses = "px-2 py-1 rounded-full text-xs font-medium"
-    switch (state) {
-      case "input-streaming":
-        return (
-          <span
-            className={cn(
-              baseClasses,
-              "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-            )}
-          >
-            Processing
-          </span>
-        )
-      case "input-available":
-        return (
-          <span
-            className={cn(
-              baseClasses,
-              "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-            )}
-          >
-            Ready
-          </span>
-        )
-      case "output-available":
-        return (
-          <span
-            className={cn(
-              baseClasses,
-              "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-            )}
-          >
-            Completed
-          </span>
-        )
-      case "output-error":
-        return (
-          <span
-            className={cn(
-              baseClasses,
-              "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-            )}
-          >
-            Error
-          </span>
-        )
-      case "approval-pending":
-        return (
-          <span
-            className={cn(
-              baseClasses,
-              "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-            )}
-          >
-            Awaiting Approval
-          </span>
-        )
-      default:
-        return (
-          <span
-            className={cn(
-              baseClasses,
-              "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
-            )}
-          >
-            Pending
-          </span>
-        )
-    }
-  }
-
-  const formatValue = (value: unknown): string => {
-    if (value === null) return "null"
-    if (value === undefined) return "undefined"
-    if (typeof value === "string") return value
-    if (typeof value === "object") {
-      return JSON.stringify(value, null, 2)
-    }
-    return String(value)
-  }
+  // Extract keys for display
+  const inputExtracted = input ? extractSingleKey(input) : null
+  const outputExtracted = output ? extractSingleKey(output) : null
 
   return (
     <div
@@ -222,37 +321,15 @@ const Tool = ({ toolPart, defaultOpen = false, className, approvalContent }: Too
           }
         >
           <div className="flex items-center gap-2">
-            {getStateIcon()}
+            <ToolStateIcon state={state} />
             <span className="text-sm font-medium">
               {toolPart.type}
             </span>
-            {getStateBadge()}
+            <ToolStateBadge state={state} />
           </div>
           <div className="flex items-center gap-1">
             {isOpen && (hasInput || hasOutput) && (
-              <div
-                role="button"
-                tabIndex={0}
-                className="h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setViewMode(viewMode === "tree" ? "json" : "tree")
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setViewMode(viewMode === "tree" ? "json" : "tree")
-                  }
-                }}
-              >
-                {viewMode === "tree" ? (
-                  <Code2 className="h-3.5 w-3.5" />
-                ) : (
-                  <ListTree className="h-3.5 w-3.5" />
-                )}
-                <span className="sr-only">Toggle {viewMode === "tree" ? "JSON" : "tree"} view</span>
-              </div>
+              <ViewModeToggle viewMode={viewMode} onToggle={handleViewModeToggle} />
             )}
             <ChevronDown className={cn("h-4 w-4", isOpen && "rotate-180")} />
           </div>
@@ -266,57 +343,25 @@ const Tool = ({ toolPart, defaultOpen = false, className, approvalContent }: Too
           style={isOpen ? { overflow: 'visible' } : undefined}
         >
           <div className="space-y-3 p-3">
-            {input && (() => {
-              const { key: inputKey, value: inputValue } = extractSingleKey(input)
-              return (
-                <div>
-                  <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
-                    Input{inputKey && <span className="ml-1 normal-case text-violet-400">({inputKey})</span>}
-                  </h4>
-                  <div className="rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] p-3">
-                    {viewMode === "tree" ? (
-                      <JsonTreeViewCompact
-                        data={inputValue}
-                        collapsed={3}
-                        maxHeight="140px"
-                      />
-                    ) : (
-                      <ScrollArea maxHeight="140px">
-                        <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
-                          {formatValue(input)}
-                        </pre>
-                      </ScrollArea>
-                    )}
-                  </div>
-                </div>
-              )
-            })()}
+            {inputExtracted && (
+              <DataSection
+                title="Input"
+                titleKey={inputExtracted.key}
+                data={inputExtracted.value}
+                viewMode={viewMode}
+                maxHeight="140px"
+              />
+            )}
 
-            {output && (() => {
-              const { key: outputKey, value: outputValue } = extractSingleKey(output)
-              return (
-                <div>
-                  <h4 className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
-                    Output{outputKey && <span className="ml-1 normal-case text-violet-400">({outputKey})</span>}
-                  </h4>
-                  <div className="rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] p-3">
-                    {viewMode === "tree" ? (
-                      <JsonTreeViewCompact
-                        data={outputValue}
-                        collapsed={3}
-                        maxHeight="200px"
-                      />
-                    ) : (
-                      <ScrollArea maxHeight="200px">
-                        <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap">
-                          {formatValue(output)}
-                        </pre>
-                      </ScrollArea>
-                    )}
-                  </div>
-                </div>
-              )
-            })()}
+            {outputExtracted && (
+              <DataSection
+                title="Output"
+                titleKey={outputExtracted.key}
+                data={outputExtracted.value}
+                viewMode={viewMode}
+                maxHeight="200px"
+              />
+            )}
 
             {state === "output-error" && toolPart.errorText && (
               <div className="rounded-md border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 p-3">

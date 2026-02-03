@@ -4,12 +4,10 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/atoms/button"
 import { WaitlistDialog } from "@/components/waitlist-dialog"
+import { useUser } from "@/hooks/use-user"
 
-interface HeroSectionProps {
-  isAuthenticated: boolean
-}
-
-export function HeroSection({ isAuthenticated }: HeroSectionProps) {
+export function HeroSection() {
+  const { isAuthenticated } = useUser()
   return (
     <section className="relative py-20 md:py-20">
       <div className="container mx-auto px-6">

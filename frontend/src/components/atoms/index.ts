@@ -1,4 +1,5 @@
 // Atoms - smallest building blocks with no dependencies
+export { ActionButton } from "./action-button"
 export { Avatar, AvatarImage, AvatarFallback } from "./avatar"
 export { Badge, RemovableBadge, badgeVariants } from "./badge"
 export { Button, buttonVariants } from "./button"

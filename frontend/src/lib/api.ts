@@ -2,8 +2,13 @@
  * API client for connecting to CrewAI agent service
  */
 
+import { DEMO_ORGANIZATION } from "@/lib/demo-user";
+
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5001";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+// Demo org ID is not a valid UUID - skip sending to backend
+const isDemoOrgId = (orgId: string | null | undefined) => orgId === DEMO_ORGANIZATION.id;
 
 /**
  * Create fetch headers with session token and optional organization context
@@ -18,7 +23,8 @@ export function createAuthHeaders(
   if (sessionToken) {
     headers["Authorization"] = `Bearer ${sessionToken}`;
   }
-  if (organizationId) {
+  // Don't send demo org ID to backend - it's not a valid UUID
+  if (organizationId && !isDemoOrgId(organizationId)) {
     headers["x-organization-id"] = organizationId;
   }
   return headers;
@@ -143,8 +149,8 @@ export async function streamChat(
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
 
-    // Add organization context for org-scoped operations
-    if (organizationId) {
+    // Add organization context for org-scoped operations (skip demo org ID)
+    if (organizationId && !isDemoOrgId(organizationId)) {
       headers["x-organization-id"] = organizationId;
     }
 
@@ -154,7 +160,7 @@ export async function streamChat(
       body: JSON.stringify({
         message,
         user_id: userId,
-        organization_id: organizationId, // Pass org to agent for provider lookup
+        organization_id: isDemoOrgId(organizationId) ? null : organizationId, // Pass org to agent for provider lookup (skip demo org)
         history: history || [],
         context: context || {},
       }),
@@ -315,9 +321,17 @@ export interface FieldFilterParams {
 
 /**
  * Fetch dynamic field options for parameter forms
- * @param fieldType - Type of field (accounts, apps, ad_units, etc.)
+ *
+ * Phase 2 optimization: Calls API server directly instead of chat server,
+ * removing one HTTP hop for ~50ms savings per request.
+ *
+ * Note: "accounts" field type is now handled by EntitySelectWidget using
+ * providers from UserContext (Phase 1 optimization), so this function
+ * is only called for dependent fields: apps, ad_units, mediation_groups, ad_sources.
+ *
+ * @param fieldType - Type of field (apps, ad_units, mediation_groups, ad_sources, etc.)
  * @param accessToken - User's access token
- * @param accountId - Optional account ID for dependent fields
+ * @param accountId - Account ID (publisherId) for dependent fields
  * @param organizationId - Optional organization context
  * @param filters - Optional filter params for cascading dependencies
  */
@@ -328,29 +342,38 @@ export async function fetchFieldOptions(
   organizationId?: string | null,
   filters?: FieldFilterParams
 ): Promise<FieldOptionsResponse> {
+  // Accounts are handled by UserContext (Phase 1 optimization)
+  // This should not be called for accounts, but handle gracefully
+  if (fieldType === "accounts") {
+    console.warn("[fetchFieldOptions] accounts should use UserContext providers");
+    return { options: [], manual_input: false };
+  }
+
+  // accountId is required for dependent fields
+  if (!accountId) {
+    return { options: [], manual_input: true };
+  }
+
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const headers: Record<string, string> = {};
     if (accessToken) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
-    if (organizationId) {
+    if (organizationId && !isDemoOrgId(organizationId)) {
       headers["x-organization-id"] = organizationId;
     }
 
-    const response = await fetch(`${AGENT_URL}/chat/field-options`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        field_type: fieldType,
-        account_id: accountId,
-        // Include filter params if provided
-        platform: filters?.platform,
-        ad_format: filters?.adFormat,
-        app_id: filters?.appId,
-      }),
-    });
+    // Build query params
+    const params = new URLSearchParams({ accountId });
+    if (filters?.platform) params.set("platform", filters.platform);
+    if (filters?.adFormat) params.set("adFormat", filters.adFormat);
+    if (filters?.appId) params.set("appId", filters.appId);
+
+    // Call API server directly (Phase 2 optimization)
+    const response = await fetch(
+      `${API_URL}/api/field-options/${fieldType}?${params}`,
+      { headers }
+    );
 
     if (!response.ok) {
       return { options: [], manual_input: true };

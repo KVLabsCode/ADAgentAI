@@ -66,7 +66,7 @@ const MessageAvatar = React.forwardRef<HTMLDivElement, MessageAvatarProps>(
       <div ref={ref} className={cn("flex-shrink-0", className)} {...props}>
         <Avatar className="w-7 h-7">
           {src ? (
-            <AvatarImage src={src} alt={alt} />
+            <AvatarImage src={src} alt={alt} referrerPolicy="no-referrer" />
           ) : null}
           <AvatarFallback className="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white text-xs font-semibold">
             {fallback}

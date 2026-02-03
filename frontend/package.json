@@ -17,8 +17,6 @@
     "test:e2e:report": "playwright show-report",
     "tokens:build": "style-dictionary build --config tokens/style-dictionary.config.mjs",
     "tokens:watch": "style-dictionary build --config tokens/style-dictionary.config.mjs --watch",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
     "validate:contrast": "bun run scripts/validate-contrast.ts"
   },
   "dependencies": {
@@ -30,8 +28,6 @@
     "@neondatabase/auth": "0.1.0-beta.21",
     "@next/mdx": "^16.1.4",
     "@portabletext/react": "^6.0.2",
-    "@radix-ui/react-scroll-area": "^1.2.10",
-    "@radix-ui/react-slot": "^1.2.4",
     "@rjsf/core": "^6.2.5",
     "@rjsf/utils": "^6.2.5",
     "@rjsf/validator-ajv8": "^6.2.5",
@@ -74,9 +70,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",
-    "@storybook/addon-a11y": "^10.2.1",
-    "@storybook/addon-docs": "^10.2.1",
-    "@storybook/nextjs": "^10.2.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@tokens-studio/sd-transforms": "^2.0.3",
     "@types/marked": "^6.0.0",
@@ -89,10 +82,7 @@
     "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.1.4",
-    "eslint-plugin-storybook": "10.2.1",
     "lightningcss": "^1.31.1",
-    "storybook": "^10.2.1",
-    "storybook-design-token": "^5.0.0",
     "style-dictionary": "^5.2.0",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",

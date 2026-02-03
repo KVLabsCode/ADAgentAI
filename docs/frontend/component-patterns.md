@@ -58,34 +58,33 @@ Compound components share state through React context, enabling flexible composi
 </Dialog>
 ```
 
-## Polymorphic Components (asChild)
+## Polymorphic Components (render prop)
 
-Use `asChild` to render a component as a different element while preserving styles and behavior.
+Use the `render` prop to render a component as a different element while preserving styles and behavior. This uses Base UI's `useRender` hook.
 
 ### Render Button as Link
 
 ```tsx
 // Render Button as a Next.js Link
-<Button asChild>
-  <Link href="/page">Go to page</Link>
-</Button>
+<Button render={<Link href="/page" />}>Go to page</Button>
 
 // Render Button as anchor
-<Button asChild>
-  <a href="https://example.com">External link</a>
-</Button>
+<Button render={<a href="https://example.com" />}>External link</Button>
 ```
 
 ### How it Works
 
-The `asChild` prop uses Radix UI's `Slot` component internally:
+The `render` prop uses Base UI's `useRender` hook internally:
 
 ```tsx
-import { Slot } from "@radix-ui/react-slot"
+import { useRender } from "@base-ui/react/use-render"
 
-function Button({ asChild, ...props }) {
-  const Comp = asChild ? Slot : "button"
-  return <Comp {...props} />
+function Button({ render, ...props }) {
+  return useRender({
+    render,
+    props: { ...props },
+    defaultTagName: "button",
+  })
 }
 ```
 
@@ -208,10 +207,10 @@ Components are organized following Atomic Design principles:
 ### Import Pattern
 
 ```tsx
-// Import from component folders
-import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { DataTable } from "@/components/ui/data-table"
+// Import from atomic design folders
+import { Button } from "@/atoms/button"
+import { Card, CardHeader, CardTitle, CardContent } from "@/molecules/card"
+import { DataTable } from "@/organisms/data-table"
 ```
 
 ## Best Practices
@@ -316,7 +315,7 @@ Use `data-*` attributes for state-based styling:
 
 ## Resources
 
-- [Radix UI Primitives](https://www.radix-ui.com/primitives) - Accessible component primitives
-- [shadcn/ui](https://ui.shadcn.com/) - Component collection
+- [Base UI](https://base-ui.com/) - Unstyled, accessible component primitives (primary)
+- [Lina](https://lina.sameer.sh/) - Adaptive ScrollArea pattern (touch: native, desktop: custom)
 - [Class Variance Authority](https://cva.style/docs) - Variant management
 - [Atomic Design](https://bradfrost.com/blog/post/atomic-web-design/) - Component organization

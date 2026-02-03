@@ -4,8 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
-import { Brain, ChevronDown, Clock, Check, X, Route, Terminal, Copy, ThumbsUp, ThumbsDown, CheckCheck, AlertTriangle, Shield, FileSearch, PenLine, Plus, Trash2, Braces, ListTree, Bot, Plug, ArrowRight, RefreshCw, KeyRound, Mail, Sparkles } from "lucide-react"
-import Link from "next/link"
+import { Bot, ChevronDown, Clock, Check, X, AlertTriangle, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/atoms/button"
 import { Badge } from "@/atoms/badge"
@@ -14,21 +13,38 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/molecules/collapsible"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/molecules/tooltip"
 import { useChatSettings } from "@/lib/chat-settings"
 import type { Message, StreamEventItem, RJSFSchema, ActionRequiredType } from "@/lib/types"
 import { RJSFParameterForm } from "./rjsf"
-import { JsonTreeView } from "./json-tree-view"
-import { ScrollArea } from "@/molecules/scroll-area"
 import { StepsTimeline } from "./steps-timeline"
 import { FinalAnswerBlock } from "./final-answer-block"
 import { Tool } from "@/organisms/tool"
 import { Loader } from "@/components/ui/loader"
+
+// Import extracted components
+import {
+  // Constants
+  CARD_HEIGHT,
+  CARD_PADDING,
+  // Utils
+  getShortToolName,
+  getToolMetadata,
+  isWriteOperation,
+  getToolIcon,
+  // Components
+  IconBox,
+  RoutingBlock,
+  ThinkingBlock,
+  MessageActions,
+  JsonDisplay,
+  ToolDeniedBlock,
+  ActionRequiredBlock,
+  ActivitySummaryBlock,
+} from "./assistant-message/index"
+
+// =============================================================================
+// Types
+// =============================================================================
 
 interface AssistantMessageProps {
   message: Message
@@ -37,443 +53,22 @@ interface AssistantMessageProps {
   isStreaming?: boolean
 }
 
-// Extract short tool name from full MCP tool path
-function getShortToolName(fullName: string): string {
-  const parts = fullName.split("__")
-  return parts[parts.length - 1] || fullName
-}
-
 // =============================================================================
-// Tool Metadata Extraction
+// Agent Response Block
 // =============================================================================
 
-interface ToolMetadata {
-  displayName: string
-  category: string  // e.g., "Ad Manager > Ad Units"
-  operationType: "Create" | "Update" | "Delete" | "Batch" | "Action"
-  riskLevel: "low" | "medium" | "high"
-  entityType: string  // e.g., "Ad Unit", "Order", "Site"
-  docUrl?: string
+interface AgentResponseBlockProps {
+  content: string
+  isStreaming?: boolean
+  messageId: string
 }
 
-function getToolMetadata(mcpToolName: string): ToolMetadata {
-  const shortName = getShortToolName(mcpToolName)
-
-  // Determine provider
-  const isAdMob = shortName.startsWith("admob_")
-  const isAdManager = shortName.startsWith("admanager_")
-  const provider = isAdMob ? "AdMob" : isAdManager ? "Ad Manager" : "Tool"
-
-  // Remove prefix and clean name
-  let cleanName = shortName
-    .replace(/^admob_/, "")
-    .replace(/^admanager_/, "")
-    .replace(/networks_/g, "")
-
-  // Determine operation type
-  let operationType: ToolMetadata["operationType"] = "Action"
-  if (cleanName.startsWith("batch_")) {
-    operationType = "Batch"
-    cleanName = cleanName.replace(/^batch_/, "")
-  } else if (cleanName.startsWith("create_")) {
-    operationType = "Create"
-  } else if (cleanName.startsWith("patch_") || cleanName.startsWith("update_")) {
-    operationType = "Update"
-  } else if (cleanName.startsWith("delete_")) {
-    operationType = "Delete"
-  }
-
-  // Extract entity type
-  const entityParts = cleanName
-    .replace(/^(create|patch|update|delete|activate|deactivate|archive|submit|run|stop|allow|block|cancel)_/, "")
-    .replace(/_for_approval$/, "")
-    .replace(/_ad_breaks$/, " Ad Breaks")
-    .replace(/_ad_review_center_ads$/, "")
-    .split("_")
-    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
-  const entityType = entityParts.join(" ")
-    .replace(/s$/, "") // singularize
-    .replace(/By Asset Key$/, "")
-    .replace(/By Custom Asset Key$/, "")
-    .trim()
-
-  // Determine risk level
-  let riskLevel: ToolMetadata["riskLevel"] = "low"
-  if (cleanName.includes("delete") || cleanName.includes("archive")) {
-    riskLevel = "high"
-  } else if (operationType === "Batch") {
-    riskLevel = "high"
-  } else if (operationType === "Update" || cleanName.includes("deactivate")) {
-    riskLevel = "medium"
-  } else if (operationType === "Create") {
-    riskLevel = "low"
-  }
-
-  // Build category path
-  const category = `${provider} › ${entityType}s`
-
-  // Format display name
-  const displayName = shortName
-    .replace(/^admob_/, "")
-    .replace(/^admanager_/, "")
-    .replace(/networks_/g, "")
-    .split("_")
-    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ")
-
-  // API documentation URL
-  const docUrl = isAdManager
-    ? "https://developers.google.com/ad-manager/api/rest"
-    : isAdMob
-      ? "https://developers.google.com/admob/api/reference/rest"
-      : undefined
-
-  return { displayName, category, operationType, riskLevel, entityType, docUrl }
-}
-
-// Risk level styling (reserved for future use)
-const _RISK_STYLES = {
-  low: { bg: "bg-emerald-500/20", text: "text-emerald-400", border: "border-emerald-500/30" },
-  medium: { bg: "bg-amber-500/20", text: "text-amber-400", border: "border-amber-500/30" },
-  high: { bg: "bg-red-500/20", text: "text-red-400", border: "border-red-500/30" },
-}
-
-// Operation type styling (reserved for future use)
-const _OP_STYLES = {
-  Create: { bg: "bg-emerald-500/20", text: "text-emerald-400" },
-  Update: { bg: "bg-amber-500/20", text: "text-amber-400" },
-  Delete: { bg: "bg-red-500/20", text: "text-red-400" },
-  Batch: { bg: "bg-violet-500/20", text: "text-violet-400" },
-  Action: { bg: "bg-sky-500/20", text: "text-sky-400" },
-}
-
-// Keywords that indicate write operations - hoisted for O(1) lookup
-const WRITE_OPERATION_KEYWORDS = [
-  "create", "update", "patch", "delete", "batch",
-  "activate", "deactivate", "archive", "submit",
-  "allow", "block", "cancel", "stop", "run_networks_reports"
-] as const
-
-// Check if a tool requires approval (write operation) - dynamic detection
-function isWriteOperation(toolName: string): boolean {
-  const name = toolName.toLowerCase()
-  return WRITE_OPERATION_KEYWORDS.some(keyword => name.includes(keyword))
-}
-
-// Keywords grouped by operation type for icon selection
-const DELETE_KEYWORDS = ["delete", "archive", "remove"] as const
-const CREATE_KEYWORDS = ["create", "add", "new"] as const
-const UPDATE_KEYWORDS = ["update", "patch", "edit", "modify", "activate", "deactivate"] as const
-
-// Get appropriate icon for tool based on operation type
-function getToolIcon(toolName: string): { icon: React.ComponentType<{ className?: string }>; type: "read" | "create" | "update" | "delete" } {
-  const name = toolName.toLowerCase()
-
-  if (DELETE_KEYWORDS.some(k => name.includes(k))) {
-    return { icon: Trash2, type: "delete" }
-  }
-  if (CREATE_KEYWORDS.some(k => name.includes(k))) {
-    return { icon: Plus, type: "create" }
-  }
-  if (UPDATE_KEYWORDS.some(k => name.includes(k))) {
-    return { icon: PenLine, type: "update" }
-  }
-  // Default to read/fetch icon
-  return { icon: FileSearch, type: "read" }
-}
-
-// Syntax highlighting for JSON
-function highlightJSON(obj: unknown): React.ReactNode {
-  const json = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2)
-  const highlighted = json
-    .replace(/"([^"]+)":/g, '<span class="text-sky-400">"$1"</span>:')
-    .replace(/: "([^"]+)"/g, ': <span class="text-amber-300">"$1"</span>')
-    .replace(/: (\d+)/g, ': <span class="text-violet-400">$1</span>')
-    .replace(/: (true|false)/g, ': <span class="text-emerald-400">$1</span>')
-    .replace(/: (null)/g, ': <span class="text-zinc-500">$1</span>')
-  return <span dangerouslySetInnerHTML={{ __html: highlighted }} />
-}
-
-// Parse content - handles JSON strings, objects, and primitives
-function parseJsonContent(content: unknown): unknown {
-  if (typeof content === "string") {
-    // Try to parse JSON string
-    try {
-      return JSON.parse(content)
-    } catch {
-      // Not valid JSON, return as-is
-      return content
-    }
-  }
-  return content
-}
-
-// Unwrap common wrapper keys for cleaner tree view display
-// e.g., { params: { page_size: 20 } } → { page_size: 20 }
-// Also handles message arrays: [{ type: 'text', text: '...' }] → extracts and parses text
-function unwrapForTreeView(content: unknown): unknown {
-  // Handle message arrays like [{ type: 'text', text: '...' }]
-  if (Array.isArray(content)) {
-    // Check if it's a message array (common LLM response format)
-    if (content.length > 0 && content.every(item =>
-      item && typeof item === "object" && "type" in item && "text" in item
-    )) {
-      // Extract just the text content
-      const texts = content.map(item => (item as { text: string }).text)
-      if (texts.length === 1) {
-        // Try to parse the text as JSON (API responses are JSON strings)
-        const text = texts[0]
-        try {
-          return JSON.parse(text)
-        } catch {
-          return text // Return as string if not valid JSON
-        }
-      }
-      return texts // Return array of texts
-    }
-    // For other arrays, return as-is
-    return content
-  }
-
-  if (content && typeof content === "object") {
-    const obj = content as Record<string, unknown>
-    const keys = Object.keys(obj)
-    // Unwrap if only one key and it's a common wrapper
-    if (keys.length === 1) {
-      const key = keys[0]
-      const wrapperKeys = ["params", "parameters", "data", "result", "response", "input"]
-      if (wrapperKeys.includes(key) && typeof obj[key] === "object" && obj[key] !== null) {
-        return obj[key]
-      }
-    }
-  }
-  return content
-}
-
-// JSON Display - with inline toggle between tree and raw JSON
-function JsonDisplay({
-  title,
+const AgentResponseBlock = React.memo(function AgentResponseBlock({
   content,
-  maxHeight = "280px",
-  collapsed = 2,
-  defaultMode = "tree",
-}: {
-  title: string
-  content: unknown
-  maxHeight?: string
-  collapsed?: number
-  defaultMode?: "tree" | "json"
-}) {
-  const [viewMode, setViewMode] = React.useState<"tree" | "json">(defaultMode)
-
-  // Parse content if it's a JSON string
-  const parsedContent = React.useMemo(() => parseJsonContent(content), [content])
-
-  // For tree view, unwrap common wrappers like "params" and parse JSON from text arrays
-  const treeContent = React.useMemo(() => unwrapForTreeView(parsedContent), [parsedContent])
-
-  // Can show tree view if either parsed or unwrapped content is an object/array
-  const canShowTree = (parsedContent !== null && typeof parsedContent === "object") ||
-                      (treeContent !== null && typeof treeContent === "object")
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-          {title}
-        </span>
-        {canShowTree && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    onClick={() => setViewMode(viewMode === "tree" ? "json" : "tree")}
-                    className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                  />
-                }
-              >
-                {viewMode === "tree" ? (
-                  <Braces className="h-3 w-3" />
-                ) : (
-                  <ListTree className="h-3 w-3" />
-                )}
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {viewMode === "tree" ? "View as JSON" : "View as Tree"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
-      {viewMode === "tree" && canShowTree ? (
-        <JsonTreeView
-          data={typeof treeContent === "object" ? treeContent : parsedContent}
-          maxHeight={maxHeight}
-          collapsed={collapsed}
-          displayObjectSize={false}
-          enableClipboard={true}
-        />
-      ) : (
-        <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/50">
-          <ScrollArea  className="w-full bg-zinc-50 dark:bg-zinc-900/80" style={{ maxHeight }}>
-            <pre className="p-3 text-[11px] leading-relaxed font-mono text-zinc-900 dark:text-zinc-300 whitespace-pre-wrap break-all">
-              {highlightJSON(typeof treeContent === "object" ? treeContent : parsedContent)}
-            </pre>
-          </ScrollArea>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Unified compact card height
-const CARD_HEIGHT = "h-10"
-const CARD_PADDING = "px-3"
-
-// Icon box component - colored square behind icon (higher contrast)
-function IconBox({ color, children }: { color: "violet" | "amber" | "emerald" | "red" | "zinc"; children: React.ReactNode }) {
-  const bgColors = {
-    violet: "bg-violet-600/60",
-    amber: "bg-amber-600/60",
-    emerald: "bg-emerald-600/60",
-    red: "bg-red-600/60",
-    zinc: "bg-zinc-600/60",
-  }
-  return (
-    <div className={cn("w-6 h-6 rounded flex items-center justify-center shrink-0", bgColors[color])}>
-      {children}
-    </div>
-  )
-}
-
-// Format model name for display (e.g., "claude-sonnet-4-20250514" -> "Sonnet 4")
-function formatModelName(modelId?: string): string | null {
-  if (!modelId) return null
-
-  // Handle common model patterns
-  if (modelId.includes("haiku")) return "Haiku"
-  if (modelId.includes("sonnet-4")) return "Sonnet 4"
-  if (modelId.includes("sonnet")) return "Sonnet"
-  if (modelId.includes("opus")) return "Opus"
-  if (modelId.includes("gemini-2.5-flash")) return "Gemini Flash"
-  if (modelId.includes("gemini")) return "Gemini"
-  if (modelId.includes("gpt-4")) return "GPT-4"
-  if (modelId.includes("gpt-3")) return "GPT-3.5"
-
-  // Extract model name from full ID
-  const parts = modelId.split("/")
-  const name = parts[parts.length - 1]
-  return name.length > 20 ? name.slice(0, 20) + "..." : name
-}
-
-// Routing block - compact collapsed
-function RoutingBlock({ service, capability, thinking, model_selected }: { service: string; capability: string; thinking?: string; model_selected?: string }) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const modelDisplay = formatModelName(model_selected)
-
-  if (!thinking) {
-    return (
-      <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50")}>
-        <div className="flex items-center gap-2.5">
-          <IconBox color="violet">
-            <Route className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-          </IconBox>
-          <span className="text-xs text-zinc-900 dark:text-zinc-200">
-            <span className="text-zinc-500 dark:text-zinc-400">Routing to</span>{" "}
-            <span className="font-medium text-zinc-950 dark:text-zinc-100">{service}</span>
-            <span className="mx-1.5 text-zinc-400 dark:text-zinc-500">→</span>
-            <span className="font-medium text-zinc-950 dark:text-zinc-100">{capability}</span>
-          </span>
-        </div>
-        {modelDisplay && (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 shrink-0">
-            {modelDisplay}
-          </span>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50">
-        <CollapsibleTrigger
-          render={
-            <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")} />
-          }
-        >
-          <div className="flex items-center gap-2.5 min-w-0 h-full">
-            <IconBox color="violet">
-              <Route className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-            </IconBox>
-            <span className="text-xs text-zinc-900 dark:text-zinc-200 truncate">
-              <span className="text-zinc-500 dark:text-zinc-400">Routing to</span>{" "}
-              <span className="font-medium text-zinc-950 dark:text-zinc-100">{service}</span>
-              <span className="mx-1.5 text-zinc-400 dark:text-zinc-500">→</span>
-              <span className="font-medium text-zinc-950 dark:text-zinc-100">{capability}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 shrink-0 h-full">
-            {modelDisplay && (
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
-                {modelDisplay}
-              </span>
-            )}
-            <div className="flex items-center gap-1.5">
-              <Brain className="h-3 w-3" />
-              <span className="text-[10px]">reasoning</span>
-              <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", isOpen && "rotate-180")} />
-            </div>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="px-4 pb-3 pt-2">
-            <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {thinking}
-            </p>
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  )
-}
-
-// Thinking block - compact, no preview
-function ThinkingBlock({ content }: { content: string }) {
-  const [isOpen, setIsOpen] = React.useState(false)
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50">
-        <CollapsibleTrigger
-          render={
-            <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")} />
-          }
-        >
-          <div className="flex items-center gap-2.5">
-            <IconBox color="amber">
-              <Brain className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            </IconBox>
-            <span className="text-xs font-medium text-zinc-900 dark:text-zinc-200">Thinking...</span>
-          </div>
-          <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-400 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="px-4 pb-3 pt-2">
-            <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {content}
-            </p>
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  )
-}
-
-// Agent Response Block - styled container for agent's text responses
-function AgentResponseBlock({ content, isStreaming, messageId }: { content: string; isStreaming?: boolean; messageId: string }) {
-  const [isOpen, setIsOpen] = React.useState(true) // Expanded by default
+  isStreaming,
+  messageId,
+}: AgentResponseBlockProps) {
+  const [isOpen, setIsOpen] = React.useState(true)
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -537,9 +132,12 @@ function AgentResponseBlock({ content, isStreaming, messageId }: { content: stri
       </div>
     </Collapsible>
   )
-}
+})
 
-// Tool Approval Required - uses Tool component with approval slot
+// =============================================================================
+// Tool Approval Block
+// =============================================================================
+
 interface ToolApprovalBlockProps {
   approvalId: string
   toolName: string
@@ -551,22 +149,25 @@ interface ToolApprovalBlockProps {
   isDenied?: boolean
 }
 
-function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, parameterSchema, onApproval, isPending, isExecuting = false, isDenied = false }: ToolApprovalBlockProps) {
-  // Get tool metadata for enhanced display
+const ToolApprovalBlock = React.memo(function ToolApprovalBlock({
+  approvalId: _approvalId,
+  toolName,
+  toolInput,
+  parameterSchema,
+  onApproval,
+  isPending,
+  isExecuting = false,
+  isDenied = false,
+}: ToolApprovalBlockProps) {
   const metadata = React.useMemo(() => getToolMetadata(toolName), [toolName])
 
-  // Parse initial values from tool input and normalize structure
   const initialValues = React.useMemo(() => {
     try {
       const parsed = JSON.parse(toolInput) as Record<string, unknown>
-
-      // Unwrap "params" wrapper if present (LLM often wraps args in params)
       let values = parsed
       if (parsed.params && typeof parsed.params === "object") {
         values = parsed.params as Record<string, unknown>
       }
-
-      // Flatten "targeting" object if present (AdMob mediation groups use this)
       if (values.targeting && typeof values.targeting === "object") {
         const targeting = values.targeting as Record<string, unknown>
         const { targeting: _, ...rest } = values
@@ -577,22 +178,18 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
           ad_unit_ids: targeting.ad_unit_ids,
         }
       }
-
-      // Convert array fields to comma-separated strings if schema expects string
       if (Array.isArray(values.ad_unit_ids)) {
         values = {
           ...values,
           ad_unit_ids: (values.ad_unit_ids as string[]).join(", ")
         }
       }
-
       return values
     } catch {
       return {}
     }
   }, [toolInput])
 
-  // Track modified parameters and validation state
   const [currentValues, setCurrentValues] = React.useState<Record<string, unknown>>(initialValues)
   const [hasChanges, setHasChanges] = React.useState(false)
   const [hasErrors, setHasErrors] = React.useState(false)
@@ -611,11 +208,9 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
     }
   }
 
-  // Determine state for Tool component
-  // Use input-streaming for executing (inherits "Processing" badge automatically)
   const toolState = isPending ? "approval-pending" : isExecuting ? "input-streaming" : isDenied ? "output-error" : "output-available"
+  const toolInput2 = parameterSchema && isPending ? undefined : initialValues
 
-  // Approval buttons content (only shown when pending)
   const approvalButtons = isPending && (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 text-[10px]">
@@ -663,10 +258,6 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
     </div>
   )
 
-  // For pending state with schema, show editable form
-  // Otherwise just pass the input values
-  const toolInput2 = parameterSchema && isPending ? undefined : initialValues
-
   return (
     <Tool
       toolPart={{
@@ -678,7 +269,6 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
       defaultOpen={isPending || isExecuting}
       approvalContent={
         <>
-          {/* Editable form when schema available and pending */}
           {parameterSchema && isPending && (
             <div className="mb-4">
               <RJSFParameterForm
@@ -694,137 +284,12 @@ function ToolApprovalBlock({ approvalId: _approvalId, toolName, toolInput, param
       }
     />
   )
-}
+})
 
-// Tool Denied - always collapsed/compact
-function ToolDeniedBlock({ toolName, reason }: { toolName: string; reason: string }) {
-  const shortName = getShortToolName(toolName)
+// =============================================================================
+// MCP Tool Block
+// =============================================================================
 
-  return (
-    <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center justify-between gap-2 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50")}>
-      <div className="flex items-center gap-2.5 min-w-0">
-        <IconBox color="red">
-          <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-        </IconBox>
-        <code className="text-xs font-medium text-zinc-900 dark:text-zinc-300 font-mono truncate">{shortName}</code>
-        <span className="text-[10px] text-zinc-500 truncate">{reason}</span>
-      </div>
-      <Badge className="h-5 gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-red-500/20 text-red-400 shrink-0">
-        Denied
-      </Badge>
-    </div>
-  )
-}
-
-// Action Required Block - prompts user to take action (connect provider, reauthenticate, etc.)
-interface ActionRequiredBlockProps {
-  actionType: ActionRequiredType
-  message: string
-  deepLink?: string
-  blocking: boolean
-  metadata?: Record<string, unknown>
-}
-
-function ActionRequiredBlock({ actionType, message, deepLink, blocking, metadata }: ActionRequiredBlockProps) {
-  // Get icon and styling based on action type
-  const getActionConfig = (type: ActionRequiredType) => {
-    switch (type) {
-      case "connect_provider":
-        return {
-          icon: Plug,
-          iconColor: "violet",
-          buttonText: metadata?.suggested_provider
-            ? `Connect ${String(metadata.suggested_provider).charAt(0).toUpperCase() + String(metadata.suggested_provider).slice(1)}`
-            : "Connect Provider",
-          buttonVariant: "default" as const,
-        }
-      case "reauthenticate":
-        return {
-          icon: RefreshCw,
-          iconColor: "amber",
-          buttonText: "Reconnect",
-          buttonVariant: "default" as const,
-        }
-      case "grant_permissions":
-        return {
-          icon: KeyRound,
-          iconColor: "amber",
-          buttonText: "Grant Permissions",
-          buttonVariant: "default" as const,
-        }
-      case "verify_email":
-        return {
-          icon: Mail,
-          iconColor: "emerald",
-          buttonText: "Verify Email",
-          buttonVariant: "default" as const,
-        }
-      case "upgrade_plan":
-        return {
-          icon: Sparkles,
-          iconColor: "violet",
-          buttonText: "View Plans",
-          buttonVariant: "default" as const,
-        }
-      default:
-        return {
-          icon: AlertTriangle,
-          iconColor: "amber",
-          buttonText: "Take Action",
-          buttonVariant: "default" as const,
-        }
-    }
-  }
-
-  const config = getActionConfig(actionType)
-  const ActionIcon = config.icon
-
-  return (
-    <div className={cn(
-      "rounded-2xl overflow-hidden border",
-      blocking
-        ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50"
-        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700/50"
-    )}>
-      <div className="px-4 py-3 flex items-start gap-3">
-        <IconBox color={config.iconColor as "violet" | "amber" | "emerald" | "red" | "zinc"}>
-          <ActionIcon className={cn(
-            "h-3.5 w-3.5",
-            config.iconColor === "violet" && "text-violet-600 dark:text-violet-400",
-            config.iconColor === "amber" && "text-amber-600 dark:text-amber-400",
-            config.iconColor === "emerald" && "text-emerald-600 dark:text-emerald-400",
-            config.iconColor === "red" && "text-red-600 dark:text-red-400",
-            config.iconColor === "zinc" && "text-zinc-600 dark:text-zinc-400",
-          )} />
-        </IconBox>
-        <div className="flex-1 min-w-0 space-y-2">
-          <p className="text-sm text-zinc-900 dark:text-zinc-200 leading-relaxed">
-            {message}
-          </p>
-          {deepLink && (
-            <Link href={deepLink}>
-              <Button
-                size="sm"
-                variant={config.buttonVariant}
-                className="h-8 px-3 text-xs gap-1.5"
-              >
-                {config.buttonText}
-                <ArrowRight className="h-3 w-3" />
-              </Button>
-            </Link>
-          )}
-        </div>
-        {blocking && (
-          <Badge className="h-5 text-[9px] font-semibold uppercase tracking-wide px-1.5 border-0 leading-none bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
-            Required
-          </Badge>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// MCP Tool Block - collapsed by default
 interface MCPToolBlockProps {
   name: string
   params: Record<string, unknown>
@@ -834,34 +299,38 @@ interface MCPToolBlockProps {
   approvalState?: boolean | null
 }
 
-function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalState }: MCPToolBlockProps) {
+const MCPToolBlock = React.memo(function MCPToolBlock({
+  name,
+  params,
+  result,
+  hasResult,
+  onApproval,
+  approvalState,
+}: MCPToolBlockProps) {
   const shortName = getShortToolName(name)
   const needsApproval = isWriteOperation(name)
   const isPending = needsApproval && approvalState === null
   const isApproved = !needsApproval || approvalState === true
   const isDenied = approvalState === false
 
-  // Auto-expand when approval is pending, otherwise collapsed
-  const [isOpen, setIsOpen] = React.useState(isPending)
+  // Derived state pattern: isOpen is derived from isPending OR user preference
+  const [userWantsOpen, setUserWantsOpen] = React.useState(false)
+  const isOpen = isPending || userWantsOpen
 
-  // Auto-collapse after approval/denial
+  // Reset user preference when approval completes
   React.useEffect(() => {
-    if (!isPending && isOpen) {
-      setIsOpen(false)
+    if (!isPending) {
+      setUserWantsOpen(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only auto-collapse on isPending change
   }, [isPending])
 
-  // Get appropriate icon for this tool type
   const toolIcon = getToolIcon(name)
   const ToolIconComponent = toolIcon.icon
-
-  // Icon color based on state
   const iconColor = isPending ? "amber" : isDenied ? "red" : "emerald"
   const iconTextColor = isPending ? "text-amber-400" : isDenied ? "text-red-400" : "text-emerald-400"
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Collapsible open={isOpen} onOpenChange={setUserWantsOpen}>
       <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50">
         <CollapsibleTrigger
           render={
@@ -932,100 +401,12 @@ function MCPToolBlock({ name, params, result, hasResult, onApproval, approvalSta
       </div>
     </Collapsible>
   )
-}
+})
 
-// Activity summary block
-function ActivitySummaryBlock({ events, children }: { events: StreamEventItem[], children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const toolEvents = events.filter(e => e.type === "tool")
-  const stepCount = toolEvents.length
+// =============================================================================
+// Event Processing
+// =============================================================================
 
-  if (stepCount === 0) return <>{children}</>
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50 overflow-hidden">
-        <CollapsibleTrigger
-          render={
-            <button className={cn(CARD_HEIGHT, CARD_PADDING, "w-full flex items-center justify-between gap-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors")} />
-          }
-        >
-          <div className="flex items-center gap-2.5 h-full">
-            <IconBox color="zinc">
-              <Terminal className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-            </IconBox>
-            <span className="text-xs text-zinc-900 dark:text-zinc-200">
-              <span className="font-medium">{stepCount}</span>
-              <span className="text-zinc-500 dark:text-zinc-400 ml-1">{stepCount === 1 ? 'tool call' : 'tool calls'}</span>
-            </span>
-          </div>
-          <ChevronDown className={cn("h-3.5 w-3.5 text-zinc-500 transition-transform duration-200", isOpen && "rotate-180")} />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="px-3 pb-3 pt-2 space-y-2 border-t border-zinc-200 dark:border-zinc-700/50 mt-1">
-            {children}
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  )
-}
-
-// Message Actions
-function MessageActions({ content, messageId: _messageId }: { content: string; messageId: string }) {
-  const [copied, setCopied] = React.useState(false)
-  const [liked, setLiked] = React.useState(false)
-  const [disliked, setDisliked] = React.useState(false)
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(content)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy:', err)
-    }
-  }
-
-  return (
-    <TooltipProvider delayDuration={200}>
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button onClick={handleCopy} className={cn("p-1.5 rounded-lg transition-colors", copied ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")} />
-            }
-          >
-            {copied ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">{copied ? "Copied!" : "Copy"}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button onClick={() => { setLiked(!liked); if (!liked && disliked) setDisliked(false) }} className={cn("p-1.5 rounded-lg transition-colors", liked ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")} />
-            }
-          >
-            <ThumbsUp className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">{liked ? "Liked" : "Like"}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button onClick={() => { setDisliked(!disliked); if (!disliked && liked) setLiked(false) }} className={cn("p-1.5 rounded-lg transition-colors", disliked ? "text-red-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800")} />
-            }
-          >
-            <ThumbsDown className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">{disliked ? "Disliked" : "Dislike"}</TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
-  )
-}
-
-// Convert legacy message format to events
 function getEventsFromMessage(message: Message): StreamEventItem[] {
   if (message.events && message.events.length > 0) return message.events
   const events: StreamEventItem[] = []
@@ -1040,16 +421,19 @@ function getEventsFromMessage(message: Message): StreamEventItem[] {
   return events
 }
 
-export function AssistantMessage({ message, onToolApproval, pendingApprovals = new Map(), isStreaming = false }: AssistantMessageProps) {
+// =============================================================================
+// Main Component
+// =============================================================================
+
+export function AssistantMessage({
+  message,
+  onToolApproval,
+  pendingApprovals = new Map(),
+  isStreaming = false,
+}: AssistantMessageProps) {
   const events = getEventsFromMessage(message)
   const { displayMode: _displayMode } = useChatSettings()
 
-  // =============================================================================
-  // Simplified Event Processing - Approval now handled inside StepsTimeline
-  // =============================================================================
-
-  // Timeline events include: routing, thinking, content, tool, tool_result, tool_approval_required, tool_executing
-  // Approval UI is now rendered INSIDE the timeline via StepsTimeline component
   const timelineEvents: StreamEventItem[] = events.filter(e =>
     e.type === "routing" ||
     e.type === "thinking" ||
@@ -1061,7 +445,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
     e.type === "finished"
   )
 
-  // Check if any approval is pending (for timeline spinner state)
   const hasPendingApproval = events.some(e => {
     if (e.type === "tool_approval_required") {
       const approvalState = pendingApprovals.get(e.approval_id)
@@ -1070,44 +453,26 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
     return false
   })
 
-  // Extract tool denied events
   const deniedEvents = events.filter(e => e.type === "tool_denied") as Array<Extract<StreamEventItem, { type: "tool_denied" }>>
-
-  // Extract action required events
   const actionRequiredEvents = events.filter(e => e.type === "action_required") as Array<Extract<StreamEventItem, { type: "action_required" }>>
 
-  // Extract final content from "result" events (definitive final answer from backend)
-  // "content" events are intermediate (during tool execution), "result" is the final answer
   let finalContent = ""
-
-  // First, check for explicit "result" events (the definitive final answer)
   for (const event of events) {
     if (event.type === "result") {
       finalContent = event.content
-      break  // Take the first result event
+      break
     }
   }
 
-  // Check if this message had tool calls (indicating a multi-step flow)
-  // If there were tools, intermediate content was streamed BEFORE tools and should NOT appear in final answer
   const hadToolCalls = events.some(e => e.type === "tool" || e.type === "tool_result")
 
-  // Fallback: use accumulated message.content when no result event exists
-  // BUT ONLY if there were NO tool calls - if there were tools, the accumulated content
-  // includes intermediate "I'll help you..." text that should NOT be the final answer
-  // Do NOT use fallback for aborted streams - that would show intermediate content as final answer
   if (!finalContent && message.content && !isStreaming && !message.aborted && !hadToolCalls) {
     finalContent = message.content
   }
 
-  // =============================================================================
-  // Render with Perplexity-style layout
-  // =============================================================================
-
   return (
     <div className="flex gap-2.5 group" data-testid="assistant-message">
       <div className="flex-1 min-w-0 space-y-2">
-        {/* === Initial Loading State (before any events arrive) === */}
         {isStreaming && timelineEvents.length === 0 && !message.content && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
             <Loader variant="circular" size="sm" className="text-muted-foreground" />
@@ -1115,7 +480,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           </div>
         )}
 
-        {/* === PERPLEXITY STYLE: Steps Timeline (now includes approval UI) === */}
         {timelineEvents.length > 0 && (
           <StepsTimeline
             events={timelineEvents}
@@ -1126,7 +490,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           />
         )}
 
-        {/* === Tool Denied Events === */}
         {deniedEvents.map((event, idx) => (
           <ToolDeniedBlock
             key={`denied-${idx}`}
@@ -1135,7 +498,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           />
         ))}
 
-        {/* === Action Required Events (connect provider, reauthenticate, etc.) === */}
         {actionRequiredEvents.map((event, idx) => (
           <ActionRequiredBlock
             key={`action-required-${idx}`}
@@ -1147,10 +509,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           />
         ))}
 
-        {/* === Live Streaming Content === */}
-        {/* During streaming, ONLY show FinalAnswerBlock if there are NO timeline events.
-            If there are timeline events (routing, thinking, tools), wait for streaming to complete.
-            This prevents intermediate content from appearing in final answer area. */}
         {isStreaming && message.content && timelineEvents.length === 0 && (
           <FinalAnswerBlock
             content={message.content}
@@ -1159,8 +517,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           />
         )}
 
-        {/* === PERPLEXITY STYLE: Final Answer === */}
-        {/* Show final answer after streaming completes */}
         {!isStreaming && finalContent && (
           <FinalAnswerBlock
             content={finalContent}
@@ -1170,7 +526,6 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
           />
         )}
 
-        {/* === Stopped Indicator (when streaming was aborted) === */}
         {message.aborted && !finalContent && (
           <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50">
             <div className="w-2 h-2 rounded-full bg-zinc-400" />
@@ -1185,39 +540,35 @@ export function AssistantMessage({ message, onToolApproval, pendingApprovals = n
 }
 
 // =============================================================================
-// Legacy Component (kept for backward compatibility if needed)
+// Legacy Component (kept for backward compatibility)
 // =============================================================================
 
-export function AssistantMessageLegacy({ message, onToolApproval, pendingApprovals = new Map(), isStreaming = false }: AssistantMessageProps) {
+export function AssistantMessageLegacy({
+  message,
+  onToolApproval,
+  pendingApprovals = new Map(),
+  isStreaming = false,
+}: AssistantMessageProps) {
   const events = getEventsFromMessage(message)
   const { displayMode } = useChatSettings()
 
-  // Note: MCPToolBlock no longer handles approvals - ToolApprovalBlock does
-  // MCPToolBlock just displays tool calls with their request/response
-
-  // Build map of tool results by index (tool_result follows its tool event)
-  // Also track which approval events have received their results (by event index)
   const toolResultsByToolIndex = new Map<number, unknown>()
   const approvalIndicesWithResults = new Set<number>()
   for (let i = 0; i < events.length; i++) {
     const event = events[i]
     if (event.type === "tool_result") {
-      // Find the preceding tool event with matching name
       for (let j = i - 1; j >= 0; j--) {
         const prevEvent = events[j]
         if (prevEvent.type === "tool" && prevEvent.name === event.name) {
-          // Only map if this tool doesn't already have a result
           if (!toolResultsByToolIndex.has(j)) {
             toolResultsByToolIndex.set(j, event.result)
             break
           }
         }
       }
-      // Find the preceding tool_approval_required event with matching tool name
       for (let j = i - 1; j >= 0; j--) {
         const prevEvent = events[j]
         if (prevEvent.type === "tool_approval_required" && prevEvent.tool_name === event.name) {
-          // Only mark if this approval doesn't already have a result
           if (!approvalIndicesWithResults.has(j)) {
             approvalIndicesWithResults.add(j)
             break
@@ -1227,7 +578,6 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
     }
   }
 
-  // Process events
   const processedEvents: Array<
     | { type: "routing"; service: string; capability: string; thinking?: string; execution_path?: string; model_selected?: string; key: string }
     | { type: "thinking"; content: string; key: string }
@@ -1238,7 +588,6 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
     | { type: "action_required"; action_type: ActionRequiredType; message: string; deep_link?: string; blocking: boolean; metadata?: Record<string, unknown>; key: string }
   > = []
 
-  // Process events in the order they arrive from LangGraph (which is sequential)
   for (let i = 0; i < events.length; i++) {
     const event = events[i]
     if (event.type === "routing") {
@@ -1248,34 +597,20 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
       processedEvents.push({ ...event, key: `thinking-${i}` })
     }
     else if (event.type === "content") {
-      // Merge consecutive content events into a single block
-      // This handles both token streaming (many small chunks) and state updates (single chunk)
       const lastEvent = processedEvents[processedEvents.length - 1]
       if (lastEvent?.type === "content") {
-        // Append to existing content block
         lastEvent.content += event.content
       } else {
-        // Start a new content block
         processedEvents.push({ type: "content", content: event.content, key: `content-${i}` })
       }
     }
     else if (event.type === "tool_approval_required") {
-      // Render approval card based on THIS approval's status
       const approvalState = pendingApprovals.get(event.approval_id)
       const hasToolResult = approvalIndicesWithResults.has(i)
-
-      // Show approval card if:
-      // 1. Still pending (approvalState === null or undefined), OR
-      // 2. Approved but tool result hasn't arrived yet (show "Executing..." state), OR
-      // 3. Denied (show "Denied" state until tool_denied event arrives)
-      // Hide only when: approved AND tool result has arrived (MCPToolBlock takes over)
-      // OR when tool_denied event has been processed
       const hasDeniedEvent = events.some((e, idx) => idx > i && e.type === "tool_denied" && e.tool_name === event.tool_name)
       const isPending = approvalState === undefined || approvalState === null
       const isExecuting = approvalState === true && !hasToolResult
       const isDenied = approvalState === false && !hasDeniedEvent
-
-      // Only show ONE approval at a time - skip if we already have one showing
       const alreadyHasApproval = processedEvents.some(e => e.type === "tool_approval_required")
 
       if ((isPending || isExecuting || isDenied) && !alreadyHasApproval) {
@@ -1289,12 +624,10 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
       const isDangerous = isWriteOperation(event.name)
       const hasResult = toolResultsByToolIndex.has(i)
 
-      // Skip dangerous unapproved tools - ToolApprovalBlock handles those
       if (isDangerous && event.approved !== true) {
         continue
       }
 
-      // Skip tool events without results (avoid duplicate cards)
       if (!hasResult) {
         continue
       }
@@ -1306,22 +639,15 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
         key: `tool-${i}`
       })
     }
-    // Skip tool_result events - they're paired with tool events above
   }
 
   const toolGroups = processedEvents.filter(e => e.type === "tool_group")
 
   return (
     <div className="flex gap-2.5 group" data-testid="assistant-message">
-      {/* Agent Avatar - matches h-10 message height */}
-      {/* Agent Avatar hidden */}
-
-      {/* Content - limited width for chat bubble feel */}
       <div className="flex-1 min-w-0 space-y-2">
-        {/* Events */}
         {displayMode === "compact" ? (
           <>
-            {/* Compact mode: Hide thinking blocks, hide routing reasoning, only show essential events */}
             {processedEvents.filter(e => e.type !== "tool_group" && e.type !== "thinking").map((event) => {
               if (event.type === "routing") return <RoutingBlock key={event.key} service={event.service} capability={event.capability} thinking={undefined} model_selected={event.model_selected} />
               if (event.type === "content") return (
@@ -1335,8 +661,8 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
               if (event.type === "tool_approval_required") {
                 const approvalState = pendingApprovals.get(event.approval_id)
                 const isPending = approvalState === undefined || approvalState === null
-                const isExecuting = approvalState === true // Approved but waiting for result
-                const isDenied = approvalState === false // Denied, waiting for tool_denied event
+                const isExecuting = approvalState === true
+                const isDenied = approvalState === false
                 return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} isExecuting={isExecuting} isDenied={isDenied} />
               }
               if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
@@ -1373,8 +699,8 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
             if (event.type === "tool_approval_required") {
               const approvalState = pendingApprovals.get(event.approval_id)
               const isPending = approvalState === undefined || approvalState === null
-              const isExecuting = approvalState === true // Approved but waiting for result
-              const isDenied = approvalState === false // Denied, waiting for tool_denied event
+              const isExecuting = approvalState === true
+              const isDenied = approvalState === false
               return <ToolApprovalBlock key={event.key} approvalId={event.approval_id} toolName={event.tool_name} toolInput={event.tool_input} parameterSchema={event.parameter_schema} onApproval={(approved, modifiedParams) => onToolApproval?.(event.approval_id, approved, modifiedParams)} isPending={isPending} isExecuting={isExecuting} isDenied={isDenied} />
             }
             if (event.type === "tool_denied") return <ToolDeniedBlock key={event.key} toolName={event.tool_name} reason={event.reason} />
@@ -1393,8 +719,6 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
           })
         )}
 
-        {/* Fallback Content - Only show if content wasn't rendered inline via events */}
-        {/* Show loading indicator while streaming before any content event is pushed */}
         {!processedEvents.some(e => e.type === "content") && isStreaming && !message.content && (
           <div className="rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/50">
             <div className={cn(CARD_HEIGHT, CARD_PADDING, "flex items-center gap-2.5")}>
@@ -1412,7 +736,6 @@ export function AssistantMessageLegacy({ message, onToolApproval, pendingApprova
             </div>
           </div>
         )}
-        {/* Fallback for messages without events but with content (legacy/stored messages) */}
         {!processedEvents.some(e => e.type === "content") && message.content && !isStreaming && (
           <AgentResponseBlock
             content={message.content}

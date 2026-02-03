@@ -51,7 +51,7 @@ export function InlineProviderBadges({
             onClick={() => onToggleProvider(provider.id)}
             className={cn(
               "group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg",
-              "text-xs font-medium transition-all duration-150",
+              "text-xs font-medium transition-colors duration-150",
               "border",
               isSelected
                 ? "bg-primary/10 border-primary/30 text-primary"

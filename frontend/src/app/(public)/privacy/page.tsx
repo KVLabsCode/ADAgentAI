@@ -1,11 +1,14 @@
 import { Metadata } from "next"
+import { cacheLife } from "next/cache"
 
 export const metadata: Metadata = {
   title: "Privacy Policy | Ad Agent AI",
   description: "Privacy Policy for Ad Agent AI platform",
 }
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  "use cache"
+  cacheLife("weeks")
   return (
     <div className="container mx-auto px-4 py-16 max-w-3xl">
       <h1 className="text-3xl font-semibold mb-8">Privacy Policy</h1>

@@ -40,6 +40,8 @@ export function UserMessage({ content }: UserMessageProps) {
             width={28}
             height={28}
             className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+            unoptimized
           />
         ) : (
           <span className="text-xs font-semibold text-white">

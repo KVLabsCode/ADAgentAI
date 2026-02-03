@@ -87,7 +87,7 @@ export function AccountSelectionModal({
                 key={account.id}
                 htmlFor={account.id}
                 className={cn(
-                  "flex items-center gap-3 rounded border px-3 py-2.5 cursor-pointer transition-all",
+                  "flex items-center gap-3 rounded border px-3 py-2.5 cursor-pointer transition-colors",
                   selectedAccountId === account.id
                     ? "border-primary bg-primary/5"
                     : "border-border/40 hover:border-border/60 hover:bg-muted/30"

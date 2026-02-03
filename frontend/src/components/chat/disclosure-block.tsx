@@ -8,31 +8,31 @@ import { cn } from "@/lib/utils"
 interface DisclosureBlockProps {
   label: string
   expandedLabel: string
+  /** Variant for future styling differentiation. Currently all variants use same style. */
   variant?: "thinking" | "tool" | "result"
   children: React.ReactNode
   defaultOpen?: boolean
 }
 
-export function DisclosureBlock({
+// Shared styles - all variants currently identical, extracted for easy future customization
+const CONTENT_STYLES = "border-border/40 bg-muted/30"
+const ICON_STYLES = "text-muted-foreground"
+
+/**
+ * Collapsible disclosure block with label that changes when expanded.
+ * Memoized to prevent re-renders when parent state changes.
+ */
+export const DisclosureBlock = React.memo(function DisclosureBlock({
   label,
   expandedLabel,
-  variant = "thinking",
+  variant: _variant = "thinking",
   children,
   defaultOpen = false,
 }: DisclosureBlockProps) {
   const [isOpen, setIsOpen] = React.useState(defaultOpen)
 
-  const variantStyles = {
-    thinking: "border-border/40 bg-muted/30",
-    tool: "border-border/40 bg-muted/30",
-    result: "border-border/40 bg-muted/30",
-  }
-
-  const iconStyles = {
-    thinking: "text-muted-foreground",
-    tool: "text-muted-foreground",
-    result: "text-muted-foreground",
-  }
+  const ChevronIcon = isOpen ? ChevronDown : ChevronRight
+  const displayLabel = isOpen ? expandedLabel : label
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -43,24 +43,15 @@ export function DisclosureBlock({
           "group"
         )}
       >
-        {isOpen ? (
-          <ChevronDown className={cn("h-3 w-3", iconStyles[variant])} />
-        ) : (
-          <ChevronRight className={cn("h-3 w-3", iconStyles[variant])} />
-        )}
-        <span>{isOpen ? expandedLabel : label}</span>
+        <ChevronIcon className={cn("h-3 w-3", ICON_STYLES)} />
+        <span>{displayLabel}</span>
       </CollapsibleTrigger>
 
       <CollapsibleContent>
-        <div
-          className={cn(
-            "mt-1.5 rounded border p-2",
-            variantStyles[variant]
-          )}
-        >
+        <div className={cn("mt-1.5 rounded border p-2", CONTENT_STYLES)}>
           {children}
         </div>
       </CollapsibleContent>
     </Collapsible>
   )
-}
+})

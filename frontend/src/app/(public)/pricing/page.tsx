@@ -1,8 +1,13 @@
-"use client"
-
 import Link from "next/link"
+import { Metadata } from "next"
+import { cacheLife } from "next/cache"
 import { Check, Sparkles } from "lucide-react"
 import { Button } from "@/atoms/button"
+
+export const metadata: Metadata = {
+  title: "Pricing | Ad Agent AI",
+  description: "Simple, transparent pricing for Ad Agent AI platform",
+}
 
 const tiers = [
   {
@@ -61,7 +66,10 @@ const faqs = [
   },
 ]
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  "use cache"
+  cacheLife("days")
+
   return (
     <div className="flex flex-col">
       {/* Hero */}

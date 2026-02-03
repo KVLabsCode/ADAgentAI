@@ -3,11 +3,15 @@
 import * as React from "react"
 import { authClient } from "@/lib/neon-auth/client"
 import { OrganizationMember } from "@/lib/types"
+import { DEMO_ORGANIZATION } from "@/lib/demo-user"
 
 interface UseMemberManagementOptions {
   organizationId: string | null
   userId?: string
 }
+
+// Demo mode check - skip API calls for demo organization
+const isDemoOrg = (orgId: string | null) => orgId === DEMO_ORGANIZATION.id
 
 export function useMemberManagement({ organizationId, userId }: UseMemberManagementOptions) {
   const [members, setMembers] = React.useState<OrganizationMember[]>([])
@@ -17,7 +21,7 @@ export function useMemberManagement({ organizationId, userId }: UseMemberManagem
   const [pendingRole, setPendingRole] = React.useState<"member" | "admin" | null>(null)
 
   const fetchMembers = React.useCallback(async () => {
-    if (!organizationId) return
+    if (!organizationId || isDemoOrg(organizationId)) return
     setIsLoading(true)
     try {
       await authClient.organization.setActive({ organizationId })
@@ -61,7 +65,7 @@ export function useMemberManagement({ organizationId, userId }: UseMemberManagem
   }, [organizationId, fetchMembers])
 
   const removeMember = async (memberId: string) => {
-    if (!organizationId) return
+    if (!organizationId || isDemoOrg(organizationId)) return
     if (!confirm("Are you sure you want to remove this member?")) return
     try {
       await authClient.organization.removeMember({ memberIdOrEmail: memberId })
@@ -82,7 +86,7 @@ export function useMemberManagement({ organizationId, userId }: UseMemberManagem
   }
 
   const saveRole = async (memberId: string) => {
-    if (!organizationId || !pendingRole) return
+    if (!organizationId || !pendingRole || isDemoOrg(organizationId)) return
     setChangingRoleMemberId(memberId)
     try {
       await authClient.organization.updateMemberRole({

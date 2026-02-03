@@ -110,7 +110,7 @@ export function ExamplePrompts({ onPromptClick }: ExamplePromptsProps) {
                 className={cn(
                   "h-9 px-4 text-sm font-normal",
                   "border-border/40 bg-background hover:bg-muted/50",
-                  "transition-all duration-150"
+                  "transition-colors duration-150"
                 )}
               >
                 <Icon className="mr-2 h-4 w-4 text-muted-foreground" />

@@ -2,6 +2,10 @@
 
 import * as React from "react"
 import { authClient } from "@/lib/neon-auth/client"
+import { DEMO_ORGANIZATION } from "@/lib/demo-user"
+
+// Demo mode check - skip API calls for demo organization
+const isDemoOrg = (orgId: string | null) => orgId === DEMO_ORGANIZATION.id
 
 interface PendingInvitation {
   id: string
@@ -44,7 +48,7 @@ export function useInvitationManagement({
 
   // Fetch pending invitations
   const fetchPendingInvites = React.useCallback(async () => {
-    if (!organizationId) return
+    if (!organizationId || isDemoOrg(organizationId)) return
     setIsLoadingInvites(true)
     try {
       const response = await authClient.organization.listInvitations({
@@ -73,7 +77,7 @@ export function useInvitationManagement({
   }, [organizationId, fetchPendingInvites])
 
   const sendInvite = async (email: string) => {
-    if (!email || !organizationId) return
+    if (!email || !organizationId || isDemoOrg(organizationId)) return
     setIsInviting(true)
     setInviteError(null)
     setInviteSuccess(false)

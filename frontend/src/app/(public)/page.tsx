@@ -1,5 +1,4 @@
-"use client"
-
+import { cacheLife } from "next/cache"
 import {
   HeroSection,
   HowItWorksSection,
@@ -10,15 +9,15 @@ import {
   PlatformsSection,
   FAQSection,
 } from "@/components/landing"
-import { useUser } from "@/hooks/use-user"
 
-export default function LandingPage() {
-  const { isAuthenticated } = useUser()
+export default async function LandingPage() {
+  "use cache"
+  cacheLife("hours")
 
   return (
     <div className="flex flex-col">
-      {/* Hero - Main value proposition */}
-      <HeroSection isAuthenticated={isAuthenticated} />
+      {/* Hero - Main value proposition (client component, handles own auth) */}
+      <HeroSection />
 
       {/* Platforms - Connect your ad platforms (moved to top) */}
       <PlatformsSection />

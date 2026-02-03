@@ -80,9 +80,9 @@ export function PublicLayoutClient({
               <div className="h-8 w-8 rounded-full bg-white/[0.05] animate-pulse" />
             ) : isAuthenticated && user ? (
               <DropdownMenu>
-                <DropdownMenuTrigger className="h-8 w-8 rounded-full overflow-hidden ring-1 ring-white/[0.08] hover:ring-white/[0.15] transition-all duration-100">
+                <DropdownMenuTrigger className="h-8 w-8 rounded-full overflow-hidden ring-1 ring-white/[0.08] hover:ring-white/[0.15] transition-shadow duration-100">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar} alt={user.name} />
+                    <AvatarImage src={user.avatar} alt={user.name} referrerPolicy="no-referrer" />
                     <AvatarFallback className="text-xs bg-[#1c1c1f] text-[#f7f8f8]">
                       {user.name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>

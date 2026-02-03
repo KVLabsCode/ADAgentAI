@@ -35,9 +35,10 @@ function ProviderCard({ provider, onClick, onToggle, isToggling }: ProviderCardP
   }
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="flex items-center justify-between w-full px-[var(--item-padding-x)] py-[var(--item-padding-y)] border-b border-border/40 last:border-b-0 hover:bg-muted/50 transition-colors cursor-pointer"
+      className="flex items-center justify-between w-full px-[var(--item-padding-x)] py-[var(--item-padding-y)] border-b border-border/40 last:border-b-0 hover:bg-muted/50 transition-colors cursor-pointer text-left"
     >
       <div className="flex items-center gap-[var(--item-gap)]">
         <ProviderLogo provider={provider.type} size="sm" />
@@ -71,7 +72,7 @@ function ProviderCard({ provider, onClick, onToggle, isToggling }: ProviderCardP
         </div>
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
       </div>
-    </div>
+    </button>
   )
 }
 

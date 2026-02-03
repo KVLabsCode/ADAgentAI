@@ -172,7 +172,7 @@ export function JsonTreeView({
         className
       )}
     >
-      <ScrollArea className="w-full" maxHeight={maxHeight}>
+      <ScrollArea className="w-full" maxHeight={maxHeight} >
         <div className="p-3">
           <JsonView
             value={data as object}
@@ -217,7 +217,7 @@ export function JsonTreeViewCompact({
   // Handle primitive types (strings, numbers, booleans) - display as text, not JSON tree
   if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
     return (
-      <ScrollArea className={cn("w-full", className)} maxHeight={maxHeight}>
+      <ScrollArea className={cn("w-full", className)} maxHeight={maxHeight} >
         <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap py-1">
           {String(data)}
         </pre>
@@ -228,7 +228,7 @@ export function JsonTreeViewCompact({
   // Handle null/undefined
   if (data === null || data === undefined) {
     return (
-      <ScrollArea className={cn("w-full", className)} maxHeight={maxHeight}>
+      <ScrollArea className={cn("w-full", className)} maxHeight={maxHeight} >
         <span className="font-mono text-xs text-muted-foreground py-1">
           {data === null ? "null" : "undefined"}
         </span>
@@ -237,7 +237,7 @@ export function JsonTreeViewCompact({
   }
 
   return (
-    <ScrollArea className={cn("w-full", className)} maxHeight={maxHeight}>
+    <ScrollArea className={cn("w-full", className)} maxHeight={maxHeight} >
       <div className="py-1">
         <JsonView
           value={data as object}

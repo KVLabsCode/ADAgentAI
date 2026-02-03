@@ -409,7 +409,7 @@ export function ChatInput({
       className={cn(
         "border border-border/50 bg-zinc-100 dark:bg-zinc-900/80 p-0",
         "shadow-lg shadow-black/10 dark:shadow-xl dark:shadow-black/40",
-        "transition-all duration-200",
+        "transition-[border-radius] duration-200",
         dropdownAttached
           ? "rounded-b-xl rounded-t-none border-t-0"
           : "rounded-xl ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
@@ -462,7 +462,7 @@ export function ChatInput({
               }}
               className={cn(
                 "h-7 w-7 rounded-lg cursor-pointer",
-                "transition-all duration-150",
+                "transition-[opacity,background-color] duration-150",
                 (value.trim() || isLoading) && !disabled
                   ? "opacity-100 bg-foreground text-background hover:bg-foreground/90"
                   : "opacity-30 bg-muted-foreground/50 text-muted"
@@ -579,7 +579,7 @@ export function ChatInput({
                   }}
                   className={cn(
                     "h-7 w-7 rounded-lg cursor-pointer",
-                    "transition-all duration-150",
+                    "transition-[opacity,background-color] duration-150",
                     (value.trim() || isLoading) && !disabled
                       ? "opacity-100 bg-foreground text-background hover:bg-foreground/90"
                       : "opacity-30 bg-muted-foreground/50 text-muted"

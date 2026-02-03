@@ -50,13 +50,17 @@ export function CurrencyWidget(props: WidgetProps) {
   // Local state for the input value (in dollars)
   const [inputValue, setInputValue] = React.useState(() => microsToDollars(value))
 
-  // Sync input value when external value changes
+  // Track previous external value to detect parent-initiated changes
+  const prevValueRef = React.useRef(value)
+
+  // Sync input value when external value changes (ref-based tracking)
   React.useEffect(() => {
-    const dollarValue = microsToDollars(value)
-    if (dollarValue !== inputValue) {
-      setInputValue(dollarValue)
+    // Only sync if the external value actually changed (not from our own onChange)
+    if (value !== prevValueRef.current) {
+      setInputValue(microsToDollars(value))
+      prevValueRef.current = value
     }
-  }, [value, microsToDollars]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value, microsToDollars])
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,6 +75,7 @@ export function CurrencyWidget(props: WidgetProps) {
 
       // Convert to micros and update parent
       const micros = dollarsToMicros(newValue)
+      prevValueRef.current = micros // Track what we sent to prevent sync loop
       onChange(micros)
     },
     [onChange, dollarsToMicros]
@@ -80,6 +85,7 @@ export function CurrencyWidget(props: WidgetProps) {
     // On blur, format the value properly
     if (inputValue === "" || inputValue === ".") {
       setInputValue("")
+      prevValueRef.current = undefined // Track what we sent
       onChange(undefined)
       return
     }
@@ -97,7 +103,9 @@ export function CurrencyWidget(props: WidgetProps) {
       const newValue = direction === "up" ? current + step : Math.max(0, current - step)
       const formatted = newValue.toFixed(2)
       setInputValue(formatted)
-      onChange(dollarsToMicros(formatted))
+      const micros = dollarsToMicros(formatted)
+      prevValueRef.current = micros // Track what we sent
+      onChange(micros)
     },
     [inputValue, step, onChange, dollarsToMicros]
   )

@@ -240,7 +240,7 @@ function renderInlineTokens(tokens: Token[]): React.ReactNode {
       case "image": {
         const imgToken = token as Tokens.Image
         return (
-          // eslint-disable-next-line @next/next/no-img-element
+          // eslint-disable-next-line @next/next/no-img-element -- Dynamic markdown images have unknown dimensions and external URLs
           <img
             key={index}
             src={imgToken.href}

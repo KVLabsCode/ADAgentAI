@@ -3,6 +3,7 @@
 import * as React from "react"
 import { WidgetProps } from "@rjsf/utils"
 import { useEntityData } from "@/contexts/entity-data-context"
+import { useUser } from "@/contexts/user-context"
 import { getParentField, getParamDisplayName } from "@/lib/entity-config"
 import type { FieldFilterParams } from "@/lib/api"
 import { BaseDropdown, FallbackInput, DependencyMessage } from "./base-dropdown"
@@ -28,6 +29,9 @@ export function EntitySelectWidget(props: WidgetProps) {
   const formContext = (registry as { formContext?: { formData?: Record<string, unknown> } })?.formContext
 
   const fetchType = options?.fetchType as string | undefined
+
+  // Get providers from context for instant accounts dropdown (Phase 1 optimization)
+  const { providers, providersLoading } = useUser()
 
   // Normalize account IDs: "accounts/pub-XXX" -> "pub-XXX"
   // The LLM sends full path format, but dropdown options use short IDs
@@ -60,6 +64,7 @@ export function EntitySelectWidget(props: WidgetProps) {
     isLoading,
     getError,
     getDisplayName,
+    prefetchDependentEntities,
   } = useEntityData()
 
   const explicitDependsOn = options?.dependsOn as string | undefined
@@ -162,6 +167,63 @@ export function EntitySelectWidget(props: WidgetProps) {
 
   if (!fetchType) {
     return <FallbackInput id={id} value={normalizedValue ?? ""} onChange={handleChange} disabled={disabled} readonly={readonly} placeholder="Enter value..." />
+  }
+
+  // Phase 1 optimization: Use providers from context for instant accounts dropdown
+  // This bypasses the API call for accounts, making it instant (~200ms -> 0ms)
+  if (fetchType === "accounts") {
+    const admobProviders = providers.filter(p => p.type === "admob")
+    const accountOptions = admobProviders.map(p => ({
+      value: p.identifiers?.publisherId || "",
+      label: p.displayName || p.identifiers?.publisherId || "Unknown Account",
+    }))
+
+    // Get display value from providers
+    const accountDisplayValue = normalizedValue
+      ? admobProviders.find(p => p.identifiers?.publisherId === normalizedValue)?.displayName || normalizedValue
+      : ""
+
+    // Phase 3 optimization: Prefetch dependent entities when account is selected
+    // This fetches apps, ad_units, etc. in parallel, reducing total form load time
+    const handleAccountChange = (newValue: string) => {
+      handleChange(newValue)
+      if (newValue) {
+        // Fire and forget - don't await, just start the prefetch
+        prefetchDependentEntities(newValue)
+      }
+    }
+
+    if (providersLoading && accountOptions.length === 0) {
+      return (
+        <BaseDropdown
+          id={id}
+          value=""
+          options={[]}
+          onChange={handleAccountChange}
+          disabled={disabled}
+          readonly={readonly}
+          loading={true}
+          displayValue=""
+        />
+      )
+    }
+
+    if (accountOptions.length === 0) {
+      return <FallbackInput id={id} value={normalizedValue ?? ""} onChange={handleAccountChange} disabled={disabled} readonly={readonly} placeholder="No accounts connected" />
+    }
+
+    return (
+      <BaseDropdown
+        id={id}
+        value={normalizedValue ?? ""}
+        options={accountOptions}
+        onChange={handleAccountChange}
+        disabled={disabled}
+        readonly={readonly}
+        loading={false}
+        displayValue={accountDisplayValue}
+      />
+    )
   }
 
   if (dependsOn && !dependencyValue) {
