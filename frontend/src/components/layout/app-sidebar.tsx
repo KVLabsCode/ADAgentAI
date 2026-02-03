@@ -55,6 +55,16 @@ export function AppSidebar() {
     }
   }
 
+  // Handle Demo Chat click - forces fresh navigation when already on demo chat
+  const handleDemoChat = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (pathname === '/demo/chat') {
+      router.push('/demo/chat?new=' + Date.now())
+    } else {
+      router.push('/demo/chat')
+    }
+  }
+
   return (
     <Sidebar collapsible="icon" className="border-r border-border/40">
       <SidebarHeader className="h-14 flex flex-row items-center justify-between border-b border-border/40 px-2">
@@ -175,7 +185,10 @@ export function AppSidebar() {
                   {demoNavItems.map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
-                        render={<Link href={item.url} />}
+                        render={item.title === "Demo Chat"
+                          ? <Link href={item.url} onClick={handleDemoChat} />
+                          : <Link href={item.url} />
+                        }
                         isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
                         tooltip={item.title}
                         className="h-8 text-xs"

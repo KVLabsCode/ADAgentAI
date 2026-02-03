@@ -10,6 +10,7 @@ import { ThemeProvider } from "./theme-provider"
 import { QueryProvider, getQueryClient } from "./query-provider"
 import { PostHogProvider } from "./posthog-provider"
 import { DemoModeProvider } from "@/contexts/demo-mode-context"
+import { DemoExperimentsProvider } from "@/contexts/demo-experiments-context"
 import { UserProvider } from "@/contexts/user-context"
 import { EntityDataProvider } from "@/contexts/entity-data-context"
 
@@ -50,13 +51,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
         >
           <Suspense fallback={null}>
             <DemoModeProvider>
-              <UserProvider>
-                <EntityDataProvider>
-                  <ThemeProvider>
-                    {children}
-                  </ThemeProvider>
-                </EntityDataProvider>
-              </UserProvider>
+              <DemoExperimentsProvider>
+                <UserProvider>
+                  <EntityDataProvider>
+                    <ThemeProvider>
+                      {children}
+                    </ThemeProvider>
+                  </EntityDataProvider>
+                </UserProvider>
+              </DemoExperimentsProvider>
             </DemoModeProvider>
           </Suspense>
         </NeonAuthUIProvider>

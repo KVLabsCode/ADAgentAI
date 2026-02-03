@@ -9,6 +9,7 @@ import {
   UserPlus,
   SlidersHorizontal,
   FlaskConical,
+  MessageSquareText,
 } from "lucide-react"
 
 export const mainNavItems = [
@@ -32,4 +33,5 @@ export const adminNavItems = [
 // Demo-only navigation items (shown when demo mode is active)
 export const demoNavItems = [
   { title: "Experiments", url: "/experiments", icon: FlaskConical },
+  { title: "Demo Chat", url: "/demo/chat", icon: MessageSquareText },
 ]
