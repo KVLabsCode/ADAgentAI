@@ -16,7 +16,7 @@ export const FieldTemplate = React.memo(function FieldTemplate(props: FieldTempl
     label,
     required,
     children,
-    errors,
+    errors: _errors,
     hidden,
     displayLabel = true,
     uiSchema,

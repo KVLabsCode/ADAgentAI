@@ -8,6 +8,7 @@ import { ExamplePrompts } from "./example-prompts"
 import { streamChat, type ChatHistoryMessage, type ChatContext } from "@/lib/api"
 import { useUser } from "@/hooks/use-user"
 import { useChatSettings } from "@/lib/chat-settings"
+import { useDemo } from "@/contexts/demo-mode-context"
 import {
   useChatPersistence,
   saveChatState,
@@ -18,7 +19,8 @@ import {
 } from "@/hooks/chat"
 import type { Message, Provider, StreamEventItem, RJSFSchema } from "@/lib/types"
 import { extractMcpContent } from "@/lib/step-utils"
-import { Zap } from "lucide-react"
+import { Zap, FlaskConical } from "lucide-react"
+import Link from "next/link"
 
 interface ChatContainerProps {
   initialMessages?: Message[]
@@ -38,6 +40,7 @@ export function ChatContainer({
   const newChatParam = searchParams.get('new')
   const { user, getAccessToken, selectedOrganizationId } = useUser()
   const { enabledProviderIds, enabledAppIds, responseStyle, autoIncludeContext, selectedModel, contextMode } = useChatSettings()
+  const { isDemoMode } = useDemo()
 
   // Core state
   const [messages, setMessages] = React.useState<Message[]>(initialMessages)
@@ -521,14 +524,25 @@ export function ChatContainer({
                 )}
               </ChatInput>
 
-              {/* Dev quick action */}
-              <button
-                onClick={() => handlePromptClick("Create any admob mediation group. You must use the tool.")}
-                className="mt-4 flex items-center gap-1.5 px-3 py-1.5 mx-auto rounded-full text-xs text-violet-500 hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-colors"
-              >
-                <Zap className="h-3 w-3" />
-                Dev: Create Mediation Group
-              </button>
+              {/* Quick actions */}
+              <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+                {isDemoMode && (
+                  <Link
+                    href="/experiments"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-violet-500 hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-colors"
+                  >
+                    <FlaskConical className="h-3 w-3" />
+                    Create A/B Test
+                  </Link>
+                )}
+                <button
+                  onClick={() => handlePromptClick("Create any admob mediation group. You must use the tool.")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-violet-500 hover:text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-colors"
+                >
+                  <Zap className="h-3 w-3" />
+                  Dev: Create Mediation Group
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -3,8 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { PanelLeftClose, Shield } from "lucide-react"
+import { PanelLeftClose, Shield, Sparkles } from "lucide-react"
 import { useUser } from "@/hooks/use-user"
+import { useDemo } from "@/contexts/demo-mode-context"
 import { storage } from "@/lib/storage"
 
 import {
@@ -29,13 +30,14 @@ import {
 import { Logo } from "@/components/brand/logo"
 import { OrganizationSwitcher } from "./OrganizationSwitcher"
 import { UserMenu } from "./UserMenu"
-import { mainNavItems, bottomNavItems, adminNavItems } from "@/constants/navigation"
+import { mainNavItems, bottomNavItems, adminNavItems, demoNavItems } from "@/constants/navigation"
 
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { toggleSidebar, state } = useSidebar()
   const { isAdmin } = useUser()
+  const { isDemoMode } = useDemo()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
@@ -152,6 +154,37 @@ export function AppSidebar() {
                       </SidebarMenuItem>
                     )
                   })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+
+        {isDemoMode && (
+          <>
+            <div className="my-2 h-px bg-border/40" />
+            <SidebarGroup className="p-0">
+              <div className="flex items-center gap-2 px-2 mb-2 group-data-[collapsible=icon]:justify-center">
+                <Sparkles className="h-4 w-4 text-violet-500" />
+                <span className="text-xs font-semibold text-violet-500 uppercase tracking-wide group-data-[collapsible=icon]:hidden">
+                  Demo
+                </span>
+              </div>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0.5">
+                  {demoNavItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        render={<Link href={item.url} />}
+                        isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
+                        tooltip={item.title}
+                        className="h-8 text-xs"
+                      >
+                        <item.icon className="h-3.5 w-3.5" />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

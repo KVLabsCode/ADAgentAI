@@ -8,6 +8,7 @@ import {
   Settings,
   UserPlus,
   SlidersHorizontal,
+  FlaskConical,
 } from "lucide-react"
 
 export const mainNavItems = [
@@ -26,4 +27,9 @@ export const bottomNavItems = [
 export const adminNavItems = [
   { title: "Panel", url: "/admin", icon: SlidersHorizontal },
   { title: "Waitlist", url: "/admin/waitlist", icon: UserPlus },
+]
+
+// Demo-only navigation items (shown when demo mode is active)
+export const demoNavItems = [
+  { title: "Experiments", url: "/experiments", icon: FlaskConical },
 ]
