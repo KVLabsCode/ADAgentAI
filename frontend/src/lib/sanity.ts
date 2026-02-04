@@ -1,16 +1,18 @@
 import { createClient } from "@sanity/client"
 
 // Sanity client configuration
-// Configure these environment variables in .env.local:
+// Environment variables (set via Vercel integration):
 // NEXT_PUBLIC_SANITY_PROJECT_ID - Your Sanity project ID
 // NEXT_PUBLIC_SANITY_DATASET - Dataset name (e.g., 'production')
-// SANITY_API_TOKEN - Optional: API token for authenticated requests (admin only)
+// SANITY_API_READ_TOKEN - Read token for authenticated requests
+// SANITY_API_WRITE_TOKEN - Write token for mutations (admin only)
 
 export const sanityClient = createClient({
   projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
   apiVersion: "2024-01-01",
   useCdn: process.env.NODE_ENV === "production",
+  token: process.env.SANITY_API_READ_TOKEN,
 })
 
 // Client with write access (server-side only)
@@ -19,7 +21,7 @@ export const sanityWriteClient = createClient({
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
   apiVersion: "2024-01-01",
   useCdn: false,
-  token: process.env.SANITY_API_TOKEN,
+  token: process.env.SANITY_API_WRITE_TOKEN,
 })
 
 // GROQ queries for blog posts
