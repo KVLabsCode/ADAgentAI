@@ -144,12 +144,14 @@ app.route("/webhooks", webhookRoutes);
 app.route("/api", api);
 
 // ============================================================
-// Server (Bun native)
+// Server (Bun native - only runs when executed directly)
 // ============================================================
 
-const port = Number(Bun.env.PORT) || 3001;
+// Only start server when running directly (not imported by Vercel)
+if (typeof Bun !== "undefined" && Bun.main === import.meta.path) {
+  const port = Number(Bun.env.PORT) || 3001;
 
-console.log(`
+  console.log(`
 ╔══════════════════════════════════════════════════════════╗
 ║                    KVLabs API Server                      ║
 ╠══════════════════════════════════════════════════════════╣
@@ -162,24 +164,28 @@ console.log(`
 ╚══════════════════════════════════════════════════════════╝
 `);
 
-// Graceful shutdown handler
-process.on("SIGINT", async () => {
-  console.log("\nShutting down gracefully...");
-  await flushAnalytics();
-  process.exit(0);
-});
+  // Graceful shutdown handler
+  process.on("SIGINT", async () => {
+    console.log("\nShutting down gracefully...");
+    await flushAnalytics();
+    process.exit(0);
+  });
 
-process.on("SIGTERM", async () => {
-  console.log("\nShutting down gracefully...");
-  await flushAnalytics();
-  process.exit(0);
-});
+  process.on("SIGTERM", async () => {
+    console.log("\nShutting down gracefully...");
+    await flushAnalytics();
+    process.exit(0);
+  });
 
-// Bun native server export
-export default {
-  port,
-  fetch: app.fetch,
-};
+  // Start Bun server
+  Bun.serve({
+    port,
+    fetch: app.fetch,
+  });
+}
+
+// Export Hono app for Vercel
+export default app;
 
 // Export app type for RPC client
 export type AppType = typeof app;
