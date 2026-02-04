@@ -93,11 +93,12 @@ export function AdSourceCredentialDialog({
     }
   }
 
-  if (!config || !adSourceName) return null
-
+  // Don't return null - let Dialog handle visibility to allow exit animations
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md sm:left-[calc(50%+var(--sidebar-width)/2)]">
+        {!config || !adSourceName ? null : (
+          <>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <NetworkLogo network={adSourceName} size="md" />
@@ -187,6 +188,8 @@ export function AdSourceCredentialDialog({
             </Button>
           </DialogFooter>
         </form>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   )

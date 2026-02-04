@@ -48,7 +48,7 @@ function ProviderDetailContent({ providerType }: { providerType: ProviderType })
   const providerEntry = providers.find(p => p.type === providerType)
   const providerId = providerEntry?.id
 
-  // Provider detail hook
+  // Provider detail hook - only fetch when we have a valid providerId
   const {
     provider,
     canManage,
@@ -72,7 +72,14 @@ function ProviderDetailContent({ providerType }: { providerType: ProviderType })
   const [adSourceDialogOpen, setAdSourceDialogOpen] = React.useState(false)
   const [selectedAdSourceName, setSelectedAdSourceName] = React.useState<AdSourceName | null>(null)
 
-  const isLoading = isLoadingProviders || isLoadingDetail || isLoadingAdSources
+  // Loading states:
+  // 1. Still fetching providers list → show loading
+  // 2. Have providerId, still fetching details → show loading
+  // 3. Have providerId, still fetching ad sources → show loading
+  // 4. Providers loaded but no matching provider → show "not connected"
+  const isLoading = isLoadingProviders ||
+    (providerId !== undefined && isLoadingDetail) ||
+    (providerId !== undefined && isLoadingAdSources)
   const providerInfo = PROVIDER_INFO[providerType]
 
   // Handle clicking connect on an ad source
