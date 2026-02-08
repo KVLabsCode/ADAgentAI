@@ -33,7 +33,7 @@ export function PublicLayoutClient({
       {isDemoMode && <DemoBanner />}
       {/* Linear-style Navigation */}
       <header className="sticky top-0 z-50 bg-[#08090a]/80 backdrop-blur-md border-b border-white/[0.05]">
-        <nav className="mx-auto flex h-14 max-w-[1200px] items-center px-6">
+        <nav className="mx-auto flex h-[65px] max-w-[1024px] items-center px-6">
           {/* Logo - equal flex for true centering */}
           <div className="flex-1 flex justify-start">
             <Link href="/" className="flex items-center">
@@ -42,22 +42,22 @@ export function PublicLayoutClient({
           </div>
 
           {/* Center nav links - fixed width, truly centered */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-2">
             <Link
               href="/platforms"
-              className="px-3 py-1.5 text-[13.5px] font-medium text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100"
+              className="px-2 py-1.5 text-[13px] font-normal text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100"
             >
               Platforms
             </Link>
             <Link
               href="/pricing"
-              className="px-3 py-1.5 text-[13.5px] font-medium text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100"
+              className="px-2 py-1.5 text-[13px] font-normal text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100"
             >
               Pricing
             </Link>
             <Link
               href="/blog"
-              className="px-3 py-1.5 text-[13.5px] font-medium text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100"
+              className="px-2 py-1.5 text-[13px] font-normal text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100"
             >
               Blog
             </Link>
@@ -69,6 +69,7 @@ export function PublicLayoutClient({
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="h-8 w-8 flex items-center justify-center rounded-md text-[#8a8f98] hover:text-[#f7f8f8] hover:bg-white/[0.05] transition-colors duration-100"
+              suppressHydrationWarning
             >
               <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
@@ -171,29 +172,29 @@ export function PublicLayoutClient({
       {/* Linear-style Footer */}
       <footer className="border-t border-white/[0.05] bg-[#08090a]">
         {/* Links Section */}
-        <div className="mx-auto max-w-[1200px] px-6 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+        <div className="mx-auto max-w-[1024px] py-[56px]">
+          <div className="grid grid-cols-2 md:grid-cols-[repeat(6,144px)] gap-x-[32px] gap-y-[40px]">
             {/* Logo - icon only */}
-            <div>
+            <div className="pl-6">
               <LogoSvgWide className="h-14 w-14 text-[#f7f8f8]" />
             </div>
 
             {/* Product */}
             <div>
-              <h4 className="text-[14px] font-semibold text-[#f7f8f8] mb-4">Product</h4>
-              <ul className="space-y-3">
+              <h4 className="text-[13px] font-[510] tracking-[-0.13px] text-[#f7f8f8] mb-[24px]">Product</h4>
+              <ul className="space-y-[2px]">
                 <li>
-                  <Link href="/platforms" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/platforms" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Platforms
                   </Link>
                 </li>
                 <li>
-                  <Link href="/pricing" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/pricing" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Pricing
                   </Link>
                 </li>
                 <li>
-                  <Link href="/blog" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/blog" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Changelog
                   </Link>
                 </li>
@@ -202,15 +203,15 @@ export function PublicLayoutClient({
 
             {/* Company */}
             <div>
-              <h4 className="text-[14px] font-semibold text-[#f7f8f8] mb-4">Company</h4>
-              <ul className="space-y-3">
+              <h4 className="text-[13px] font-[510] tracking-[-0.13px] text-[#f7f8f8] mb-[24px]">Company</h4>
+              <ul className="space-y-[2px]">
                 <li>
-                  <Link href="/blog" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/blog" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Blog
                   </Link>
                 </li>
                 <li>
-                  <Link href="/about" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/about" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     About
                   </Link>
                 </li>
@@ -219,15 +220,15 @@ export function PublicLayoutClient({
 
             {/* Resources */}
             <div>
-              <h4 className="text-[14px] font-semibold text-[#f7f8f8] mb-4">Resources</h4>
-              <ul className="space-y-3">
+              <h4 className="text-[13px] font-[510] tracking-[-0.13px] text-[#f7f8f8] mb-[24px]">Resources</h4>
+              <ul className="space-y-[2px]">
                 <li>
-                  <Link href="/blog" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/blog" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Documentation
                   </Link>
                 </li>
                 <li>
-                  <a href="mailto:support@adagent.ai" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <a href="mailto:support@adagent.ai" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Support
                   </a>
                 </li>
@@ -236,17 +237,34 @@ export function PublicLayoutClient({
 
             {/* Legal */}
             <div>
-              <h4 className="text-[14px] font-semibold text-[#f7f8f8] mb-4">Legal</h4>
-              <ul className="space-y-3">
+              <h4 className="text-[13px] font-[510] tracking-[-0.13px] text-[#f7f8f8] mb-[24px]">Legal</h4>
+              <ul className="space-y-[2px]">
                 <li>
-                  <Link href="/privacy" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/privacy" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Privacy
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="text-[13px] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                  <Link href="/terms" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
                     Terms
                   </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Connect */}
+            <div className="pr-6">
+              <h4 className="text-[13px] font-[510] tracking-[-0.13px] text-[#f7f8f8] mb-[24px]">Connect</h4>
+              <ul className="space-y-[2px]">
+                <li>
+                  <a href="mailto:hello@adagent.ai" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                    Contact us
+                  </a>
+                </li>
+                <li>
+                  <a href="https://twitter.com/adagentai" target="_blank" rel="noopener noreferrer" className="text-[13px] leading-[1.5] text-[#8a8f98] hover:text-[#f7f8f8] transition-colors duration-100">
+                    X (Twitter)
+                  </a>
                 </li>
               </ul>
             </div>

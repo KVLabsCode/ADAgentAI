@@ -1,5 +1,5 @@
 // Server-side blog data fetching (no CORS issues)
-import { sanityClient, blogQueries, isSanityConfigured, type SanityBlogPost, type PortableTextBlock } from "./sanity"
+import { sanityClient, blogQueries, isSanityConfigured, urlFor, type SanityBlogPost, type PortableTextBlock } from "./sanity"
 
 export interface BlogPost {
   slug: string
@@ -12,6 +12,7 @@ export interface BlogPost {
   featured: boolean
   date: string
   readTime: string
+  coverImage?: string
   author: {
     name: string
     role: string
@@ -27,6 +28,7 @@ export interface BlogPostMeta {
   featured: boolean
   date: string
   readTime: string
+  coverImage?: string
   author: {
     name: string
     role: string
@@ -58,6 +60,12 @@ function calculateReadTime(content: string | PortableTextBlock[]): string {
 function transformPost(post: SanityBlogPost): BlogPost {
   const isPortableText = Array.isArray(post.content)
 
+  // Convert Sanity image reference to URL
+  let coverImageUrl: string | undefined
+  if (post.coverImage?.asset) {
+    coverImageUrl = urlFor(post.coverImage).url()
+  }
+
   return {
     slug: post.slug,
     title: post.title,
@@ -69,6 +77,7 @@ function transformPost(post: SanityBlogPost): BlogPost {
     featured: post.featured,
     date: post.publishedAt || post.createdAt,
     readTime: calculateReadTime(post.content || ""),
+    coverImage: coverImageUrl,
     author: {
       name: post.authorName || "ADAgentAI Team",
       role: post.authorRole || "",
@@ -86,6 +95,7 @@ function toMeta(post: BlogPost): BlogPostMeta {
     featured: post.featured,
     date: post.date,
     readTime: post.readTime,
+    coverImage: post.coverImage,
     author: post.author,
   }
 }

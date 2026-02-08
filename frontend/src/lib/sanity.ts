@@ -1,4 +1,5 @@
 import { createClient } from "@sanity/client"
+import imageUrlBuilder from "@sanity/image-url"
 
 // Sanity client configuration
 // Environment variables (set via Vercel integration):
@@ -24,6 +25,13 @@ export const sanityWriteClient = createClient({
   token: process.env.SANITY_API_WRITE_TOKEN,
 })
 
+// Image URL builder for Sanity images
+const builder = imageUrlBuilder(sanityClient)
+
+export function urlFor(source: any) {
+  return builder.image(source)
+}
+
 // GROQ queries for blog posts
 // Note: Uses coalesce() to support both author reference and direct authorName field
 export const blogQueries = {
@@ -34,6 +42,7 @@ export const blogQueries = {
     title,
     excerpt,
     content,
+    coverImage,
     category,
     featured,
     status,
@@ -52,6 +61,7 @@ export const blogQueries = {
     title,
     excerpt,
     content,
+    coverImage,
     category,
     featured,
     status,

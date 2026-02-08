@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState } from "react"
-import { ArrowRight, Zap, Layers, Clock, Search, Star, Cpu, Building2, Gamepad2 } from "lucide-react"
+import { useParams } from "next/navigation"
+import { ArrowLeft, Zap, Layers } from "lucide-react"
 
 // Types
 type AdSource = {
@@ -27,11 +27,10 @@ type MediationPlatform = {
   subtitle: string
   status: "available" | "coming-soon"
   adSources: AdSource[]
-  icon: React.ReactNode
 }
 
-// Theme-aware logo component using CSS (no hydration issues)
-function ThemeAwareLogo({ logoLight, logoDark, alt, size = 32 }: {
+// Theme-aware logo component
+function ThemeAwareLogo({ logoLight, logoDark, alt, size = 48 }: {
   logoLight: string
   logoDark: string
   alt: string
@@ -57,18 +56,16 @@ function ThemeAwareLogo({ logoLight, logoDark, alt, size = 32 }: {
   )
 }
 
-// All mediation platforms with their ad sources
-const mediationPlatforms: MediationPlatform[] = [
-  {
+// Platform data (same as main page)
+const platformsData: Record<string, MediationPlatform> = {
+  admob: {
     id: "admob",
     name: "Google AdMob",
     logo: "/logos/admob.svg",
     description: "Google's mobile advertising platform with built-in mediation supporting 48 ad networks.",
     subtitle: "Mobile app monetization with 40+ ad network integrations",
     status: "available",
-    icon: <Cpu className="h-4 w-4" />,
     adSources: [
-      // Currently supported (8)
       { id: "meta", name: "Meta Audience Network", logo: "/logos/meta.svg", supportsBidding: true, supportsWaterfall: false, status: "available" },
       { id: "applovin", name: "AppLovin", logo: "/logos/applovin.svg", supportsBidding: true, supportsWaterfall: true, status: "available" },
       { id: "unity", name: "Unity Ads", logoLight: "/logos/unity.svg", logoDark: "/logos/unity-light.svg", supportsBidding: true, supportsWaterfall: true, status: "available" },
@@ -77,7 +74,6 @@ const mediationPlatforms: MediationPlatform[] = [
       { id: "mintegral", name: "Mintegral", logo: "/logos/mintegral.png", supportsBidding: true, supportsWaterfall: true, status: "available" },
       { id: "pangle", name: "Pangle", logo: "/logos/pangle.svg", supportsBidding: true, supportsWaterfall: true, status: "available" },
       { id: "dtexchange", name: "DT Exchange", logo: "/logos/dtexchange.svg", supportsBidding: true, supportsWaterfall: true, status: "available" },
-      // Coming soon - Open Source SDK adapters (8)
       { id: "ironsource", name: "ironSource Ads", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "chartboost", name: "Chartboost", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "moloco", name: "Moloco", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
@@ -86,10 +82,8 @@ const mediationPlatforms: MediationPlatform[] = [
       { id: "imobile", name: "i-mobile", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "mytarget", name: "myTarget", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "pubmatic-openwrap", name: "PubMatic OpenWrap", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
-      // Coming soon - Non-open source (2)
       { id: "vpon", name: "Vpon", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "zucks", name: "Zucks", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
-      // Coming soon - Bidding exchanges (no SDK) (22)
       { id: "adgeneration", name: "Ad Generation", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
       { id: "chocolate", name: "Chocolate Platform", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
       { id: "equativ", name: "Equativ", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
@@ -114,18 +108,15 @@ const mediationPlatforms: MediationPlatform[] = [
       { id: "yieldone", name: "YieldOne", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
     ],
   },
-  {
+  gam: {
     id: "gam",
     name: "Google Ad Manager",
     logo: "/logos/google-ad-manager.svg",
     description: "Enterprise ad serving platform with 30+ Open Bidding partners and programmatic demand.",
     subtitle: "Enterprise ad serving with 30+ Open Bidding partners",
     status: "available",
-    icon: <Building2 className="h-4 w-4" />,
     adSources: [
-      // Currently available
       { id: "adx", name: "Google Ad Exchange", logo: "/logos/admob.svg", supportsBidding: true, supportsWaterfall: false, status: "available" },
-      // Coming soon - Open Bidding Partners (30)
       { id: "amazon", name: "Amazon TAM/UAM", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
       { id: "openx", name: "OpenX", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
       { id: "indexexchange", name: "Index Exchange", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
@@ -158,7 +149,7 @@ const mediationPlatforms: MediationPlatform[] = [
       { id: "yahoossp", name: "Yahoo SSP", supportsBidding: true, supportsWaterfall: false, status: "coming-soon" },
     ],
   },
-  {
+  levelplay: {
     id: "levelplay",
     name: "Unity LevelPlay",
     logoLight: "/logos/unity.svg",
@@ -166,9 +157,7 @@ const mediationPlatforms: MediationPlatform[] = [
     description: "ironSource's mediation platform with 29 ad networks and unified auction.",
     subtitle: "Unified auction mediation with 29 ad networks",
     status: "coming-soon",
-    icon: <Gamepad2 className="h-4 w-4" />,
     adSources: [
-      // All 29 networks from Unity LevelPlay documentation
       { id: "admob", name: "Google AdMob", logo: "/logos/admob.svg", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "meta", name: "Meta Audience Network", logo: "/logos/meta.svg", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "unity", name: "Unity Ads", logoLight: "/logos/unity.svg", logoDark: "/logos/unity-light.svg", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
@@ -200,16 +189,14 @@ const mediationPlatforms: MediationPlatform[] = [
       { id: "mytarget", name: "myTarget", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
     ],
   },
-  {
+  max: {
     id: "max",
     name: "AppLovin MAX",
     logo: "/logos/applovin.svg",
     description: "Industry-leading mediation with real-time bidding and 25+ networks.",
     subtitle: "Real-time bidding mediation with 26 networks",
     status: "coming-soon",
-    icon: <Star className="h-4 w-4" />,
     adSources: [
-      // All 26 networks from AppLovin MAX documentation
       { id: "admob", name: "Google AdMob", logo: "/logos/admob.svg", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "meta", name: "Meta Audience Network", logo: "/logos/meta.svg", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
       { id: "unity", name: "Unity Ads", logoLight: "/logos/unity.svg", logoDark: "/logos/unity-light.svg", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
@@ -238,13 +225,12 @@ const mediationPlatforms: MediationPlatform[] = [
       { id: "fyber", name: "Fyber", supportsBidding: true, supportsWaterfall: true, status: "coming-soon" },
     ],
   },
-]
+}
 
-// Linear-style integration card
-function IntegrationCard({ source }: { source: AdSource }) {
+// List-style card for detail page - same as main page
+function NetworkCard({ source }: { source: AdSource }) {
   const hasThemeLogo = source.logoLight && source.logoDark
   const isComingSoon = source.status === "coming-soon"
-  const hasLogo = hasThemeLogo || source.logo
 
   return (
     <div className={`group relative flex items-start gap-4 p-5 rounded-xl bg-[#18191b] border border-transparent hover:border-[#2a2b2e] transition-all duration-150 ${isComingSoon ? 'opacity-60' : ''}`}>
@@ -283,7 +269,7 @@ function IntegrationCard({ source }: { source: AdSource }) {
         </div>
       </div>
 
-      {/* Status badge - positioned at top right */}
+      {/* Status badge */}
       {isComingSoon && (
         <div className="absolute top-4 right-4">
           <span className="text-[11px] font-medium text-[#6b6f76] bg-[#232428] px-2 py-0.5 rounded">Soon</span>
@@ -293,141 +279,92 @@ function IntegrationCard({ source }: { source: AdSource }) {
   )
 }
 
-// Platform section component - Linear style
-function PlatformSection({ platform }: { platform: MediationPlatform }) {
-  // Show first 6 cards only
-  const visibleSources = platform.adSources.slice(0, 6)
-  const hasMore = platform.adSources.length > 6
+export default function PlatformDetailPage() {
+  const params = useParams()
+  const platformId = params.platform as string
+  const platform = platformsData[platformId]
 
-  return (
-    <section id={platform.id} className="scroll-mt-24">
-      {/* Section Header - Linear style */}
-      <div className="mb-6">
-        <h2 className="text-[18px] font-semibold text-[#f7f8f8] mb-1">{platform.name}</h2>
-        <p className="text-[15px] text-[#6b6f76]">{platform.subtitle}</p>
+  if (!platform) {
+    return (
+      <div className="min-h-screen bg-[#08090a] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-[24px] font-semibold text-[#f7f8f8] mb-2">Platform not found</h1>
+          <Link href="/platforms" className="text-[#5e6ad2] hover:text-[#7c85e0]">
+            Back to Platforms
+          </Link>
+        </div>
       </div>
-
-      {/* 2-column grid of cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {visibleSources.map((source) => (
-          <IntegrationCard key={source.id} source={source} />
-        ))}
-      </div>
-
-      {/* Browse all link - navigates to detail page */}
-      {hasMore && (
-        <Link
-          href={`/platforms/${platform.id}`}
-          className="mt-6 text-[14px] font-medium text-[#5e6ad2] hover:text-[#7c85e0] transition-colors inline-flex items-center gap-1"
-        >
-          Browse all {platform.adSources.length}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      )}
-
-      {/* Section divider */}
-      <div className="mt-12 mb-12 border-t border-[#1f2023]" />
-    </section>
-  )
-}
-
-export default function PlatformsPage() {
-  const [activePlatform, setActivePlatform] = useState<string | null>(null)
-
-  const scrollToPlatform = (platformId: string) => {
-    setActivePlatform(platformId)
-    const element = document.getElementById(platformId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' })
-    }
+    )
   }
+
+  const hasThemeLogo = platform.logoLight && platform.logoDark
+  const availableSources = platform.adSources.filter(s => s.status === "available")
+  const comingSoonSources = platform.adSources.filter(s => s.status === "coming-soon")
 
   return (
     <div className="min-h-screen bg-[#08090a]">
-      {/* Header */}
-      <div className="border-b border-[#1f2023]">
-        <div className="mx-auto max-w-[1024px] px-6 py-10">
-          <div className="flex items-start justify-between">
-            <h1 className="text-[32px] font-semibold tracking-tight text-[#f7f8f8]">Platforms</h1>
+      {/* Header with breadcrumb and hero */}
+      <div className="pt-10 pb-12">
+        <div className="mx-auto max-w-[1024px] px-6">
+          {/* Breadcrumb - centered */}
+          <nav className="flex items-center justify-center gap-2 text-[14px] mb-6">
+            <Link href="/platforms" className="text-[#6b6f76] hover:text-[#f7f8f8] transition-colors">
+              Platforms
+            </Link>
+            <span className="text-[#3a3d42]">/</span>
+            <span className="text-[#8a8f98]">{platform.name}</span>
+          </nav>
 
-            {/* Search button - Linear style */}
-            <button className="flex items-center gap-3 h-9 px-3 rounded-lg border border-[#27282c] bg-[#111113] text-[14px] text-[#6b6f76] hover:border-[#3a3d42] transition-colors">
-              <Search className="h-4 w-4" />
-              <span>Search...</span>
-              <span className="text-[11px] text-[#4a4d52] bg-[#1a1b1e] px-1.5 py-0.5 rounded">⌘K</span>
-            </button>
+          {/* Hero - Linear style centered */}
+          <div className="text-center max-w-[600px] mx-auto">
+            <h1 className="text-[40px] font-semibold tracking-tight text-[#f7f8f8] mb-3">
+              {platform.subtitle}
+            </h1>
           </div>
         </div>
       </div>
 
-      {/* Main Content - Two column layout */}
-      <div className="mx-auto max-w-[1024px] px-6 py-10">
-        <div className="flex gap-12">
-          {/* Left Sidebar - Platform navigation */}
-          <aside className="w-[200px] flex-shrink-0">
-            <nav className="sticky top-24 space-y-1">
-              {mediationPlatforms.map((platform) => {
-                const isActive = activePlatform === platform.id
-                const isPlatformComingSoon = platform.status === "coming-soon"
-
-                return (
-                  <button
-                    key={platform.id}
-                    onClick={() => scrollToPlatform(platform.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-colors ${
-                      isActive
-                        ? "bg-white/[0.05] text-[#f7f8f8]"
-                        : "text-[#6b6f76] hover:text-[#f7f8f8] hover:bg-white/[0.02]"
-                    }`}
-                  >
-                    <span className={isActive ? "text-[#f7f8f8]" : "text-[#6b6f76]"}>
-                      {platform.icon}
-                    </span>
-                    <span className="flex-1 text-left">{platform.name}</span>
-                    {isPlatformComingSoon && (
-                      <Clock className="h-3.5 w-3.5 text-[#5e6ad2]" />
-                    )}
-                  </button>
-                )
-              })}
-            </nav>
-          </aside>
-
-          {/* Right Content - Platform sections */}
-          <main className="flex-1 min-w-0">
-            {mediationPlatforms.map((platform) => (
-              <PlatformSection key={platform.id} platform={platform} />
-            ))}
-
-            {/* CTA Section */}
-            <div className="p-8 rounded-xl border border-[#1f2023] bg-gradient-to-br from-[#111113] to-[#0d0e0f]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-[18px] font-semibold text-[#f7f8f8] mb-1">
-                    Ready to connect your platforms?
-                  </h3>
-                  <p className="text-[14px] text-[#6b6f76]">
-                    Get AI-powered insights across all your ad sources in minutes.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Link
-                    href="/pricing"
-                    className="h-9 px-4 flex items-center text-[14px] font-medium text-[#8a8f98] hover:text-[#f7f8f8] transition-colors"
-                  >
-                    View pricing
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="h-9 px-4 flex items-center gap-2 rounded-lg text-[14px] font-medium bg-[#f7f8f8] text-[#08090a] hover:bg-white transition-colors"
-                  >
-                    Get started
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
+      {/* Networks grid */}
+      <div className="pb-20">
+        <div className="mx-auto max-w-[1024px] px-6">
+          {/* Available networks */}
+          {availableSources.length > 0 && (
+            <div className="mb-10">
+              <h2 className="text-[13px] font-medium text-[#6b6f76] uppercase tracking-wider mb-4">
+                Available ({availableSources.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {availableSources.map((source) => (
+                  <NetworkCard key={source.id} source={source} />
+                ))}
               </div>
             </div>
-          </main>
+          )}
+
+          {/* Coming soon networks */}
+          {comingSoonSources.length > 0 && (
+            <div>
+              <h2 className="text-[13px] font-medium text-[#6b6f76] uppercase tracking-wider mb-4">
+                Coming Soon ({comingSoonSources.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {comingSoonSources.map((source) => (
+                  <NetworkCard key={source.id} source={source} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Back link */}
+          <div className="mt-14 pt-6 border-t border-[#1f2023]">
+            <Link
+              href="/platforms"
+              className="inline-flex items-center gap-2 text-[14px] text-[#6b6f76] hover:text-[#f7f8f8] transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to all platforms
+            </Link>
+          </div>
         </div>
       </div>
     </div>
