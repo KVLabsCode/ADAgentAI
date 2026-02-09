@@ -1,5 +1,5 @@
-import { createClient } from "@sanity/client"
-import imageUrlBuilder from "@sanity/image-url"
+import { createClient, type SanityClient } from "@sanity/client"
+import { createImageUrlBuilder } from "@sanity/image-url"
 
 // Sanity client configuration
 // Environment variables (set via Vercel integration):
@@ -8,28 +8,63 @@ import imageUrlBuilder from "@sanity/image-url"
 // SANITY_API_READ_TOKEN - Read token for authenticated requests
 // SANITY_API_WRITE_TOKEN - Write token for mutations (admin only)
 
-export const sanityClient = createClient({
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-  apiVersion: "2024-01-01",
-  useCdn: process.env.NODE_ENV === "production",
-  token: process.env.SANITY_API_READ_TOKEN,
+// Lazy client initialization — avoids calling crypto.randomUUID() at module
+// load time, which breaks Next.js PPR/cacheComponents prerendering.
+let _sanityClient: SanityClient | null = null
+export function getSanityClient(): SanityClient {
+  if (!_sanityClient) {
+    _sanityClient = createClient({
+      projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
+      dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
+      apiVersion: "2024-01-01",
+      useCdn: process.env.NODE_ENV === "production",
+      token: process.env.SANITY_API_READ_TOKEN,
+    })
+  }
+  return _sanityClient
+}
+
+// Keep for backward compat — lazily initialized
+export const sanityClient = new Proxy({} as SanityClient, {
+  get(_target, prop, receiver) {
+    const real = getSanityClient()
+    const value = Reflect.get(real, prop, receiver)
+    if (typeof value === "function") {
+      return value.bind(real)
+    }
+    return value
+  },
 })
 
 // Client with write access (server-side only)
-export const sanityWriteClient = createClient({
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
-  apiVersion: "2024-01-01",
-  useCdn: false,
-  token: process.env.SANITY_API_WRITE_TOKEN,
+let _sanityWriteClient: SanityClient | null = null
+export const sanityWriteClient = new Proxy({} as SanityClient, {
+  get(_target, prop, receiver) {
+    if (!_sanityWriteClient) {
+      _sanityWriteClient = createClient({
+        projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
+        dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
+        apiVersion: "2024-01-01",
+        useCdn: false,
+        token: process.env.SANITY_API_WRITE_TOKEN,
+      })
+    }
+    const real = _sanityWriteClient
+    const value = Reflect.get(real, prop, receiver)
+    if (typeof value === "function") {
+      return value.bind(real)
+    }
+    return value
+  },
 })
 
-// Image URL builder for Sanity images
-const builder = imageUrlBuilder(sanityClient)
-
+// Image URL builder for Sanity images (lazy)
+let _builder: ReturnType<typeof createImageUrlBuilder> | null = null
 export function urlFor(source: any) {
-  return builder.image(source)
+  if (!_builder) {
+    _builder = createImageUrlBuilder(getSanityClient())
+  }
+  return _builder.image(source)
 }
 
 // GROQ queries for blog posts
