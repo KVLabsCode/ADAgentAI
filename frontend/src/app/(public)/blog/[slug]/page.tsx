@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { connection } from "next/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getPostBySlug, getAllPosts } from "@/lib/blog"
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  await connection()
   const { slug } = await params
   const post = await getPostBySlug(slug)
 
@@ -32,6 +34,7 @@ function formatDate(dateString: string): string {
 }
 
 export default async function BlogPostPage({ params }: Props) {
+  await connection()
   const { slug } = await params
   const post = await getPostBySlug(slug)
 

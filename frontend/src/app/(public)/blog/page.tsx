@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { connection } from "next/server"
 import { getAllPosts } from "@/lib/blog"
 import { BlogContent } from "./blog-content"
 
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function BlogPage() {
+  await connection()
   const posts = await getAllPosts()
 
   return (
