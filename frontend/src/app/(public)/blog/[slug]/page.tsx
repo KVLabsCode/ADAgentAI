@@ -1,16 +1,11 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { getPostBySlug, getAllSlugs, getAllPosts } from "@/lib/blog"
+import { getPostBySlug, getAllPosts } from "@/lib/blog"
 import { BlogContent } from "./blog-post-content"
 
 interface Props {
   params: Promise<{ slug: string }>
-}
-
-export async function generateStaticParams() {
-  const slugs = await getAllSlugs()
-  return slugs.map((slug) => ({ slug }))
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
