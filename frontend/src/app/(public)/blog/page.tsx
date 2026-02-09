@@ -1,5 +1,5 @@
 import { Metadata } from "next"
-import { connection } from "next/server"
+import { cacheLife } from "next/cache"
 import { BlogContent } from "./blog-content"
 
 export const metadata: Metadata = {
@@ -7,10 +7,15 @@ export const metadata: Metadata = {
   description: "Latest news and updates from ADAgent",
 }
 
-export default async function BlogPage() {
-  await connection()
+async function getCachedPosts() {
+  "use cache"
+  cacheLife("hours")
   const { getAllPosts } = await import("@/lib/blog")
-  const posts = await getAllPosts()
+  return getAllPosts()
+}
+
+export default async function BlogPage() {
+  const posts = await getCachedPosts()
 
   return (
     <div className="min-h-screen bg-[#08090a]">

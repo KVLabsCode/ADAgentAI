@@ -68,11 +68,8 @@ let _builder: any = null
 export function urlFor(source: any) {
   if (!_builder) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const imageUrlBuilder = require("@sanity/image-url") as typeof import("@sanity/image-url")
-    const createImageUrlBuilder = imageUrlBuilder.default || imageUrlBuilder.createImageUrlBuilder || imageUrlBuilder
-    _builder = typeof createImageUrlBuilder === "function"
-      ? createImageUrlBuilder(getSanityClient())
-      : (imageUrlBuilder as any)(getSanityClient())
+    const { createImageUrlBuilder } = require("@sanity/image-url")
+    _builder = createImageUrlBuilder(getSanityClient())
   }
   return _builder.image(source)
 }

@@ -1,5 +1,5 @@
 import { Metadata } from "next"
-import { connection } from "next/server"
+import { cacheLife } from "next/cache"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { BlogContent } from "./blog-post-content"
@@ -8,11 +8,23 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  await connection()
+async function getCachedPost(slug: string) {
+  "use cache"
+  cacheLife("hours")
   const { getPostBySlug } = await import("@/lib/blog")
+  return getPostBySlug(slug)
+}
+
+async function getCachedPosts() {
+  "use cache"
+  cacheLife("hours")
+  const { getAllPosts } = await import("@/lib/blog")
+  return getAllPosts()
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const post = await getPostBySlug(slug)
+  const post = await getCachedPost(slug)
 
   if (!post) {
     return { title: "Post Not Found | ADAgent" }
@@ -34,17 +46,15 @@ function formatDate(dateString: string): string {
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  await connection()
-  const { getPostBySlug, getAllPosts } = await import("@/lib/blog")
   const { slug } = await params
-  const post = await getPostBySlug(slug)
+  const post = await getCachedPost(slug)
 
   if (!post) {
     notFound()
   }
 
   // Get all posts for prev/next navigation
-  const allPosts = await getAllPosts()
+  const allPosts = await getCachedPosts()
   const sortedPosts = allPosts.sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   )
