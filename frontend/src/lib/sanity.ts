@@ -1,5 +1,5 @@
-import { createClient, type SanityClient } from "@sanity/client"
-import { createImageUrlBuilder } from "@sanity/image-url"
+// Type-only imports — erased at compile time, no module evaluation
+import type { SanityClient } from "@sanity/client"
 
 // Sanity client configuration
 // Environment variables (set via Vercel integration):
@@ -8,11 +8,14 @@ import { createImageUrlBuilder } from "@sanity/image-url"
 // SANITY_API_READ_TOKEN - Read token for authenticated requests
 // SANITY_API_WRITE_TOKEN - Write token for mutations (admin only)
 
-// Lazy client initialization — avoids calling crypto.randomUUID() at module
-// load time, which breaks Next.js PPR/cacheComponents prerendering.
+// Lazy client initialization — uses require() inside functions so
+// @sanity/client module is NOT evaluated at import time. This prevents
+// crypto.randomUUID() from being called during Next.js PPR prerendering.
 let _sanityClient: SanityClient | null = null
 export function getSanityClient(): SanityClient {
   if (!_sanityClient) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createClient } = require("@sanity/client") as typeof import("@sanity/client")
     _sanityClient = createClient({
       projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
       dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
@@ -24,7 +27,7 @@ export function getSanityClient(): SanityClient {
   return _sanityClient
 }
 
-// Keep for backward compat — lazily initialized
+// Keep for backward compat — lazily initialized via Proxy
 export const sanityClient = new Proxy({} as SanityClient, {
   get(_target, prop, receiver) {
     const real = getSanityClient()
@@ -41,6 +44,8 @@ let _sanityWriteClient: SanityClient | null = null
 export const sanityWriteClient = new Proxy({} as SanityClient, {
   get(_target, prop, receiver) {
     if (!_sanityWriteClient) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createClient } = require("@sanity/client") as typeof import("@sanity/client")
       _sanityWriteClient = createClient({
         projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "demo",
         dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
@@ -59,10 +64,15 @@ export const sanityWriteClient = new Proxy({} as SanityClient, {
 })
 
 // Image URL builder for Sanity images (lazy)
-let _builder: ReturnType<typeof createImageUrlBuilder> | null = null
+let _builder: any = null
 export function urlFor(source: any) {
   if (!_builder) {
-    _builder = createImageUrlBuilder(getSanityClient())
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const imageUrlBuilder = require("@sanity/image-url") as typeof import("@sanity/image-url")
+    const createImageUrlBuilder = imageUrlBuilder.default || imageUrlBuilder.createImageUrlBuilder || imageUrlBuilder
+    _builder = typeof createImageUrlBuilder === "function"
+      ? createImageUrlBuilder(getSanityClient())
+      : (imageUrlBuilder as any)(getSanityClient())
   }
   return _builder.image(source)
 }
