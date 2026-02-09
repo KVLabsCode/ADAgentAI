@@ -25,11 +25,19 @@ import adminConversationsRoutes from "./routes/admin/conversations";
 import adminStatsRoutes from "./routes/admin/stats";
 import testAuthRoutes from "./routes/test-auth";
 
-// Initialize observability (as early as possible)
-initSentry();
-initAnalytics();
-
 const app = new Hono();
+
+// Lazy-initialize observability on first request (not at module evaluation
+// time) to prevent crypto/side-effect calls during Next.js PPR prerendering.
+let _observabilityInitialized = false;
+app.use("*", async (c, next) => {
+  if (!_observabilityInitialized) {
+    _observabilityInitialized = true;
+    initSentry();
+    initAnalytics();
+  }
+  await next();
+});
 
 // ============================================================
 // Global Middleware
