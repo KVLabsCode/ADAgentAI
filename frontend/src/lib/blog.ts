@@ -1,8 +1,108 @@
 // Server-side blog data fetching using direct fetch() to Sanity API.
-// Avoids @sanity/client which uses nanoid → crypto.getRandomValues() at
-// module level, breaking Next.js PPR/cacheComponents prerendering.
-import type { PortableTextBlock, SanityBlogPost } from "./sanity"
-import { blogQueries } from "./sanity"
+// IMPORTANT: This file must NOT import @sanity/client (even transitively)
+// because nanoid → crypto.getRandomValues() breaks Next.js PPR prerendering.
+// All types and queries are inlined to avoid loading sanity.ts which bundles
+// @sanity/client via require() even when tree-shaken.
+
+// Inlined Portable Text block type
+export interface PortableTextBlock {
+  _type: string
+  _key: string
+  children?: Array<{
+    _type: string
+    _key: string
+    text?: string
+    marks?: string[]
+  }>
+  style?: string
+  markDefs?: Array<{
+    _type: string
+    _key: string
+    href?: string
+  }>
+  asset?: {
+    _ref: string
+    _type: string
+  }
+  code?: string
+  language?: string
+  caption?: string
+  alt?: string
+}
+
+// Inlined Sanity blog post type
+interface SanityBlogPost {
+  id: string
+  slug: string
+  title: string
+  subtitle?: string
+  excerpt: string
+  content: string | PortableTextBlock[]
+  coverImage?: { asset: { _ref: string } }
+  category: "Product" | "Company" | "Education" | "Tips"
+  featured: boolean
+  status: "draft" | "published"
+  authorName: string
+  authorImage?: string
+  authorRole?: string
+  authorId?: string
+  publishedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Inlined GROQ queries (from sanity.ts)
+const blogQueries = {
+  allPublishedPosts: `*[_type == "post" && status == "published"] | order(publishedAt desc) {
+    "id": _id,
+    "slug": slug.current,
+    title,
+    excerpt,
+    content,
+    coverImage,
+    category,
+    featured,
+    status,
+    "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
+    "authorRole": coalesce(author->role, authorRole),
+    publishedAt,
+    "createdAt": _createdAt,
+    "updatedAt": _updatedAt
+  }`,
+
+  postBySlug: `*[_type == "post" && slug.current == $slug && status == "published"][0] {
+    "id": _id,
+    "slug": slug.current,
+    title,
+    excerpt,
+    content,
+    coverImage,
+    category,
+    featured,
+    status,
+    "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
+    "authorRole": coalesce(author->role, authorRole),
+    publishedAt,
+    "createdAt": _createdAt,
+    "updatedAt": _updatedAt
+  }`,
+
+  relatedPosts: `*[_type == "post" && status == "published" && slug.current != $slug] | order(publishedAt desc)[0...2] {
+    "id": _id,
+    "slug": slug.current,
+    title,
+    excerpt,
+    category,
+    featured,
+    "authorName": coalesce(author->name, authorName),
+    "authorImage": coalesce(author->image, authorImage),
+    "authorRole": coalesce(author->role, authorRole),
+    publishedAt,
+    "createdAt": _createdAt
+  }`,
+}
 
 export interface BlogPost {
   slug: string

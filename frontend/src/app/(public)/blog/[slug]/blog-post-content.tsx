@@ -3,7 +3,7 @@
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { PortableText } from "@portabletext/react"
-import type { PortableTextBlock } from "@/lib/sanity"
+import type { PortableTextBlock } from "@/lib/blog"
 
 interface BlogContentProps {
   content: string | PortableTextBlock[]
