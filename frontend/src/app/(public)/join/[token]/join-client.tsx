@@ -48,7 +48,7 @@ export function JoinClient({ token }: JoinClientProps) {
       }
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
         const response = await fetch(`${apiUrl}/api/invite-links/${token}/info`)
 
         if (!response.ok) {
@@ -93,7 +93,7 @@ export function JoinClient({ token }: JoinClientProps) {
     setPageState({ status: "joining" })
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const accessToken = await getAccessToken()
 
       const response = await authFetch(`${apiUrl}/api/invite-links/${token}/join`, accessToken, {

@@ -49,7 +49,7 @@ import {
 import { Skeleton } from "@/atoms/skeleton"
 import { cn } from "@/lib/utils"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 interface Agent {
   key: string

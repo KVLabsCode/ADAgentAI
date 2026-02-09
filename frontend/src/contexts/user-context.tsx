@@ -11,7 +11,7 @@ import { getDemoUser, getDemoOrganization, getDemoProviders } from "@/lib/demo-u
 import { useDemo } from "@/contexts/demo-mode-context"
 
 const ORG_STORAGE_KEY = "adagent_selected_org"
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 interface UserContextValue {
   user: User | null
@@ -297,7 +297,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     setIsCheckingWaitlist(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const response = await fetch(`${apiUrl}/api/waitlist/access/${encodeURIComponent(neonUser.email)}`)
 
       if (!response.ok) {
@@ -353,7 +353,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
       setIsCheckingTos(true)
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
 
         // Get session token for auth
         const sessionAny = session as Record<string, unknown> | undefined
@@ -573,7 +573,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Accept Terms of Service
   const acceptTos = useCallback(async (marketingOptIn: boolean = false): Promise<boolean> => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
 
       // Get session token for auth
       const sessionAny = session as Record<string, unknown> | undefined

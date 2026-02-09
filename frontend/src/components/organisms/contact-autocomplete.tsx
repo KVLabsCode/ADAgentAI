@@ -93,7 +93,7 @@ export function ContactAutocomplete({
     const timer = setTimeout(async () => {
       setLoading(true)
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
         const accessToken = await getAccessToken()
         const response = await authFetch(
           `${apiUrl}/api/account/contacts/search?q=${encodeURIComponent(username)}`,

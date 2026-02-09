@@ -5,7 +5,9 @@
 import { DEMO_ORGANIZATION } from "@/lib/demo-user";
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:5001";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// API URL: empty string means same-origin (Hono runs as Next.js API route)
+// Falls back to external URL for local dev if NEXT_PUBLIC_API_URL is set
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Demo org ID is not a valid UUID - skip sending to backend
 const isDemoOrgId = (orgId: string | null | undefined) => orgId === DEMO_ORGANIZATION.id;

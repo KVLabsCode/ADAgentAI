@@ -25,7 +25,7 @@ export function useInviteLinkManagement({
     if (!organizationId) return
     setIsLoadingInviteLink(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const accessToken = await getAccessToken()
       const response = await authFetch(`${apiUrl}/api/invite-links`, accessToken)
       if (response.ok) {
@@ -53,7 +53,7 @@ export function useInviteLinkManagement({
     if (!organizationId) return
     setIsRegeneratingLink(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const accessToken = await getAccessToken()
       const response = await authFetch(`${apiUrl}/api/invite-links`, accessToken, {
         method: 'POST',

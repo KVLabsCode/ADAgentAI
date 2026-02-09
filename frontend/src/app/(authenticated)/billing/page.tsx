@@ -17,7 +17,7 @@ import { useUser } from "@/contexts/user-context"
 import { authFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 interface UsageData {
   queries: number       // Number of user messages

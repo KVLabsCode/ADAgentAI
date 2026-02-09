@@ -22,9 +22,9 @@ const getConfigDir = (): string => {
     ? import.meta.dir
     : path.dirname(new URL(import.meta.url).pathname);
   const possiblePaths = [
+    path.resolve(process.cwd(), "../backend/ad_platform_crew/config"),
     path.resolve(process.cwd(), "../ad_platform_crew/config"),
-    path.resolve(process.cwd(), "../../backend/ad_platform_crew/config"),
-    path.resolve(currentDir, "../../../../ad_platform_crew/config"),
+    path.resolve(currentDir, "../../../../../backend/ad_platform_crew/config"),
   ];
 
   for (const configPath of possiblePaths) {

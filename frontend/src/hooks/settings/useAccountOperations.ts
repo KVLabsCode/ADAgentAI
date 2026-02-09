@@ -30,7 +30,7 @@ export function useAccountOperations({
   const exportData = async () => {
     setIsExportingData(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const accessToken = await getAccessToken()
       const response = await authFetch(`${apiUrl}/api/account/export`, accessToken)
 
@@ -61,7 +61,7 @@ export function useAccountOperations({
     setChatHistoryDeleteSuccess(false)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const accessToken = await getAccessToken()
       const response = await authFetch(`${apiUrl}/api/account/chat-history`, accessToken, {
         method: 'DELETE',
@@ -93,7 +93,7 @@ export function useAccountOperations({
     setDeleteAccountError(null)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const accessToken = await getAccessToken()
       const response = await authFetch(`${apiUrl}/api/account`, accessToken, {
         method: 'DELETE',

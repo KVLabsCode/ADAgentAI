@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/contexts/user-context"
 import { authFetch } from "@/lib/api"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 // Discord icon (not in Lucide)
 function DiscordIcon({ className }: { className?: string }) {
