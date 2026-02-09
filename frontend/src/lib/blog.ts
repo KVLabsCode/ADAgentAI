@@ -1,5 +1,8 @@
-// Server-side blog data fetching (no CORS issues)
-import { sanityClient, blogQueries, isSanityConfigured, urlFor, type SanityBlogPost, type PortableTextBlock } from "./sanity"
+// Server-side blog data fetching using direct fetch() to Sanity API.
+// Avoids @sanity/client which uses nanoid → crypto.getRandomValues() at
+// module level, breaking Next.js PPR/cacheComponents prerendering.
+import type { PortableTextBlock, SanityBlogPost } from "./sanity"
+import { blogQueries } from "./sanity"
 
 export interface BlogPost {
   slug: string
@@ -36,6 +39,48 @@ export interface BlogPostMeta {
   }
 }
 
+// Direct Sanity API fetch — no @sanity/client needed
+const SANITY_PROJECT_ID = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
+const SANITY_DATASET = process.env.NEXT_PUBLIC_SANITY_DATASET || "production"
+const SANITY_API_VERSION = "2024-01-01"
+const SANITY_TOKEN = process.env.SANITY_API_READ_TOKEN
+
+function isSanityConfigured(): boolean {
+  return !!(SANITY_PROJECT_ID && SANITY_PROJECT_ID !== "demo")
+}
+
+async function sanityFetch<T>(query: string, params?: Record<string, string>): Promise<T> {
+  const useCdn = process.env.NODE_ENV === "production" && !SANITY_TOKEN
+  const host = useCdn ? "apicdn.sanity.io" : "api.sanity.io"
+  const url = new URL(`https://${SANITY_PROJECT_ID}.${host}/v${SANITY_API_VERSION}/data/query/${SANITY_DATASET}`)
+  url.searchParams.set("query", query)
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(`$${key}`, JSON.stringify(value))
+    }
+  }
+
+  const headers: Record<string, string> = {}
+  if (SANITY_TOKEN) {
+    headers["Authorization"] = `Bearer ${SANITY_TOKEN}`
+  }
+
+  const res = await fetch(url.toString(), { headers })
+  if (!res.ok) {
+    throw new Error(`Sanity API error: ${res.status} ${res.statusText}`)
+  }
+  const data = await res.json()
+  return data.result as T
+}
+
+// Build Sanity image URL from asset reference (no @sanity/image-url needed)
+function sanityImageUrl(image: { asset: { _ref: string } }): string {
+  // _ref format: "image-{id}-{width}x{height}-{format}"
+  const ref = image.asset._ref
+  const [, id, dimensions, format] = ref.split("-")
+  return `https://cdn.sanity.io/images/${SANITY_PROJECT_ID}/${SANITY_DATASET}/${id}-${dimensions}.${format}`
+}
+
 // Calculate reading time from content (handles both string and Portable Text)
 function calculateReadTime(content: string | PortableTextBlock[]): string {
   const wordsPerMinute = 200
@@ -60,10 +105,9 @@ function calculateReadTime(content: string | PortableTextBlock[]): string {
 function transformPost(post: SanityBlogPost): BlogPost {
   const isPortableText = Array.isArray(post.content)
 
-  // Convert Sanity image reference to URL
   let coverImageUrl: string | undefined
   if (post.coverImage?.asset) {
-    coverImageUrl = urlFor(post.coverImage).url()
+    coverImageUrl = sanityImageUrl(post.coverImage)
   }
 
   return {
@@ -107,7 +151,7 @@ export async function getAllPosts(): Promise<BlogPostMeta[]> {
   }
 
   try {
-    const sanityPosts = await sanityClient.fetch<SanityBlogPost[]>(
+    const sanityPosts = await sanityFetch<SanityBlogPost[]>(
       blogQueries.allPublishedPosts
     )
     const posts = sanityPosts.map(transformPost).map(toMeta)
@@ -125,7 +169,7 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
   }
 
   try {
-    const post = await sanityClient.fetch<SanityBlogPost | null>(
+    const post = await sanityFetch<SanityBlogPost | null>(
       blogQueries.postBySlug,
       { slug }
     )
@@ -143,7 +187,7 @@ export async function getRelatedPosts(currentSlug: string): Promise<BlogPostMeta
   }
 
   try {
-    const sanityPosts = await sanityClient.fetch<SanityBlogPost[]>(
+    const sanityPosts = await sanityFetch<SanityBlogPost[]>(
       blogQueries.relatedPosts,
       { slug: currentSlug }
     )
