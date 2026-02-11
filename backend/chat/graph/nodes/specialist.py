@@ -34,6 +34,32 @@ from mcp_servers.annotations import get_tools_for_network_capability
 TOOL_COUNT_THRESHOLD = 15
 FTS_TOP_K = 5
 
+
+def _stable_args_key(args: dict) -> str:
+    """Create a stable string key from tool args for deduplication.
+
+    Sorts keys so {"a": 1, "b": 2} and {"b": 2, "a": 1} produce the same key.
+    Also normalizes JSON strings inside values (e.g., body_json) so that
+    semantically identical JSON with different whitespace produces the same key.
+    """
+    import json
+
+    def normalize_value(v):
+        if isinstance(v, str):
+            # Try to parse as JSON and re-serialize with consistent formatting
+            try:
+                parsed = json.loads(v)
+                return json.dumps(parsed, sort_keys=True, separators=(",", ":"))
+            except (json.JSONDecodeError, TypeError):
+                return v
+        return v
+
+    try:
+        normalized = {k: normalize_value(v) for k, v in args.items()}
+        return json.dumps(normalized, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return str(args)
+
 # Model mapping by execution path for auto-selection
 # Reactive: simple queries → fast, cheap model
 # Workflow: complex queries → capable model with extended thinking
@@ -557,6 +583,20 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
         traceback.print_exc()
         llm_with_tools = llm
 
+    # Detect if this is a synthesis iteration (specialist called AFTER tool_executor)
+    # Use state.tool_calls (reliable — uses merge_tool_calls reducer) instead of
+    # checking message types (messages reducer can lag behind tool_calls state)
+    existing_tool_calls = state.get("tool_calls", [])
+    is_synthesis = any(tc.get("result") is not None for tc in existing_tool_calls)
+    if is_synthesis:
+        print(f"[specialist] Synthesis iteration (completed {sum(1 for tc in existing_tool_calls if tc.get('result') is not None)}/{len(existing_tool_calls)} tools)", flush=True)
+
+    # On synthesis iterations for OpenRouter/Gemini: strip tools so the model
+    # MUST respond with text instead of re-calling the same tool
+    if is_synthesis and is_openrouter:
+        print(f"[specialist] Synthesis iteration — unbinding tools to force text response", flush=True)
+        llm_with_tools = llm  # No tools bound
+
     # Build messages for LLM
     llm_messages = [SystemMessage(content=system_prompt)]
 
@@ -564,10 +604,11 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     for msg in messages:
         llm_messages.append(msg)
 
-    # For OpenRouter/Gemini models, inject entity context as a user message
-    # This ensures the model "sees" the account info prominently
-    # Gemini models sometimes don't weight system prompts as heavily as Claude/GPT
-    if is_openrouter:
+    # For OpenRouter/Gemini models on the FIRST call only, inject entity context
+    # as a user message so the model "sees" account info prominently.
+    # Skip on synthesis iterations — re-injecting context + query after tool
+    # results makes Gemini think it's a new request.
+    if is_openrouter and not is_synthesis:
         print(f"[specialist] OpenRouter model detected, injecting entity context into conversation")
         accounts = user_context.get("accounts", [])
         if accounts:
@@ -595,8 +636,16 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         isinstance(msg, HumanMessage) and msg.content == user_query
         for msg in messages
     )
-    if not user_query_exists:
+    if not user_query_exists and not is_synthesis:
         llm_messages.append(HumanMessage(content=user_query))
+
+    # On synthesis iterations, add a clear instruction to analyze results
+    if is_synthesis:
+        llm_messages.append(HumanMessage(
+            content="The tool has returned results above. Now analyze the data and provide "
+                    "a clear, helpful response to the user's question. "
+                    "Do NOT call any tools — just respond with the answer."
+        ))
 
     # Get streaming queues from config
     # content_queue: for token-level streaming to frontend
@@ -749,6 +798,32 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         print(f"[specialist] Response: {response_text[:100] if response_text else 'None'}...", flush=True)
 
         # Check if we have accumulated tool calls
+        if tool_calls_accumulated:
+            # Deduplicate: skip tool calls that already completed in prior iterations
+            # Gemini models sometimes re-generate the same tool call after receiving results
+            existing_tool_calls = state.get("tool_calls", [])
+            completed_tools = {
+                (tc.get("name"), _stable_args_key(tc.get("args", {})))
+                for tc in existing_tool_calls
+                if tc.get("result") is not None
+            }
+
+            if completed_tools:
+                original_count = len(tool_calls_accumulated)
+                tool_calls_accumulated = [
+                    tc for tc in tool_calls_accumulated
+                    if (tc.get("name"), _stable_args_key(tc.get("args", {}))) not in completed_tools
+                ]
+                if len(tool_calls_accumulated) < original_count:
+                    skipped = original_count - len(tool_calls_accumulated)
+                    print(f"[specialist] Deduplicated {skipped} tool call(s) that already have results", flush=True)
+
+            # If all tool calls were duplicates, treat as no tool calls (generate response)
+            if not tool_calls_accumulated and response_text:
+                print(f"[specialist] All tool calls were duplicates, using response text instead", flush=True)
+                # Fall through to the "no tool calls" path below
+                tool_calls_accumulated = []
+
         if tool_calls_accumulated:
             # Return tool calls for tool_executor to handle
             tool_calls = []

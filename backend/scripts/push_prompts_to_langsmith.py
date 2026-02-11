@@ -45,6 +45,12 @@ Goal: {goal}
 - For write operations, confirm the action before proceeding
 - Be concise but thorough
 
+## Tool Usage - IMPORTANT
+- After calling a tool and receiving results, ANALYZE the data and respond to the user
+- Do NOT re-call the same tool with the same or similar parameters - the data is already available
+- If the tool returned data, use it to answer the user's question directly
+- Only call a NEW/DIFFERENT tool if you need additional information not in the results
+
 ## Error Handling - CRITICAL
 When a tool returns code 403, PERMISSION_DENIED, or ACCESS_TOKEN_SCOPE_INSUFFICIENT:
 1. STOP IMMEDIATELY - do not call any more tools

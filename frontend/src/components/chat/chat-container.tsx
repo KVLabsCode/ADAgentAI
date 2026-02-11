@@ -309,15 +309,16 @@ export function ChatContainer({
             )
           )
         },
-        onThinking: (thinkingContent) => {
+        onThinking: (thinkingContent, model) => {
           // Append to existing thinking event or create new one
           const lastEvent = events[events.length - 1]
           if (lastEvent && lastEvent.type === "thinking") {
             // Append to existing thinking event
             lastEvent.content = (lastEvent.content || "") + thinkingContent
+            if (model) lastEvent.model = model
           } else {
             // Create new thinking event
-            events.push({ type: "thinking", content: thinkingContent })
+            events.push({ type: "thinking", content: thinkingContent, model })
           }
           setMessages(prev =>
             prev.map(m =>
@@ -325,7 +326,7 @@ export function ChatContainer({
             )
           )
         },
-        onToolCall: (tool, inputPreview, inputFull, approved) => {
+        onToolCall: (tool, inputPreview, inputFull, approved, model) => {
           // Flush any pending content as a "content" event BEFORE the tool event
           // This creates the chain of thought: "I'll help you..." → Tool: get_data
           if (pendingContent.trim()) {
@@ -340,7 +341,7 @@ export function ChatContainer({
           } catch {
             params = { input: inputPreview }
           }
-          events.push({ type: "tool", name: tool, params, approved })
+          events.push({ type: "tool", name: tool, params, approved, model })
           toolCalls.push({ name: tool, params })
           setMessages(prev =>
             prev.map(m =>
@@ -425,10 +426,10 @@ export function ChatContainer({
             )
           )
         },
-        onResult: (resultContent) => {
+        onResult: (resultContent, model) => {
           finalContent = resultContent
           // Push result event for final answer (distinct from intermediate content)
-          events.push({ type: "result", content: resultContent })
+          events.push({ type: "result", content: resultContent, model })
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId ? { ...m, content: resultContent, events: [...events] } : m

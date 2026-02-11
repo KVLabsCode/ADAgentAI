@@ -62,6 +62,7 @@ export interface StreamEvent {
   thinking?: string;  // Router's reasoning for routing decision
   execution_path?: string;  // "reactive" or "workflow"
   model_selected?: string;  // Auto-selected model based on execution path
+  model?: string;  // Actual LLM model ID for this event (e.g., "google/gemini-2.5-flash")
   agent?: string;
   task?: string;
   tool?: string;
@@ -92,15 +93,15 @@ export interface ChatStreamCallbacks {
   onStreamId?: (streamId: string) => void;  // Called with stream ID for reconnection
   onRouting?: (service: string, capability: string, thinking?: string, executionPath?: string, modelSelected?: string) => void;
   onAgent?: (agent: string, task: string) => void;
-  onThinking?: (content: string) => void;
-  onToolCall?: (tool: string, inputPreview: string, inputFull?: string, approved?: boolean) => void;
+  onThinking?: (content: string, model?: string) => void;
+  onToolCall?: (tool: string, inputPreview: string, inputFull?: string, approved?: boolean, model?: string) => void;
   onToolExecuting?: (toolName: string, message: string) => void;  // Tool started executing (shows spinner)
   onToolResult?: (toolName: string, preview: string, full?: string, dataType?: string) => void;
   onToolApprovalRequired?: (approvalId: string, toolName: string, toolInput: string, parameterSchema?: Record<string, unknown>) => void;
   onToolDenied?: (toolName: string, reason: string) => void;
   onActionRequired?: (actionType: string, message: string, deepLink?: string, blocking?: boolean, metadata?: Record<string, unknown>) => void;
   onContent?: (chunk: string) => void;  // Streaming content chunks
-  onResult?: (content: string) => void;
+  onResult?: (content: string, model?: string) => void;
   onError?: (error: string) => void;
   onDone?: () => void;
 }
@@ -245,14 +246,15 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       callbacks.onAgent?.(event.agent || "", event.task || "");
       break;
     case "thinking":
-      callbacks.onThinking?.(event.content || "");
+      callbacks.onThinking?.(event.content || "", event.model);
       break;
     case "tool":
       callbacks.onToolCall?.(
         event.tool || "",
         event.input_preview || "",
         event.input_full,
-        event.approved
+        event.approved,
+        event.model
       );
       break;
     case "tool_result":
@@ -286,7 +288,7 @@ function handleEvent(event: StreamEvent, callbacks: ChatStreamCallbacks) {
       callbacks.onContent?.(event.content || "");
       break;
     case "result":
-      callbacks.onResult?.(event.content || "");
+      callbacks.onResult?.(event.content || "", event.model);
       break;
     case "error":
       callbacks.onError?.(event.content || "Unknown error");
