@@ -30,6 +30,7 @@ import { Loader } from "@/components/ui/loader"
 import { Button } from "@/atoms/button"
 import { RJSFParameterForm } from "./rjsf"
 import { getStepInfo, extractMcpContent, type StepIconName } from "@/lib/step-utils"
+import { formatModelName } from "./assistant-message/utils"
 import type { StreamEventItem, RJSFSchema } from "@/lib/types"
 
 export interface TimelineStep {
@@ -142,6 +143,19 @@ function formatToolName(name: string): string {
     .split("_")
     .map(p => p.charAt(0).toUpperCase() + p.slice(1))
     .join(" ")
+}
+
+/**
+ * Small pill badge showing which model handled this step
+ */
+function ModelBadge({ model }: { model?: string }) {
+  const display = formatModelName(model)
+  if (!display) return null
+  return (
+    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300">
+      {display}
+    </span>
+  )
 }
 
 /**
@@ -290,6 +304,7 @@ function ToolApprovalStep({ step, event, isPending, isExecuting, isDenied, toolR
           step.label
         )}
       </ChainOfThoughtTrigger>
+
       <ChainOfThoughtContent>
         <Tool
           toolPart={{
@@ -415,7 +430,10 @@ export function StepsTimeline({
             return (
               <ChainOfThoughtStep key={step.id} defaultOpen={false}>
                 <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={true}>
-                  {step.label}
+                  <span className="flex items-center gap-2">
+                    {step.label}
+                    <ModelBadge model={event.model} />
+                  </span>
                 </ChainOfThoughtTrigger>
                 <ChainOfThoughtContent>
                   <Tool
@@ -434,26 +452,13 @@ export function StepsTimeline({
 
           // For routing events (with or without thinking)
           if (event.type === "routing") {
-            // Format model name for display
-            const modelDisplay = event.model_selected
-              ? event.model_selected.includes("haiku") ? "Haiku"
-              : event.model_selected.includes("sonnet-4") ? "Sonnet 4"
-              : event.model_selected.includes("sonnet") ? "Sonnet"
-              : event.model_selected.includes("opus") ? "Opus"
-              : null
-              : null
-
             if (event.thinking) {
               return (
                 <ChainOfThoughtStep key={step.id} defaultOpen={false}>
                   <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={true}>
                     <span className="flex items-center gap-2">
                       {step.label}
-                      {modelDisplay && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300">
-                          {modelDisplay}
-                        </span>
-                      )}
+                      <ModelBadge model={event.model_selected} />
                     </span>
                   </ChainOfThoughtTrigger>
                   <ChainOfThoughtContent>
@@ -471,11 +476,7 @@ export function StepsTimeline({
                 <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={false}>
                   <span className="flex items-center gap-2">
                     {step.label}
-                    {modelDisplay && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300">
-                        {modelDisplay}
-                      </span>
-                    )}
+                    <ModelBadge model={event.model_selected} />
                   </span>
                 </ChainOfThoughtTrigger>
               </ChainOfThoughtStep>
@@ -487,7 +488,10 @@ export function StepsTimeline({
             return (
               <ChainOfThoughtStep key={step.id} defaultOpen={false}>
                 <ChainOfThoughtTrigger leftIcon={renderIcon()} swapIconOnHover={true}>
-                  {step.label}
+                  <span className="flex items-center gap-2">
+                    {step.label}
+                    <ModelBadge model={event.model} />
+                  </span>
                 </ChainOfThoughtTrigger>
                 <ChainOfThoughtContent>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">

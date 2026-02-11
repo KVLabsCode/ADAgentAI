@@ -46,6 +46,7 @@ from .state import (
 )
 from ..graph import run_graph, resume_graph
 from ..graph.nodes.specialist import MODEL_BY_PATH
+from ..graph.nodes.llm import get_model_name
 from ..observability import RunMetrics, save_run_summary, calculate_cost
 
 
@@ -382,7 +383,8 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
         if routing:
             execution_path = routing.get("execution_path", "workflow")
             # Determine model that will be auto-selected for this path
-            model_selected = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
+            role = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
+            model_selected = get_model_name(role)
             print(f"[DEBUG] Routing event: path={execution_path}, model={model_selected}", flush=True)
             routing_event = RoutingEvent(
                 service=routing.get("service", "general"),
@@ -413,12 +415,17 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
             ).model_dump(mode='json'))
 
     elif node_name == "specialist":
+        specialist_model = state_update.get("model")
+
         # Check for thinking content (extended thinking from Claude)
         # Only emit if NOT already streamed via output_queue
         thinking = state_update.get("thinking")
         thinking_streamed = state_update.get("thinking_streamed", False)
         if thinking and not thinking_streamed:
-            events.append(ThinkingEvent(content=thinking).model_dump(mode='json'))
+            events.append({
+                **ThinkingEvent(content=thinking).model_dump(mode='json'),
+                "model": specialist_model,
+            })
 
         # Check for partial response (text before tool calls)
         # Only emit as ContentEvent if NOT already streamed via content_queue
@@ -446,6 +453,7 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
                     # New format (types.ts interface)
                     "name": tool_name,  # Must match tool_result's "name" for pairing
                     "params": tool_args,  # Frontend expects params as object
+                    "model": specialist_model,
                     # Legacy format (api.ts callbacks) - keep for backwards compat
                     "tool": tool_name,
                     "input_preview": args_json,
@@ -459,7 +467,10 @@ def _convert_state_to_sse(node_name: str, state_update: dict) -> list[dict]:
         print(f"[_convert_state_to_sse] response field = '{response[:50] if response else 'None'}...', tool_calls count = {len(tool_calls)}", flush=True)
         if response and len(tool_calls) == 0:
             print(f"[_convert_state_to_sse] EMITTING ResultEvent (no tool calls = final answer)", flush=True)
-            events.append(ResultEvent(content=response).model_dump(mode='json'))
+            events.append({
+                **ResultEvent(content=response).model_dump(mode='json'),
+                "model": specialist_model,
+            })
 
         # Check for error
         error = state_update.get("error")

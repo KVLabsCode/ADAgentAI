@@ -96,10 +96,10 @@ export interface RJSFSchema {
 // Sequential event types for streaming
 export type StreamEventItem =
   | { type: "routing"; service: string; capability: string; thinking?: string; execution_path?: string; model_selected?: string }
-  | { type: "thinking"; content: string }
+  | { type: "thinking"; content: string; model?: string }
   | { type: "content"; content: string }  // Intermediate content (before/between tools)
-  | { type: "result"; content: string }    // Final answer (after all tools complete)
-  | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean }
+  | { type: "result"; content: string; model?: string }    // Final answer (after all tools complete)
+  | { type: "tool"; name: string; params: Record<string, unknown>; approved?: boolean; model?: string }
   | { type: "tool_executing"; tool_name: string; message: string }  // Tool execution started (shows spinner)
   | { type: "tool_result"; name: string; result: unknown }
   | { type: "tool_approval_required"; approval_id: string; tool_name: string; tool_input: string; parameter_schema?: RJSFSchema }

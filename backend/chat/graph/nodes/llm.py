@@ -30,6 +30,26 @@ def get_provider() -> str:
     return os.getenv("LLM_PROVIDER", "openrouter")
 
 
+def get_model_name(role: str = "sonnet") -> str:
+    """Get the actual model ID for a role.
+
+    Args:
+        role: "haiku", "sonnet", or a full model ID.
+
+    Returns:
+        The actual model ID string (e.g., "google/gemini-2.5-flash").
+    """
+    provider = get_provider()
+    if provider == "openrouter":
+        if role in OPENROUTER_MODELS:
+            return OPENROUTER_MODELS[role]
+    else:
+        if role in ANTHROPIC_MODELS:
+            return ANTHROPIC_MODELS[role]
+    # Already a full model ID (e.g., "google/gemini-2.5-flash", "claude-sonnet-4-...")
+    return role
+
+
 def get_llm(
     *,
     role: str = "sonnet",

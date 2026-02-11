@@ -15,7 +15,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, AIMe
 from langsmith import traceable
 from langgraph.types import RunnableConfig
 
-from .llm import get_llm, get_provider
+from .llm import get_llm, get_provider, get_model_name
 
 from ..state import GraphState
 from .entity_loader import build_entity_system_prompt
@@ -186,7 +186,7 @@ def _get_model_for_execution_path(
     if user_override and user_override != "auto":
         llm = get_llm(role=user_override, max_tokens=16000)
         print(f"[specialist] User override model: {user_override}")
-        return llm, user_override
+        return llm, get_model_name(user_override)
 
     # Auto-select based on execution path
     role = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
@@ -202,7 +202,7 @@ def _get_model_for_execution_path(
         thinking = {"type": "enabled", "budget_tokens": 4096}
 
     llm = get_llm(role=role, max_tokens=16000, thinking=thinking)
-    return llm, role
+    return llm, get_model_name(role)
 
 
 def _sanitize_tool_name(name: str) -> str:

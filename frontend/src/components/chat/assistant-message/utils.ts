@@ -225,7 +225,7 @@ export function formatModelName(modelId?: string): string | null {
   if (modelId.includes("sonnet-4")) return "Sonnet 4"
   if (modelId.includes("sonnet")) return "Sonnet"
   if (modelId.includes("opus")) return "Opus"
-  if (modelId.includes("gemini-2.5-flash")) return "Gemini Flash"
+  if (modelId.includes("gemini-2.5-flash")) return "Gemini 2.5 Flash"
   if (modelId.includes("gemini")) return "Gemini"
   if (modelId.includes("gpt-4")) return "GPT-4"
   if (modelId.includes("gpt-3")) return "GPT-3.5"

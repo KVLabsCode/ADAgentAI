@@ -19,7 +19,7 @@ from typing import Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langsmith import traceable
 
-from .llm import get_llm
+from .llm import get_llm, get_model_name
 
 from ..state import GraphState
 from ...utils.prompts import get_router_prompt
@@ -202,7 +202,7 @@ async def router_node(state: GraphState) -> dict:
                 "execution_path": execution_path,
             },
             "router_token_usage": token_usage,
-            "router_model": "claude-3-5-haiku-20241022",
+            "router_model": get_model_name("haiku"),
         }
 
         # Clear backflow flags to prevent infinite loops
