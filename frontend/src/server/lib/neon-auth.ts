@@ -42,7 +42,7 @@ async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
   }
 
   // Neon Auth JWKS endpoint - get from env or use default pattern
-  const neonAuthUrl = process.env.NEON_AUTH_URL || "";
+  const neonAuthUrl = process.env.NEON_AUTH_BASE_URL || "";
   const jwksUrl = neonAuthUrl
     ? `${neonAuthUrl}/.well-known/jwks.json`
     : null;
