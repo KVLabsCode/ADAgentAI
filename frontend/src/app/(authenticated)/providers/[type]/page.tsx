@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Suspense } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams, usePathname } from "next/navigation"
 import { ChevronLeft, Layers, Settings } from "lucide-react"
 import { Button } from "@/atoms/button" // Used for Disconnect button
 import {
@@ -254,20 +254,15 @@ function ProviderDetailLoadingSkeleton() {
 
 export default function ProviderDetailPage() {
   const params = useParams<{ type: string }>()
-  const providerType = params.type as ProviderType
+  const pathname = usePathname()
 
-  // Validate provider type
-  if (providerType !== "admob" && providerType !== "gam") {
-    return (
-      <PageContainer>
-        <EmptyState
-          icon={Settings}
-          title="Provider not found"
-          description="The requested provider type does not exist."
-          className="py-8"
-        />
-      </PageContainer>
-    )
+  // useParams may lag behind during client-side navigation transitions,
+  // so fall back to extracting the type from the URL pathname
+  const rawType = params?.type || pathname?.split("/").pop()
+  const providerType = (rawType === "admob" || rawType === "gam") ? rawType : null
+
+  if (!providerType) {
+    return <ProviderDetailLoadingSkeleton />
   }
 
   return (
