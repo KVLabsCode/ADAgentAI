@@ -13,6 +13,7 @@ from typing import Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     pass
 
+import httpx
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langsmith import traceable
@@ -229,6 +230,43 @@ def get_checkpointer_context():
     return AsyncPostgresSaver.from_conn_string(DATABASE_URL)
 
 
+async def _fetch_connected_networks(user_id: str, organization_id: str | None = None) -> list[str]:
+    """Lightweight pre-fetch of connected network names for router context.
+
+    This is a fast check so the router knows which networks are available
+    before entity_loader does the full entity load.
+    """
+    api_url = os.environ.get("API_URL", "http://localhost:3001")
+    internal_key = os.environ.get("INTERNAL_API_KEY", "")
+    if not internal_key:
+        return []
+
+    networks = set()
+    try:
+        params = {"userId": user_id}
+        if organization_id:
+            params["organizationId"] = organization_id
+
+        async with httpx.AsyncClient(timeout=5) as client:
+            # Check OAuth providers (admob, gam)
+            resp = await client.get(
+                f"{api_url}/api/providers/internal/list",
+                params=params,
+                headers={"x-internal-api-key": internal_key},
+            )
+            if resp.status_code == 200:
+                for p in resp.json().get("providers", []):
+                    ptype = p.get("type", "")
+                    if ptype == "admob":
+                        networks.add("admob")
+                    elif ptype == "gam":
+                        networks.add("admanager")
+    except Exception as e:
+        print(f"[run_graph] Error pre-fetching networks: {e}", flush=True)
+
+    return list(networks)
+
+
 @traceable(
     name="run_graph",
     run_type="chain",
@@ -273,6 +311,10 @@ async def run_graph(
 
     print(f"[run_graph] Thread ID: {thread_id}", flush=True)
 
+    # Pre-fetch connected networks so the router can classify correctly
+    connected_networks = await _fetch_connected_networks(user_id, organization_id)
+    print(f"[run_graph] Pre-fetched connected networks: {connected_networks}", flush=True)
+
     # Add metadata to current LangSmith run for observability
     run_tree = get_current_run_tree()
     if run_tree:
@@ -294,6 +336,7 @@ async def run_graph(
             "organization_id": organization_id,
             "context_mode": context_mode,
             "enabled_accounts": enabled_accounts or [],
+            "connected_networks": connected_networks,
         },
         "stream_id": thread_id,
         "selected_model": selected_model,

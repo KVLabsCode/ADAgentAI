@@ -158,6 +158,13 @@ async def router_node(state: GraphState) -> dict:
     # Build context string
     context_str = _build_context_string(conversation_history)
 
+    # Get connected networks from state (pre-fetched in run_graph)
+    user_context = state.get("user_context", {})
+    connected_networks = user_context.get("connected_networks", [])
+
+    # Build connected networks context for the router
+    networks_str = ", ".join(connected_networks) if connected_networks else "none"
+
     # Create router LLM (lightweight, fast)
     router_llm = get_llm(role="haiku", temperature=0.0, max_tokens=150)
 
@@ -165,7 +172,7 @@ async def router_node(state: GraphState) -> dict:
     router_prompt = get_router_prompt()
     messages = [
         SystemMessage(content=router_prompt),
-        HumanMessage(content=f"Context:\n{context_str}\n\nQuery: {user_query}"),
+        HumanMessage(content=f"Connected networks: {networks_str}\n\nContext:\n{context_str}\n\nQuery: {user_query}"),
     ]
 
     try:

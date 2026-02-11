@@ -473,7 +473,7 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     # Debug: log user_context to verify entity loading
     accounts = user_context.get("accounts", [])
     apps = user_context.get("apps", [])
-    print(f"[specialist] User context has {len(accounts)} accounts and {len(apps)} apps")
+    print(f"[specialist] User context has {len(accounts)} accounts and {len(apps)} apps", flush=True)
     if accounts:
         for acc in accounts[:3]:  # Log first 3 accounts
             print(f"[specialist]   Account: {acc.get('name')} ({acc.get('type')}) - {acc.get('identifier')}")
@@ -511,13 +511,17 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     tools = []  # Initialize to avoid undefined variable if loading fails
 
     try:
+        # General service doesn't need MCP tools - it's a general assistant
+        if service == "general":
+            tools = []
+            print(f"[specialist] General service - no MCP tools needed", flush=True)
         # Handle orchestration service specially - load all network tools
-        if service == "orchestration":
+        elif service == "orchestration":
             tools = await get_tools_for_service("all", user_id, organization_id)
-            print(f"[specialist] Loaded {len(tools)} tools for orchestration (all networks)")
+            print(f"[specialist] Loaded {len(tools)} tools for orchestration (all networks)", flush=True)
         else:
             tools = await get_tools_for_service(service, user_id, organization_id)
-            print(f"[specialist] Loaded {len(tools)} tools for service: {service}")
+            print(f"[specialist] Loaded {len(tools)} tools for service: {service}", flush=True)
 
         if service not in ("general", "orchestration") and not _service_has_enabled_accounts(user_context, service):
             print(f"[specialist] No enabled accounts for service={service}; skipping tool binding")
@@ -614,7 +618,7 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         response_chunks: list[AIMessageChunk] = []
         final_response: AIMessageChunk | None = None
 
-        print(f"[specialist] Starting response (streaming mode)")
+        print(f"[specialist] Starting response (streaming mode)", flush=True)
 
         async for chunk in llm_with_tools.astream(llm_messages):
             response_chunks.append(chunk)
@@ -739,10 +743,10 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         # Use actual_model_name from auto-selection (more accurate than extracting from llm)
         model_name = actual_model_name
 
-        print(f"[specialist] Model: {model_name}, execution_path: {execution_path}")
-        print(f"[specialist] Token usage: {token_usage}")
-        print(f"[specialist] Thinking: {thinking_content[:100] if thinking_content else 'None'}...")
-        print(f"[specialist] Response: {response_text[:100] if response_text else 'None'}...")
+        print(f"[specialist] Model: {model_name}, execution_path: {execution_path}", flush=True)
+        print(f"[specialist] Token usage: {token_usage}", flush=True)
+        print(f"[specialist] Thinking: {thinking_content[:100] if thinking_content else 'None'}...", flush=True)
+        print(f"[specialist] Response: {response_text[:100] if response_text else 'None'}...", flush=True)
 
         # Check if we have accumulated tool calls
         if tool_calls_accumulated:
