@@ -104,7 +104,7 @@ def _get_context_summary(state: GraphState) -> str:
 
 
 async def _stream_synthesis(
-    llm: ChatAnthropic,
+    llm,
     messages: list,
     output_queue: Optional[asyncio.Queue] = None,
 ) -> str:
