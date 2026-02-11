@@ -56,6 +56,7 @@ def get_llm(
     max_tokens: int = 8192,
     temperature: float = 0.1,
     thinking: dict[str, Any] | None = None,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     """Create an LLM instance based on the configured provider.
 
@@ -66,7 +67,8 @@ def get_llm(
               or "openrouter/google/gemini-2.5-flash".
         max_tokens: Maximum response tokens.
         temperature: Sampling temperature.
-        thinking: Extended thinking config (Claude-only, ignored for OpenRouter).
+        thinking: Extended thinking config for Anthropic models.
+        reasoning_effort: Reasoning effort for OpenRouter models ("high", "medium", "low").
 
     Returns:
         Configured LLM instance.
@@ -74,7 +76,7 @@ def get_llm(
     provider = get_provider()
 
     if provider == "openrouter":
-        return _make_openrouter_llm(role, max_tokens, temperature)
+        return _make_openrouter_llm(role, max_tokens, temperature, reasoning_effort)
     else:
         return _make_anthropic_llm(role, max_tokens, temperature, thinking)
 
@@ -83,6 +85,7 @@ def _make_openrouter_llm(
     role: str,
     max_tokens: int,
     temperature: float,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     """Create an OpenRouter LLM via ChatOpenAI."""
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -102,21 +105,38 @@ def _make_openrouter_llm(
         # Unknown role, use sonnet-equivalent
         model_name = OPENROUTER_MODELS["sonnet"]
 
-    print(f"[llm] Using OpenRouter model: {model_name} (role={role})")
+    print(f"[llm] Using OpenRouter model: {model_name} (role={role})", end="")
 
-    return ChatOpenAI(
-        model=model_name,
-        openai_api_key=api_key,
-        openai_api_base="https://openrouter.ai/api/v1",
-        max_tokens=max_tokens,
-        temperature=temperature,
-        model_kwargs={
-            "extra_headers": {
-                "HTTP-Referer": "https://adagentai.com",
-                "X-Title": "ADAgentAI",
-            }
-        },
-    )
+    kwargs: dict[str, Any] = {
+        "extra_headers": {
+            "HTTP-Referer": "https://adagentai.com",
+            "X-Title": "ADAgentAI",
+        }
+    }
+
+    # Enable reasoning/thinking if requested
+    # Uses OpenRouter's reasoning parameter: {"effort": "high"|"medium"|"low"}
+    # Note: Gemini 2.5 Flash has built-in thinking but reasoning content may not
+    # be exposed through OpenRouter's response (known LangChain limitation #32981)
+    if reasoning_effort:
+        kwargs["reasoning"] = {"effort": reasoning_effort}
+        print(f", reasoning={reasoning_effort}")
+    else:
+        print()  # newline
+
+    import warnings
+    # Suppress LangChain warning about 'reasoning' in model_kwargs — it's needed
+    # for OpenRouter's API format and there's no equivalent direct parameter
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Parameters.*reasoning.*should be specified explicitly")
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key,
+            openai_api_base="https://openrouter.ai/api/v1",
+            max_tokens=max_tokens,
+            temperature=temperature,
+            model_kwargs=kwargs,
+        )
 
 
 # Anthropic model mappings

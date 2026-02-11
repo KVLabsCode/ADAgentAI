@@ -218,16 +218,18 @@ def _get_model_for_execution_path(
     role = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
     print(f"[specialist] Auto-selected role for path='{execution_path}': {role}")
 
-    # Configure model based on path
-    # Reactive path: no extended thinking (faster)
-    # Workflow path: enable extended thinking for complex reasoning
-    enable_thinking = execution_path == "workflow" and get_provider() == "anthropic"
-
+    # Configure thinking/reasoning based on provider and path
+    provider = get_provider()
     thinking = None
-    if enable_thinking:
-        thinking = {"type": "enabled", "budget_tokens": 4096}
+    reasoning_effort = None
 
-    llm = get_llm(role=role, max_tokens=16000, thinking=thinking)
+    if provider == "anthropic" and execution_path == "workflow":
+        thinking = {"type": "enabled", "budget_tokens": 4096}
+    elif provider == "openrouter":
+        # Enable Gemini thinking for all paths
+        reasoning_effort = "high"
+
+    llm = get_llm(role=role, max_tokens=16000, thinking=thinking, reasoning_effort=reasoning_effort)
     return llm, get_model_name(role)
 
 
@@ -588,14 +590,39 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     # checking message types (messages reducer can lag behind tool_calls state)
     existing_tool_calls = state.get("tool_calls", [])
     is_synthesis = any(tc.get("result") is not None for tc in existing_tool_calls)
+    completed_tool_names = {tc.get("name") for tc in existing_tool_calls if tc.get("result") is not None}
     if is_synthesis:
-        print(f"[specialist] Synthesis iteration (completed {sum(1 for tc in existing_tool_calls if tc.get('result') is not None)}/{len(existing_tool_calls)} tools)", flush=True)
+        print(f"[specialist] Synthesis iteration (completed: {completed_tool_names})", flush=True)
 
-    # On synthesis iterations for OpenRouter/Gemini: strip tools so the model
-    # MUST respond with text instead of re-calling the same tool
-    if is_synthesis and is_openrouter:
-        print(f"[specialist] Synthesis iteration — unbinding tools to force text response", flush=True)
-        llm_with_tools = llm  # No tools bound
+    # On synthesis iterations for OpenRouter/Gemini: remove already-called tools
+    # so the model can't re-call them, but keep OTHER tools available for multi-step
+    # workflows (e.g., list ad sources → create mediation group)
+    #
+    # For workflow paths where only read tools completed (no dangerous/write ops yet),
+    # force tool_choice="required" so the model MUST call the next tool instead of
+    # asking the user for details. Once a write op completes, let the model synthesize.
+    has_write_op_completed = any(
+        tc.get("is_dangerous") for tc in existing_tool_calls if tc.get("result") is not None
+    )
+    if is_synthesis and is_openrouter and tools:
+        before_count = len(tools)
+        tools = [t for t in tools if getattr(t, "name", "") not in completed_tool_names]
+        if len(tools) < before_count:
+            print(f"[specialist] Removed {before_count - len(tools)} completed tool(s), {len(tools)} remaining", flush=True)
+            print(f"[specialist] Write op completed: {has_write_op_completed}", flush=True)
+            # Re-bind with remaining tools (or no tools if all were completed)
+            # Tools are already sanitized from the initial bind above
+            if tools:
+                # For workflow paths where only reads are done: FORCE tool calling
+                # so the model continues gathering data / calling create tools.
+                # Once a write (dangerous) tool completes, stop forcing.
+                if execution_path == "workflow" and not has_write_op_completed:
+                    llm_with_tools = llm.bind_tools(tools, tool_choice="required")
+                    print(f"[specialist] Forced tool_choice=required for workflow continuation", flush=True)
+                else:
+                    llm_with_tools = llm.bind_tools(tools)
+            else:
+                llm_with_tools = llm
 
     # Build messages for LLM
     llm_messages = [SystemMessage(content=system_prompt)]
@@ -636,16 +663,27 @@ Use these account IDs when calling tools. If the user asks about "my account" or
         isinstance(msg, HumanMessage) and msg.content == user_query
         for msg in messages
     )
-    if not user_query_exists and not is_synthesis:
+    if not user_query_exists:
         llm_messages.append(HumanMessage(content=user_query))
 
-    # On synthesis iterations, add a clear instruction to analyze results
-    if is_synthesis:
-        llm_messages.append(HumanMessage(
-            content="The tool has returned results above. Now analyze the data and provide "
-                    "a clear, helpful response to the user's question. "
-                    "Do NOT call any tools — just respond with the answer."
-        ))
+    # On synthesis iterations, nudge the model to use results (not re-call same tool)
+    # but allow calling DIFFERENT tools for multi-step workflows
+    if is_synthesis and is_openrouter:
+        if execution_path == "workflow" and tools and not has_write_op_completed:
+            # Workflow path with remaining tools, no write yet: MUST call next tool
+            remaining_tool_names = [getattr(t, "name", "") for t in tools[:10]]
+            llm_messages.append(HumanMessage(
+                content="The tool above returned results. You MUST call the next tool now. "
+                        "Do NOT respond with text — use reasonable defaults from the data "
+                        "you have and call the appropriate tool. "
+                        f"Available tools: {', '.join(remaining_tool_names)}"
+            ))
+        else:
+            # Reactive path, no remaining tools, or write op already done: synthesize
+            llm_messages.append(HumanMessage(
+                content="The tool above has returned results. Use those results to "
+                        "answer the user's question directly. Do NOT re-call any tools."
+            ))
 
     # Get streaming queues from config
     # content_queue: for token-level streaming to frontend
@@ -718,10 +756,55 @@ Use these account IDs when calling tools. If the user asks about "my account" or
                                         await content_queue.put(text)
                                     response_text += text
                 elif isinstance(chunk_content, str) and chunk_content:
-                    # Simple string content (OpenRouter models - no thinking)
+                    # Simple string content (OpenRouter text response)
                     if content_queue:
                         await content_queue.put(chunk_content)
                     response_text += chunk_content
+
+            # Debug: log first few chunks' attributes to find where reasoning lives
+            chunk_idx = len(response_chunks)
+            if chunk_idx <= 3:
+                ak = getattr(chunk, "additional_kwargs", {})
+                rm = getattr(chunk, "response_metadata", {})
+                if ak:
+                    print(f"[specialist] chunk[{chunk_idx}] additional_kwargs: {ak}", flush=True)
+                if rm:
+                    print(f"[specialist] chunk[{chunk_idx}] response_metadata: {rm}", flush=True)
+                # Log all non-empty attrs on first chunk for comprehensive debugging
+                if chunk_idx == 1:
+                    for attr in dir(chunk):
+                        if attr.startswith("_"):
+                            continue
+                        val = getattr(chunk, attr, None)
+                        if val and not callable(val) and attr not in ("content", "id", "type"):
+                            print(f"[specialist] chunk[1] {attr}: {val}", flush=True)
+
+            # Extract OpenRouter reasoning from streaming chunks
+            # Try multiple possible locations for reasoning content
+            ak = getattr(chunk, "additional_kwargs", {})
+            if ak:
+                reasoning_text = None
+
+                # Format 1: reasoning_details as array
+                reasoning_details = ak.get("reasoning_details")
+                if reasoning_details and isinstance(reasoning_details, list):
+                    for detail in reasoning_details:
+                        if isinstance(detail, dict):
+                            reasoning_text = detail.get("text", "") or detail.get("content", "")
+                        elif isinstance(detail, str):
+                            reasoning_text = detail
+
+                # Format 2: reasoning_content or reasoning as string
+                if not reasoning_text:
+                    reasoning_text = ak.get("reasoning_content") or ak.get("reasoning")
+
+                if reasoning_text:
+                    thinking_content = (thinking_content or "") + reasoning_text
+                    if output_queue:
+                        await output_queue.put(format_sse(
+                            ThinkingEvent(content=reasoning_text).model_dump(mode='json')
+                        ))
+                        thinking_emitted = True
 
             # Accumulate tool calls from chunks
             if hasattr(chunk, "tool_call_chunks") and chunk.tool_call_chunks:
