@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Suspense, use } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { ChevronLeft, Layers, Settings } from "lucide-react"
 import { Button } from "@/atoms/button" // Used for Disconnect button
 import {
@@ -252,9 +252,9 @@ function ProviderDetailLoadingSkeleton() {
   )
 }
 
-function ProviderDetailInner({ params }: { params: Promise<{ type: string }> }) {
-  const resolvedParams = use(params)
-  const providerType = resolvedParams.type as ProviderType
+export default function ProviderDetailPage() {
+  const params = useParams<{ type: string }>()
+  const providerType = params.type as ProviderType
 
   // Validate provider type
   if (providerType !== "admob" && providerType !== "gam") {
@@ -270,13 +270,9 @@ function ProviderDetailInner({ params }: { params: Promise<{ type: string }> }) 
     )
   }
 
-  return <ProviderDetailContent providerType={providerType} />
-}
-
-export default function ProviderDetailPage({ params }: { params: Promise<{ type: string }> }) {
   return (
     <Suspense fallback={<ProviderDetailLoadingSkeleton />}>
-      <ProviderDetailInner params={params} />
+      <ProviderDetailContent providerType={providerType} />
     </Suspense>
   )
 }
