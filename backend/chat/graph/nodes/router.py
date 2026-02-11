@@ -16,9 +16,10 @@ Supports 9 ad networks:
 """
 
 from typing import Literal
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langsmith import traceable
+
+from .llm import get_llm
 
 from ..state import GraphState
 from ...utils.prompts import get_router_prompt
@@ -158,12 +159,7 @@ async def router_node(state: GraphState) -> dict:
     context_str = _build_context_string(conversation_history)
 
     # Create router LLM (lightweight, fast)
-    # Using Claude Haiku for routing - fast and cheap
-    router_llm = ChatAnthropic(
-        model="claude-3-5-haiku-20241022",
-        temperature=0.0,
-        max_tokens=150,
-    )
+    router_llm = get_llm(role="haiku", temperature=0.0, max_tokens=150)
 
     # Build messages with prompt from LangSmith
     router_prompt = get_router_prompt()

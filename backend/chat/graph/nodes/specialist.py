@@ -10,12 +10,12 @@ import re
 import asyncio
 from datetime import datetime, timezone
 from typing import Any
-from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, AIMessageChunk
 from langsmith import traceable
 from langgraph.types import RunnableConfig
+
+from .llm import get_llm, get_provider
 
 from ..state import GraphState
 from .entity_loader import build_entity_system_prompt
@@ -38,8 +38,8 @@ FTS_TOP_K = 5
 # Reactive: simple queries → fast, cheap model
 # Workflow: complex queries → capable model with extended thinking
 MODEL_BY_PATH = {
-    "reactive": "claude-3-5-haiku-20241022",
-    "workflow": "claude-sonnet-4-20250514",
+    "reactive": "haiku",
+    "workflow": "sonnet",
 }
 
 # Maps service names to account types stored in user context
@@ -169,87 +169,6 @@ Reference previous context when relevant (e.g., if user says "that app" or "the 
     )
 
 
-def _get_model_from_selection(selected_model: str | None, enable_thinking: bool = True) -> BaseChatModel:
-    """Create LLM instance based on user's model selection.
-
-    Args:
-        selected_model: Model selection from frontend
-            - Anthropic: "anthropic/claude-sonnet-4-20250514" or "claude-sonnet-4-20250514"
-            - OpenRouter: "openrouter/google/gemini-2.5-flash"
-        enable_thinking: Enable extended thinking for complex reasoning (only for Claude)
-
-    Returns:
-        Configured LLM instance (ChatAnthropic or ChatOpenAI)
-    """
-    # Default to Gemini 2.5 Flash Lite via OpenRouter
-    default_model = "openrouter/google/gemini-2.5-flash"
-
-    # Use selected model or default
-    model_id = selected_model or default_model
-
-    # Check if it's an OpenRouter model
-    if model_id.startswith("openrouter/"):
-        # OpenRouter models via ChatOpenAI with OpenRouter base URL
-        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        if not openrouter_api_key:
-            print("[specialist] Warning: OPENROUTER_API_KEY not set, falling back to Claude")
-            # Fallback to Claude
-            return ChatAnthropic(
-                model="claude-sonnet-4-20250514",
-                max_tokens=16000,
-                temperature=0.1,
-            )
-
-        # Extract model name (remove "openrouter/" prefix)
-        model_name = model_id.replace("openrouter/", "")
-
-        print(f"[specialist] Using OpenRouter model: {model_name}")
-
-        # OpenRouter configuration
-        return ChatOpenAI(
-            model=model_name,
-            openai_api_key=openrouter_api_key,
-            openai_api_base="https://openrouter.ai/api/v1",
-            max_tokens=16000,
-            temperature=0.1,
-            model_kwargs={
-                "extra_headers": {
-                    "HTTP-Referer": "https://adagentai.com",  # Optional but recommended
-                    "X-Title": "ADAgentAI",  # Optional but recommended
-                }
-            }
-        )
-
-    # Anthropic Claude models
-    if model_id.startswith("anthropic/"):
-        model_name = model_id.replace("anthropic/", "")
-    elif model_id.startswith("claude-"):
-        model_name = model_id
-    else:
-        # Unknown format, fallback to default
-        model_name = "claude-sonnet-4-20250514"
-
-    print(f"[specialist] Using Anthropic model: {model_name}")
-
-    # Base LLM config for Claude
-    llm_kwargs: dict[str, Any] = {
-        "model": model_name,
-        "max_tokens": 16000,
-    }
-
-    # Enable extended thinking for deeper reasoning (Claude-specific feature)
-    if enable_thinking:
-        llm_kwargs["thinking"] = {
-            "type": "enabled",
-            "budget_tokens": 4096,  # Allow up to 4K tokens for thinking
-        }
-        llm_kwargs["temperature"] = 1  # Required for thinking mode
-    else:
-        llm_kwargs["temperature"] = 0.1
-
-    return ChatAnthropic(**llm_kwargs)
-
-
 def _get_model_for_execution_path(
     execution_path: str,
     user_override: str | None = None,
@@ -265,35 +184,25 @@ def _get_model_for_execution_path(
     """
     # Allow user override if explicitly set to non-"auto" value
     if user_override and user_override != "auto":
-        llm = _get_model_from_selection(user_override)
-        model_name = user_override
-        print(f"[specialist] User override model: {model_name}")
-        return llm, model_name
+        llm = get_llm(role=user_override, max_tokens=16000)
+        print(f"[specialist] User override model: {user_override}")
+        return llm, user_override
 
     # Auto-select based on execution path
-    model_name = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
-    print(f"[specialist] Auto-selected model for path='{execution_path}': {model_name}")
+    role = MODEL_BY_PATH.get(execution_path, MODEL_BY_PATH["workflow"])
+    print(f"[specialist] Auto-selected role for path='{execution_path}': {role}")
 
     # Configure model based on path
     # Reactive path: no extended thinking (faster)
     # Workflow path: enable extended thinking for complex reasoning
-    enable_thinking = execution_path == "workflow"
+    enable_thinking = execution_path == "workflow" and get_provider() == "anthropic"
 
-    llm_kwargs: dict[str, Any] = {
-        "model": model_name,
-        "max_tokens": 16000,
-    }
-
+    thinking = None
     if enable_thinking:
-        llm_kwargs["thinking"] = {
-            "type": "enabled",
-            "budget_tokens": 4096,
-        }
-        llm_kwargs["temperature"] = 1  # Required for thinking mode
-    else:
-        llm_kwargs["temperature"] = 0.1
+        thinking = {"type": "enabled", "budget_tokens": 4096}
 
-    return ChatAnthropic(**llm_kwargs), model_name
+    llm = get_llm(role=role, max_tokens=16000, thinking=thinking)
+    return llm, role
 
 
 def _sanitize_tool_name(name: str) -> str:
@@ -593,10 +502,8 @@ async def specialist_node(state: GraphState, config: RunnableConfig) -> dict:
     llm, actual_model_name = _get_model_for_execution_path(execution_path, selected_model)
 
     # Check if we're using an OpenRouter model (needs tool name sanitization)
-    # Check both user's selection and actual model name in case of auto-selection
-    is_openrouter = (
-        (selected_model and selected_model.startswith("openrouter/")) or
-        actual_model_name.startswith("openrouter/")
+    is_openrouter = get_provider() == "openrouter" or (
+        selected_model and selected_model.startswith("openrouter/")
     )
 
     # Load MCP tools for this service

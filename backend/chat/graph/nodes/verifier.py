@@ -15,8 +15,9 @@ import json
 from typing import Literal
 
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_anthropic import ChatAnthropic
 from langsmith import traceable
+
+from .llm import get_llm
 
 from ..state import GraphState
 
@@ -161,17 +162,10 @@ Verify: Does this result fully answer the user's question?
 Consider the service context when evaluating completeness.
 """
 
-    # Always use Haiku for verification to save costs
-    verification_model = "claude-3-5-haiku-20241022"
-
-    print(f"[verifier] Using model: {verification_model}", flush=True)
+    print(f"[verifier] Running verification", flush=True)
 
     try:
-        llm = ChatAnthropic(
-            model=verification_model,
-            max_tokens=500,
-            temperature=0,
-        )
+        llm = get_llm(role="haiku", max_tokens=500, temperature=0)
 
         response = await llm.ainvoke([
             SystemMessage(content=VERIFIER_PROMPT),

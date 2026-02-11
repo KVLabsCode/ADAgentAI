@@ -15,7 +15,8 @@ from typing import Optional, Any
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
-from langchain_anthropic import ChatAnthropic
+
+from ..graph.nodes.llm import get_llm
 
 from .registry import get_tool_registry
 
@@ -566,17 +567,8 @@ async def create_specialist_agent(
     print(f"[mcp_loader] Creating specialist agent for service: {service}")
 
     # Configure LLM with optional extended thinking
-    llm_kwargs: dict[str, Any] = {
-        "model": model_name,
-        "max_tokens": 8192,
-    }
-
-    if enable_thinking:
-        # Enable extended thinking for complex reasoning
-        llm_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 4096}
-        llm_kwargs["temperature"] = 1  # Required for thinking mode
-
-    llm = ChatAnthropic(**llm_kwargs)
+    thinking = {"type": "enabled", "budget_tokens": 4096} if enable_thinking else None
+    llm = get_llm(role=model_name, max_tokens=8192, thinking=thinking)
 
     # As of langchain-mcp-adapters 0.1.0, no context manager needed
     client = MultiServerMCPClient(config)

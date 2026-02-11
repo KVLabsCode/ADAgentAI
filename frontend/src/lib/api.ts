@@ -1,5 +1,5 @@
 /**
- * API client for connecting to CrewAI agent service
+ * API client for connecting to chat agent service
  */
 
 import { DEMO_ORGANIZATION } from "@/lib/demo-user";
@@ -125,7 +125,7 @@ export interface ChatContext {
 }
 
 /**
- * Stream chat responses from CrewAI agent
+ * Stream chat responses from chat agent
  */
 export async function streamChat(
   message: string,
@@ -223,7 +223,7 @@ export async function streamChat(
     console.error("[streamChat] Error:", error);
     // Provide helpful error message for connection failures
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      callbacks.onError?.(`Unable to connect to agent service at ${AGENT_URL}. Please ensure the CrewAI agent is running.`);
+      callbacks.onError?.(`Unable to connect to agent service at ${AGENT_URL}. Please ensure the chat agent is running.`);
     } else {
       callbacks.onError?.(error instanceof Error ? error.message : "Unknown error");
     }

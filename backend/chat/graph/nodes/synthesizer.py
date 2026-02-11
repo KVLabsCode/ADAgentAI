@@ -16,8 +16,9 @@ import asyncio
 from typing import Optional
 
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain_anthropic import ChatAnthropic
 from langsmith import traceable
+
+from .llm import get_llm
 
 from ..state import GraphState
 
@@ -207,16 +208,10 @@ Provide a clear, formatted response that answers the user's question.
 Include insights and next steps where appropriate.
 """
 
-    # Use the selected model for synthesis
-    model_name = state.get("selected_model", "claude-sonnet-4-20250514")
-    print(f"[synthesizer] Using model: {model_name}", flush=True)
+    print(f"[synthesizer] Generating response", flush=True)
 
     try:
-        llm = ChatAnthropic(
-            model=model_name,
-            max_tokens=2000,
-            temperature=0.3,  # Slight creativity for better formatting
-        )
+        llm = get_llm(role="sonnet", max_tokens=2000, temperature=0.3)
 
         # Get output queue from config for streaming
         config = state.get("_config", {})
