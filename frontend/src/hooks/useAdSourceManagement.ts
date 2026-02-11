@@ -69,6 +69,10 @@ export function useAdSourceManagement(providerId?: string) {
 
   // Fetch connected ad sources
   const fetchAdSources = React.useCallback(async () => {
+    if (providerId) {
+      setState(prev => ({ ...prev, isLoading: true }))
+    }
+
     try {
       const accessToken = await getAccessToken()
       if (!accessToken) {

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Suspense } from "react"
-import { useRouter, useParams, usePathname } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { ChevronLeft, Layers, Settings } from "lucide-react"
 import { Button } from "@/atoms/button" // Used for Disconnect button
 import {
@@ -38,14 +38,16 @@ const PROVIDER_INFO = {
 
 type ProviderType = "admob" | "gam"
 
-function ProviderDetailContent({ providerType }: { providerType: ProviderType }) {
+function ProviderDetailContent() {
   const router = useRouter()
+  const params = useParams<{ type: string }>()
+  const providerType = (params?.type === "admob" || params?.type === "gam") ? params.type : null
 
   // Get providers list to find the provider ID by type
   const { providers, isLoading: isLoadingProviders } = useProviderManagement()
 
   // Find the provider of this type
-  const providerEntry = providers.find(p => p.type === providerType)
+  const providerEntry = providerType ? providers.find(p => p.type === providerType) : undefined
   const providerId = providerEntry?.id
 
   // Provider detail hook - only fetch when we have a valid providerId
@@ -73,14 +75,15 @@ function ProviderDetailContent({ providerType }: { providerType: ProviderType })
   const [selectedAdSourceName, setSelectedAdSourceName] = React.useState<AdSourceName | null>(null)
 
   // Loading states:
-  // 1. Still fetching providers list → show loading
-  // 2. Have providerId, still fetching details → show loading
-  // 3. Have providerId, still fetching ad sources → show loading
-  // 4. Providers loaded but no matching provider → show "not connected"
-  const isLoading = isLoadingProviders ||
+  // 1. Params not yet resolved (client-side navigation) → show loading
+  // 2. Still fetching providers list → show loading
+  // 3. Have providerId, still fetching details → show loading
+  // 4. Have providerId, still fetching ad sources → show loading
+  // 5. Providers loaded but no matching provider → show "not connected"
+  const isLoading = !providerType || isLoadingProviders ||
     (providerId !== undefined && isLoadingDetail) ||
     (providerId !== undefined && isLoadingAdSources)
-  const providerInfo = PROVIDER_INFO[providerType]
+  const providerInfo = providerType ? PROVIDER_INFO[providerType] : null
 
   // Handle clicking connect on an ad source
   const handleAdSourceConnectClick = (adSourceName: AdSourceName) => {
@@ -125,7 +128,7 @@ function ProviderDetailContent({ providerType }: { providerType: ProviderType })
     )
   }
 
-  if (!provider) {
+  if (!provider || !providerType || !providerInfo) {
     return (
       <>
         <button
@@ -138,7 +141,7 @@ function ProviderDetailContent({ providerType }: { providerType: ProviderType })
         <PageContainer>
           <EmptyState
             icon={Settings}
-            title={`${providerInfo.name} not connected`}
+            title={`${providerInfo?.name ?? "Provider"} not connected`}
             description="Connect this provider from the Providers page to get started."
             className="py-8"
           />
@@ -253,21 +256,9 @@ function ProviderDetailLoadingSkeleton() {
 }
 
 export default function ProviderDetailPage() {
-  const params = useParams<{ type: string }>()
-  const pathname = usePathname()
-
-  // useParams may lag behind during client-side navigation transitions,
-  // so fall back to extracting the type from the URL pathname
-  const rawType = params?.type || pathname?.split("/").pop()
-  const providerType = (rawType === "admob" || rawType === "gam") ? rawType : null
-
-  if (!providerType) {
-    return <ProviderDetailLoadingSkeleton />
-  }
-
   return (
     <Suspense fallback={<ProviderDetailLoadingSkeleton />}>
-      <ProviderDetailContent providerType={providerType} />
+      <ProviderDetailContent />
     </Suspense>
   )
 }

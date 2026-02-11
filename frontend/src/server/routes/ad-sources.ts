@@ -129,20 +129,26 @@ async function isOrgAdmin(userId: string, organizationId: string | null): Promis
     return true; // Personal context
   }
 
-  const result = await db.execute(sql`
-    SELECT role FROM neon_auth.member
-    WHERE "userId" = ${userId}
-    AND "organizationId" = ${organizationId}
-    LIMIT 1
-  `);
+  try {
+    const result = await db.execute(sql`
+      SELECT role FROM neon_auth.member
+      WHERE "userId" = ${userId}
+      AND "organizationId" = ${organizationId}
+      LIMIT 1
+    `);
 
-  const rows = result.rows as Array<{ role: string }>;
-  if (!rows || rows.length === 0) {
+    const rows = result.rows as Array<{ role: string }>;
+    if (!rows || rows.length === 0) {
+      return false;
+    }
+
+    const role = rows[0].role;
+    return role === "owner" || role === "admin";
+  } catch (error) {
+    console.error("[ad-sources] isOrgAdmin query failed:", error);
+    // Fail open for personal context, fail closed for org context
     return false;
   }
-
-  const role = rows[0].role;
-  return role === "owner" || role === "admin";
 }
 
 /**
@@ -235,16 +241,26 @@ adSourcesRouter.get("/", async (c) => {
   const canManage = await isOrgAdmin(user.id, organizationId);
 
   // Mask credentials for display
-  const adSourcesWithMaskedCreds = sources.map((source) => ({
-    id: source.id,
-    adSourceName: source.adSourceName,
-    displayName: AD_SOURCE_CONFIGS[source.adSourceName as AdSourceName]?.displayName || source.adSourceName,
-    isEnabled: source.isEnabled,
-    lastVerifiedAt: source.lastVerifiedAt,
-    connectedAt: source.createdAt,
-    providerId: source.providerId,
-    maskedCredentials: maskCredentials(source.credentials as Record<string, string>),
-  }));
+  const adSourcesWithMaskedCreds = sources.map((source) => {
+    let maskedCreds: Record<string, string> = {};
+    try {
+      if (source.credentials && typeof source.credentials === "object") {
+        maskedCreds = maskCredentials(source.credentials as Record<string, string>);
+      }
+    } catch {
+      maskedCreds = {};
+    }
+    return {
+      id: source.id,
+      adSourceName: source.adSourceName,
+      displayName: AD_SOURCE_CONFIGS[source.adSourceName as AdSourceName]?.displayName || source.adSourceName,
+      isEnabled: source.isEnabled,
+      lastVerifiedAt: source.lastVerifiedAt,
+      connectedAt: source.createdAt,
+      providerId: source.providerId,
+      maskedCredentials: maskedCreds,
+    };
+  });
 
   return c.json({
     adSources: adSourcesWithMaskedCreds,

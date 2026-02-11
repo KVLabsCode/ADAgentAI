@@ -56,6 +56,8 @@ export function useProviderDetail(providerId: string | undefined) {
       return
     }
 
+    setState(prev => ({ ...prev, isLoading: true }))
+
     try {
       const accessToken = await getAccessToken()
       if (!accessToken) {
