@@ -182,7 +182,8 @@ async def {tool_name}({sig_str}) -> Dict[str, Any]:
         )
 
         try:
-            return response.json()
+            result = response.json()
+            return {{"data": result}} if isinstance(result, list) else result
         except:
             return {{
                 "status": response.status_code,
@@ -318,7 +319,8 @@ async def {tool_name}({sig_str}) -> Dict[str, Any]:
         )
 
         try:
-            return response.json()
+            result = response.json()
+            return {{"data": result}} if isinstance(result, list) else result
         except:
             return {{
                 "status": response.status_code,
