@@ -252,8 +252,7 @@ function ProviderDetailLoadingSkeleton() {
   )
 }
 
-export default function ProviderDetailPage({ params }: { params: Promise<{ type: string }> }) {
-  // Unwrap params using React.use()
+function ProviderDetailInner({ params }: { params: Promise<{ type: string }> }) {
   const resolvedParams = use(params)
   const providerType = resolvedParams.type as ProviderType
 
@@ -271,9 +270,13 @@ export default function ProviderDetailPage({ params }: { params: Promise<{ type:
     )
   }
 
+  return <ProviderDetailContent providerType={providerType} />
+}
+
+export default function ProviderDetailPage({ params }: { params: Promise<{ type: string }> }) {
   return (
     <Suspense fallback={<ProviderDetailLoadingSkeleton />}>
-      <ProviderDetailContent providerType={providerType} />
+      <ProviderDetailInner params={params} />
     </Suspense>
   )
 }
